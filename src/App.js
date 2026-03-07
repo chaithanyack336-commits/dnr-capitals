@@ -7,7 +7,7 @@ import {
 } from "recharts";
 
 // ─── PASTE YOUR GROQ API KEY HERE ────────────────────────────────────────────
-const GROQ_API_KEY = process.env.REACT_APP_GROQ_API_KEY;
+const GROQ_API_KEY = "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";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -85,6 +85,17 @@ const styles = `
   ::-webkit-scrollbar-track{background:${T.walnutDeep}}
   ::-webkit-scrollbar-thumb{background:${T.walnut};border-radius:2px}
   body{font-family:'Jost',sans-serif;background:${T.walnutDeeper};color:${T.dun}}
+
+  /* LIGHT MODE */
+  body.light{background:#f5f0e8;color:#2a2010}
+  body.light .app{background:#f5f0e8}
+  body.light .hdr{background:linear-gradient(90deg,#e8dcc8,#f0e8d8cc);border-bottom:1px solid #c9b89a44}
+  body.light .nav{background:#e8dcc8;border-bottom:1px solid #c9b89a44}
+  body.light .nb{color:#6a5a40}
+  body.light .nb.on{background:#2a2010;color:#f0e8dc}
+  body.light .card{background:#ffffff;border-color:#c9b89a33}
+  body.light .inp{background:#ffffff;border-color:#c9b89a66;color:#2a2010}
+  body.light .main{background:#f5f0e8}
 
   .app{min-height:100vh;background:${T.walnutDeeper};font-family:'Jost',sans-serif}
 
@@ -286,7 +297,97 @@ const styles = `
     .main{padding:12px}
     .ticker{display:none}
     .scr-row{grid-template-columns:1.5fr 1fr 1fr 1fr}
+    .hdr{padding:0 12px}
+    .logo-sub{display:none}
+    .hdr-controls{gap:6px}
+    .hdr-btn{padding:5px 8px;font-size:9px}
+    .nav{overflow-x:auto;padding:0 8px}
+    .nb{padding:10px 10px;font-size:10px;white-space:nowrap}
+    .hero-features{grid-template-columns:1fr}
+    .hero-stats-bar{flex-wrap:wrap;gap:8px;padding:12px}
+    .hero-stat-item{min-width:80px;border-right:none;border-bottom:1px solid ${T.gold}18;padding-bottom:8px}
+    .hero-title{font-size:clamp(36px,10vw,72px)}
+    .hero-title-accent{font-size:clamp(36px,10vw,72px)}
+    .hero-globe-ring,.hero-globe-ring2,.hero-globe-ring3{display:none}
   }
+
+  /* HEADER CONTROLS */
+  .hdr-controls{display:flex;align-items:center;gap:10px}
+  .hdr-btn{
+    padding:6px 12px;border-radius:6px;border:1px solid ${T.walnut}44;
+    background:${T.walnut}22;color:${T.dun};font-size:10px;
+    cursor:pointer;transition:all 0.2s;letter-spacing:0.5px;font-family:'Jost',sans-serif;
+  }
+  .hdr-btn:hover{background:${T.gold}22;border-color:${T.gold}66;color:${T.goldLight}}
+  .hdr-btn.active{background:${T.gold}33;border-color:${T.goldLight};color:${T.goldLight}}
+
+  /* ALERT MODAL */
+  .modal-overlay{
+    position:fixed;inset:0;background:#00000088;z-index:500;
+    display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);
+  }
+  .modal-box{
+    background:${T.walnutDeep};border:1px solid ${T.walnut}66;
+    border-radius:16px;padding:32px;width:90%;max-width:480px;
+    box-shadow:0 20px 80px #00000088;
+  }
+  .modal-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:${T.dun};margin-bottom:20px}
+  .alert-item{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;background:${T.walnutDark}88;border:1px solid ${T.walnut}33;
+    border-radius:8px;margin-bottom:8px;
+  }
+
+  /* NEWS FEED */
+  .news-card{
+    background:${T.walnutDark}88;border:1px solid ${T.walnut}33;
+    border-radius:12px;padding:20px;margin-bottom:12px;
+    transition:all 0.2s;cursor:pointer;
+  }
+  .news-card:hover{border-color:${T.gold}44;background:${T.walnut}22}
+  .news-tag{
+    display:inline-block;padding:3px 10px;border-radius:12px;
+    font-size:9px;letter-spacing:2px;text-transform:uppercase;
+    background:${T.gold}22;color:${T.goldLight};margin-bottom:10px;
+  }
+  .news-headline{font-size:15px;font-weight:600;color:${T.dun};line-height:1.4;margin-bottom:8px}
+  .news-summary{font-size:12px;color:${T.muted};line-height:1.7}
+  .news-meta{font-size:10px;color:${T.walnutLight};margin-top:10px}
+
+  /* IPO TRACKER */
+  .ipo-card{
+    background:${T.walnutDark}88;border:1px solid ${T.walnut}33;
+    border-radius:12px;padding:20px;
+    transition:border-color 0.2s;
+  }
+  .ipo-card:hover{border-color:${T.gold}44}
+  .ipo-status{
+    display:inline-block;padding:3px 12px;border-radius:12px;
+    font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;
+    margin-bottom:12px;
+  }
+  .ipo-open{background:#22c55e22;color:#22c55e;border:1px solid #22c55e44}
+  .ipo-upcoming{background:${T.gold}22;color:${T.goldLight};border:1px solid ${T.gold}44}
+  .ipo-closed{background:#64748b22;color:#94a3b8;border:1px solid #64748b44}
+  .ipo-listed{background:#3b82f622;color:#60a5fa;border:1px solid #3b82f644}
+
+  /* FII DII */
+  .fii-bar-wrap{background:${T.walnutDeeper};border-radius:8px;overflow:hidden;height:10px;margin:8px 0}
+  .fii-bar{height:100%;border-radius:8px;transition:width 0.8s ease}
+
+  /* SECTOR ROTATION */
+  .sector-card{
+    background:${T.walnutDark}88;border:1px solid ${T.walnut}33;
+    border-radius:12px;padding:18px;cursor:pointer;transition:all 0.2s;
+  }
+  .sector-card:hover{border-color:${T.gold}44;transform:translateY(-2px)}
+  .sector-heat{
+    width:100%;height:6px;border-radius:3px;margin-top:10px;
+  }
+
+  /* LANGUAGE */
+  .lang-hi{font-family:'Noto Sans Devanagari',sans-serif}
+
 
   /* HOME PAGE — PREMIUM CINEMATIC */
   .home-hero{
@@ -1431,27 +1532,360 @@ function Legends() {
   );
 }
 
+// ─── NEWS FEED ────────────────────────────────────────────────────────────────
+function NewsFeed() {
+  const [news, setNews] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [topic, setTopic] = useState("Indian stock market");
+  const topics = ["Indian stock market","NIFTY 50","Banking sector","IT sector","Auto sector","Pharma sector","Real Estate","Global markets","RBI Policy","Budget 2025"];
+
+  const fetchNews = async (t) => {
+    setLoading(true);
+    const raw = await callGroq(`Generate 8 realistic current financial news articles about "${t}". Return ONLY JSON array: [{"headline":"...","summary":"...","tag":"...","sentiment":"bullish|bearish|neutral","time":"X hours ago","impact":"High|Medium|Low"}]`, "Return only valid JSON array.", null);
+    try {
+      const clean = raw.replace(/```json|```/g,"").trim();
+      setNews(JSON.parse(clean));
+    } catch(e) { setNews([]); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchNews(topic); }, []);
+
+  const sentColor = s => s==="bullish" ? T.green : s==="bearish" ? T.red : T.muted;
+
+  return (
+    <div>
+      <div className="ph"><h1 className="pt">📰 Market News Feed</h1><p className="ps">AI-curated financial news & sentiment analysis</p></div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20}}>
+        {topics.map(t => <button key={t} className={`hdr-btn ${topic===t?"active":""}`} onClick={() => { setTopic(t); fetchNews(t); }}>{t}</button>)}
+      </div>
+      {loading ? <div className="loading"><div className="spin"/><span>Fetching latest news...</span></div> :
+        <div className="g2">
+          {news.map((n,i) => (
+            <div key={i} className="news-card">
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                <span className="news-tag">{n.tag}</span>
+                <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:sentColor(n.sentiment)+"22",color:sentColor(n.sentiment),border:`1px solid ${sentColor(n.sentiment)}44`}}>{n.sentiment}</span>
+              </div>
+              <div className="news-headline">{n.headline}</div>
+              <div className="news-summary">{n.summary}</div>
+              <div className="news-meta" style={{display:"flex",justifyContent:"space-between"}}>
+                <span>🕐 {n.time}</span>
+                <span style={{color:n.impact==="High"?T.goldLight:T.muted}}>Impact: {n.impact}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      }
+    </div>
+  );
+}
+
+// ─── IPO TRACKER ──────────────────────────────────────────────────────────────
+const IPO_DATA = [
+  {name:"Ather Energy",price:"₹304-321",open:"12 Mar",close:"14 Mar",size:"₹2,981 Cr",gmp:"+₹45",status:"upcoming",sector:"EV",rating:"⭐⭐⭐⭐"},
+  {name:"HDB Financial",price:"₹700-740",open:"25 Mar",close:"27 Mar",size:"₹12,500 Cr",gmp:"+₹120",status:"upcoming",sector:"NBFC",rating:"⭐⭐⭐⭐⭐"},
+  {name:"Ola Electric",price:"₹72-76",open:"Closed",close:"Closed",size:"₹6,145 Cr",gmp:"-₹12",status:"listed",sector:"EV",rating:"⭐⭐⭐"},
+  {name:"Bajaj Housing",price:"₹66-70",open:"Closed",close:"Closed",size:"₹6,560 Cr",gmp:"+₹58",status:"listed",sector:"Finance",rating:"⭐⭐⭐⭐⭐"},
+  {name:"Premier Energies",price:"₹427-450",open:"Closed",close:"Closed",size:"₹2,830 Cr",gmp:"+₹35",status:"listed",sector:"Solar",rating:"⭐⭐⭐⭐"},
+  {name:"Shadowfax Tech",price:"₹338-355",open:"5 Apr",close:"7 Apr",size:"₹2,100 Cr",gmp:"+₹28",status:"upcoming",sector:"Logistics",rating:"⭐⭐⭐"},
+  {name:"Vishal Mega Mart",price:"₹74-78",open:"Closed",close:"Closed",size:"₹8,000 Cr",gmp:"+₹15",status:"listed",sector:"Retail",rating:"⭐⭐⭐"},
+  {name:"NTPC Green",price:"₹102-108",open:"Closed",close:"Closed",size:"₹10,000 Cr",gmp:"+₹22",status:"listed",sector:"Green Energy",rating:"⭐⭐⭐⭐"},
+];
+
+function IPOTracker() {
+  const [filter, setFilter] = useState("all");
+  const [analysis, setAnalysis] = useState({});
+  const [loadingId, setLoadingId] = useState(null);
+
+  const filtered = filter === "all" ? IPO_DATA : IPO_DATA.filter(i => i.status === filter);
+
+  const analyzeIPO = async (ipo) => {
+    setLoadingId(ipo.name);
+    const raw = await callGroq(`Analyze IPO: ${ipo.name}, Sector: ${ipo.sector}, Price: ${ipo.price}, Size: ${ipo.size}, GMP: ${ipo.gmp}. Give: 1) Subscription recommendation (Subscribe/Avoid/Neutral) 2) Key positives (2 points) 3) Key risks (2 points) 4) Listing gain expectation. Keep it concise.`, SYS, null);
+    setAnalysis(prev => ({...prev, [ipo.name]: raw}));
+    setLoadingId(null);
+  };
+
+  const statusClass = s => s==="open"?"ipo-open":s==="upcoming"?"ipo-upcoming":s==="closed"?"ipo-closed":"ipo-listed";
+
+  return (
+    <div>
+      <div className="ph"><h1 className="pt">🏦 IPO Tracker</h1><p className="ps">Track upcoming & recent IPOs with AI analysis</p></div>
+      <div style={{display:"flex",gap:8,marginBottom:20}}>
+        {["all","upcoming","open","listed"].map(f => <button key={f} className={`hdr-btn ${filter===f?"active":""}`} onClick={() => setFilter(f)}>{f.charAt(0).toUpperCase()+f.slice(1)}</button>)}
+      </div>
+      <div className="g2">
+        {filtered.map(ipo => (
+          <div key={ipo.name} className="ipo-card">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div>
+                <span className={`ipo-status ${statusClass(ipo.status)}`}>{ipo.status.toUpperCase()}</span>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:700,color:T.dun,marginBottom:4}}>{ipo.name}</div>
+                <div style={{fontSize:11,color:T.muted}}>{ipo.sector} · {ipo.size}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:13,fontWeight:600,color:T.goldLight}}>{ipo.price}</div>
+                <div style={{fontSize:11,color:ipo.gmp.startsWith("+") ? T.green : T.red}}>GMP {ipo.gmp}</div>
+                <div style={{fontSize:12}}>{ipo.rating}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:16,margin:"12px 0",fontSize:11,color:T.muted}}>
+              <span>📅 Open: {ipo.open}</span><span>📅 Close: {ipo.close}</span>
+            </div>
+            {analysis[ipo.name] ? (
+              <div style={{fontSize:12,color:T.dun,lineHeight:1.7,background:T.walnutDeeper+"88",padding:12,borderRadius:8,marginTop:8}} dangerouslySetInnerHTML={{__html:analysis[ipo.name].replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>")}}/>
+            ) : (
+              <button className="btn-ghost" style={{width:"100%",marginTop:8,fontSize:12}} onClick={() => analyzeIPO(ipo)} disabled={loadingId===ipo.name}>
+                {loadingId===ipo.name ? "🤖 Analyzing..." : "🤖 AI Analysis"}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── FII DII DATA ─────────────────────────────────────────────────────────────
+function FIIDIITracker() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const FII_MONTHLY = [
+    {month:"Oct 24",fii:-94017,dii:107254},{month:"Nov 24",fii:-45974,dii:54626},
+    {month:"Dec 24",fii:-16982,dii:25487},{month:"Jan 25",fii:-87374,dii:92543},
+    {month:"Feb 25",fii:-34254,dii:41832},{month:"Mar 25",fii:12543,dii:8921},
+  ];
+
+  const fetchAnalysis = async () => {
+    setLoading(true);
+    const raw = await callGroq(`Analyze FII/DII activity: Recent data shows FIIs sold ₹87,374 Cr in Jan 2025, ₹34,254 Cr in Feb 2025 but turned buyers in Mar 2025 with ₹12,543 Cr. DIIs have been consistently buying. Analyze: 1) What this means for Indian markets 2) Sectors FIIs are targeting 3) Outlook for next quarter. Be specific with data points.`, SYS, null);
+    setData(raw);
+    setLoading(false);
+  };
+
+  const maxVal = Math.max(...FII_MONTHLY.map(d => Math.max(Math.abs(d.fii), d.dii)));
+
+  return (
+    <div>
+      <div className="ph"><h1 className="pt">🌐 FII / DII Activity</h1><p className="ps">Foreign & Domestic Institutional Investor flow analysis</p></div>
+
+      <div className="g2" style={{marginBottom:24}}>
+        <div className="card">
+          <div className="sec-hdr">Monthly FII Activity (₹ Cr)</div>
+          {FII_MONTHLY.map(d => (
+            <div key={d.month} style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
+                <span style={{color:T.muted}}>{d.month}</span>
+                <span style={{color:d.fii>0?T.green:T.red,fontWeight:600}}>{d.fii>0?"+":""}{(d.fii/100).toFixed(0)} Cr</span>
+              </div>
+              <div className="fii-bar-wrap">
+                <div className="fii-bar" style={{width:`${Math.abs(d.fii)/maxVal*100}%`,background:d.fii>0?"linear-gradient(90deg,#22c55e,#16a34a)":"linear-gradient(90deg,#ef4444,#dc2626)"}}/>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="card">
+          <div className="sec-hdr">Monthly DII Activity (₹ Cr)</div>
+          {FII_MONTHLY.map(d => (
+            <div key={d.month} style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
+                <span style={{color:T.muted}}>{d.month}</span>
+                <span style={{color:T.green,fontWeight:600}}>+{(d.dii/100).toFixed(0)} Cr</span>
+              </div>
+              <div className="fii-bar-wrap">
+                <div className="fii-bar" style={{width:`${d.dii/maxVal*100}%`,background:"linear-gradient(90deg,#C9A84C,#a08030)"}}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{marginBottom:20}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,textAlign:"center"}}>
+          {[{l:"FII Mar 2025",v:"₹12,543 Cr",c:T.green,s:"Net Buyer ▲"},
+            {l:"DII Mar 2025",v:"₹8,921 Cr",c:T.goldLight,s:"Net Buyer ▲"},
+            {l:"FII YTD 2025",v:"-₹1,08,085 Cr",c:T.red,s:"Net Seller ▼"},
+            {l:"DII YTD 2025",v:"₹1,43,296 Cr",c:T.green,s:"Net Buyer ▲"}
+          ].map(s => (
+            <div key={s.l} style={{padding:16,background:T.walnutDeeper+"88",borderRadius:10,border:`1px solid ${T.walnut}33`}}>
+              <div style={{fontSize:10,color:T.muted,marginBottom:6}}>{s.l}</div>
+              <div style={{fontSize:16,fontWeight:700,color:s.c,fontFamily:"'DM Mono',monospace"}}>{s.v}</div>
+              <div style={{fontSize:10,color:s.c,marginTop:4}}>{s.s}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button className="btn-gold" onClick={fetchAnalysis} disabled={loading} style={{marginBottom:16}}>
+        {loading ? "🤖 Analyzing..." : "🤖 Get AI Flow Analysis"}
+      </button>
+      {data && <div className="res-box" style={{fontSize:13,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:data.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>")}}/>}
+    </div>
+  );
+}
+
+// ─── SECTOR ROTATION ──────────────────────────────────────────────────────────
+function SectorRotation() {
+  const [analysis, setAnalysis] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState(null);
+
+  const SECTORS = [
+    {name:"Banking & Finance",perf:"+2.8%",momentum:"Strong",heat:85,color:"#22c55e",icon:"🏦",desc:"NIM expansion, credit growth"},
+    {name:"Information Technology",perf:"-1.2%",momentum:"Weak",heat:25,color:"#ef4444",icon:"💻",desc:"US slowdown concerns, deal wins"},
+    {name:"Auto & EV",perf:"+4.1%",momentum:"Very Strong",heat:92,color:"#22c55e",icon:"🚗",desc:"Volume growth, EV transition"},
+    {name:"Pharma & Healthcare",perf:"+1.9%",momentum:"Moderate",heat:60,color:"#f59e0b",icon:"💊",desc:"US FDA approvals, domestic growth"},
+    {name:"Real Estate",perf:"+3.4%",momentum:"Strong",heat:80,color:"#22c55e",icon:"🏗️",desc:"Residential demand, luxury segment"},
+    {name:"Capital Goods",perf:"+2.1%",momentum:"Moderate",heat:65,color:"#f59e0b",icon:"⚙️",desc:"Infra push, order books"},
+    {name:"FMCG",perf:"-0.8%",momentum:"Weak",heat:30,color:"#ef4444",icon:"🛒",desc:"Rural slowdown, margin pressure"},
+    {name:"Energy & Power",perf:"+5.2%",momentum:"Very Strong",heat:95,color:"#22c55e",icon:"⚡",desc:"Renewable push, power demand"},
+    {name:"Metals & Mining",perf:"-2.1%",momentum:"Bearish",heat:15,color:"#ef4444",icon:"⛏️",desc:"China slowdown, commodity prices"},
+    {name:"Telecom",perf:"+1.5%",momentum:"Moderate",heat:55,color:"#f59e0b",icon:"📡",desc:"ARPU growth, 5G rollout"},
+    {name:"Consumer Durables",perf:"+1.1%",momentum:"Moderate",heat:50,color:"#f59e0b",icon:"📺",desc:"Summer demand, AC season"},
+    {name:"Cement & Construction",perf:"+3.8%",momentum:"Strong",heat:78,color:"#22c55e",icon:"🏛️",desc:"Infra spending, housing demand"},
+  ];
+
+  const analyzeSector = async (sector) => {
+    setSelected(sector);
+    setLoading(true);
+    const raw = await callGroq(`Deep dive analysis for ${sector.name} sector in Indian markets. Current performance: ${sector.perf}, Momentum: ${sector.momentum}. Provide: 1) Key drivers for current performance 2) Top 3 stocks to watch with brief reasoning 3) Key risks 4) 3-6 month outlook. Be specific with stock names and data.`, SYS, null);
+    setAnalysis(raw);
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="ph"><h1 className="pt">🔄 Sector Rotation Tracker</h1><p className="ps">Real-time sector momentum & rotation analysis</p></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12,marginBottom:24}}>
+        {SECTORS.map(s => (
+          <div key={s.name} className="sector-card" onClick={() => analyzeSector(s)} style={{border:`1px solid ${selected?.name===s.name ? T.goldLight : T.walnut+"33"}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <span style={{fontSize:20}}>{s.icon}</span>
+              <span style={{fontSize:13,fontWeight:700,color:s.color}}>{s.perf}</span>
+            </div>
+            <div style={{fontSize:13,fontWeight:600,color:T.dun,marginBottom:4}}>{s.name}</div>
+            <div style={{fontSize:11,color:T.muted,marginBottom:8}}>{s.desc}</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:10}}>
+              <span style={{color:s.color}}>{s.momentum}</span>
+              <span style={{color:T.muted}}>Heat: {s.heat}%</span>
+            </div>
+            <div className="fii-bar-wrap"><div className="fii-bar" style={{width:`${s.heat}%`,background:`linear-gradient(90deg,${s.color}88,${s.color})`}}/></div>
+          </div>
+        ))}
+      </div>
+      {selected && (
+        <div className="card">
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+            <span style={{fontSize:24}}>{selected.icon}</span>
+            <div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:700,color:T.dun}}>{selected.name}</div>
+              <div style={{fontSize:11,color:T.muted}}>Click any sector card to analyze</div>
+            </div>
+          </div>
+          {loading ? <div className="loading"><div className="spin"/><span>Analyzing sector...</span></div> :
+            analysis && <div className="res-box" style={{fontSize:13,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:analysis.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>")}}/>
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PRICE ALERTS ─────────────────────────────────────────────────────────────
+function PriceAlerts({ onClose }) {
+  const [alerts, setAlerts] = useState([
+    {stock:"RELIANCE",price:"1280",type:"above",active:true},
+    {stock:"TCS",price:"3900",type:"below",active:true},
+    {stock:"HDFC BANK",price:"1750",type:"above",active:false},
+  ]);
+  const [newStock, setNewStock] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newType, setNewType] = useState("above");
+
+  const addAlert = () => {
+    if (!newStock || !newPrice) return;
+    setAlerts(prev => [...prev, {stock:newStock.toUpperCase(),price:newPrice,type:newType,active:true}]);
+    setNewStock(""); setNewPrice("");
+  };
+
+  const toggleAlert = (i) => setAlerts(prev => prev.map((a,idx) => idx===i ? {...a,active:!a.active} : a));
+  const removeAlert = (i) => setAlerts(prev => prev.filter((_,idx) => idx!==i));
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target.className==="modal-overlay" && onClose()}>
+      <div className="modal-box">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <div className="modal-title">🔔 Price Alerts</div>
+          <button className="hdr-btn" onClick={onClose}>✕ Close</button>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:20}}>
+          <input className="inp" placeholder="Stock (e.g. NIFTY)" value={newStock} onChange={e => setNewStock(e.target.value)} style={{flex:1}}/>
+          <input className="inp" placeholder="₹ Price" value={newPrice} onChange={e => setNewPrice(e.target.value)} style={{width:100}}/>
+          <select className="inp" value={newType} onChange={e => setNewType(e.target.value)} style={{width:90}}>
+            <option value="above">Above</option>
+            <option value="below">Below</option>
+          </select>
+          <button className="btn-gold" style={{padding:"8px 16px",fontSize:12}} onClick={addAlert}>+ Add</button>
+        </div>
+        {alerts.map((a,i) => (
+          <div key={i} className="alert-item" style={{opacity:a.active?1:0.5}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:600,color:T.dun}}>{a.stock}</div>
+              <div style={{fontSize:11,color:a.type==="above"?T.green:T.red}}>Alert when {a.type} ₹{a.price}</div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button className="hdr-btn" style={{fontSize:10}} onClick={() => toggleAlert(i)}>{a.active?"⏸ Pause":"▶ Resume"}</button>
+              <button className="hdr-btn" style={{fontSize:10,color:T.red}} onClick={() => removeAlert(i)}>🗑</button>
+            </div>
+          </div>
+        ))}
+        {alerts.length === 0 && <div style={{textAlign:"center",color:T.muted,padding:20,fontSize:13}}>No alerts set. Add one above!</div>}
+      </div>
+    </div>
+  );
+}
+
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
+  const [darkMode, setDarkMode] = useState(true);
+  const [lang, setLang] = useState("EN");
+  const [showAlerts, setShowAlerts] = useState(false);
+
+  useEffect(() => {
+    document.body.className = darkMode ? "" : "light";
+  }, [darkMode]);
+
+  const LABELS = {
+    EN: { home:"Home", markets:"Markets", research:"Deep Research", technical:"Technical Charts", quarterly:"Quarterly Hub", screener:"Screener", watchlist:"Watchlists", portfolio:"Portfolio", legends:"Legends", news:"News Feed", ipo:"IPO Tracker", fii:"FII / DII", sector:"Sector Rotation" },
+    HI: { home:"होम", markets:"बाज़ार", research:"गहरी रिसर्च", technical:"टेक्निकल", quarterly:"तिमाही", screener:"स्क्रीनर", watchlist:"वॉचलिस्ट", portfolio:"पोर्टफोलियो", legends:"दिग्गज", news:"समाचार", ipo:"IPO", fii:"FII/DII", sector:"सेक्टर" }
+  };
+  const L = LABELS[lang];
+
   const tabs = [
-    { id: "home", icon: "🏠", label: "Home" },
-    { id: "markets", icon: "📊", label: "Markets" },
-    { id: "research", icon: "🔬", label: "Deep Research" },
-    { id: "technical", icon: "📈", label: "Technical Charts" },
-    { id: "quarterly", icon: "📋", label: "Quarterly Hub" },
-    { id: "screener", icon: "🔍", label: "Screener" },
-    { id: "watchlist", icon: "⭐", label: "Watchlists" },
-    { id: "portfolio", icon: "💼", label: "Portfolio" },
-    { id: "legends", icon: "🏛️", label: "Legends" },
+    { id:"markets", icon:"📊", label:L.markets },
+    { id:"research", icon:"🔬", label:L.research },
+    { id:"technical", icon:"📈", label:L.technical },
+    { id:"news", icon:"📰", label:L.news },
+    { id:"ipo", icon:"🏦", label:L.ipo },
+    { id:"fii", icon:"🌐", label:L.fii },
+    { id:"sector", icon:"🔄", label:L.sector },
+    { id:"quarterly", icon:"📋", label:L.quarterly },
+    { id:"screener", icon:"🔍", label:L.screener },
+    { id:"watchlist", icon:"⭐", label:L.watchlist },
+    { id:"portfolio", icon:"💼", label:L.portfolio },
+    { id:"legends", icon:"🏛️", label:L.legends },
   ];
 
   return (
     <>
       <style>{styles}</style>
+      {showAlerts && <PriceAlerts onClose={() => setShowAlerts(false)} />}
       <div className="app">
         <header className="hdr">
-          <div className="logo">
+          <div className="logo" style={{cursor:"pointer"}} onClick={() => setActiveTab("home")}>
             <div className="logo-mark">D</div>
             <div>
               <div className="logo-title">DNR Capitals</div>
@@ -1461,47 +1895,60 @@ export default function App() {
           <div className="ticker">
             <div className="ticker-inner">
               {[...TICKERS, ...TICKERS].map((t, i) => (
-                <span key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ color: T.muted }}>{t.s}</span>
-                  <span style={{ color: T.dun, fontWeight: 600 }}>{t.v}</span>
-                  <span style={{ color: t.u ? T.green : T.red }}>{t.u ? "▲" : "▼"} {t.c}</span>
+                <span key={i} style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ color:T.muted }}>{t.s}</span>
+                  <span style={{ color:T.dun, fontWeight:600 }}>{t.v}</span>
+                  <span style={{ color:t.u ? T.green : T.red }}>{t.u ? "▲" : "▼"} {t.c}</span>
                 </span>
               ))}
             </div>
           </div>
-          <div style={{ fontSize: 10, color: T.muted, textAlign: "right" }}>
-            <div style={{ color: T.goldLight, marginBottom: 2 }}>● LIVE</div>
-            <div>{new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+          <div className="hdr-controls">
+            <button className="hdr-btn" onClick={() => setShowAlerts(true)}>🔔 Alerts</button>
+            <button className={`hdr-btn ${lang==="HI"?"active":""}`} onClick={() => setLang(l => l==="EN"?"HI":"EN")}>
+              {lang==="EN" ? "🇮🇳 हिंदी" : "🇬🇧 English"}
+            </button>
+            <button className="hdr-btn" onClick={() => setDarkMode(d => !d)}>
+              {darkMode ? "☀️ Light" : "🌙 Dark"}
+            </button>
+            <div style={{ fontSize:10, color:T.muted, textAlign:"right" }}>
+              <div style={{ color:T.goldLight, marginBottom:2 }}>● LIVE</div>
+              <div>{new Date().toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" })}</div>
+            </div>
           </div>
         </header>
 
         <nav className="nav">
-          {tabs.map(t => <button key={t.id} className={`nb ${activeTab === t.id ? "on" : ""}`} onClick={() => setActiveTab(t.id)}>{t.icon} {t.label}</button>)}
+          {tabs.map(t => <button key={t.id} className={`nb ${activeTab===t.id ? "on" : ""}`} onClick={() => setActiveTab(t.id)}>{t.icon} {t.label}</button>)}
         </nav>
 
         {activeTab !== "home" && (
           <main className="main">
             {GROQ_API_KEY === "YOUR_KEY_HERE" && (
               <div className="api-warn">
-                <span style={{ fontSize: 22 }}>⚠️</span>
-                <div><strong style={{ color: T.goldLight }}>Groq API Key Required</strong><br />Open DNRCapitalsV2.jsx, find line 8, replace <code>PASTE_YOUR_GROQ_API_KEY_HERE</code> with your free key from <strong>console.groq.com</strong></div>
+                <span style={{ fontSize:22 }}>⚠️</span>
+                <div><strong style={{ color:T.goldLight }}>Groq API Key Required</strong><br />Add REACT_APP_GROQ_API_KEY to your environment variables.</div>
               </div>
             )}
-            {activeTab === "markets" && <Markets />}
-            {activeTab === "research" && <StockResearch />}
+            {activeTab === "markets"   && <Markets />}
+            {activeTab === "research"  && <StockResearch />}
             {activeTab === "technical" && <TechnicalCharts />}
+            {activeTab === "news"      && <NewsFeed />}
+            {activeTab === "ipo"       && <IPOTracker />}
+            {activeTab === "fii"       && <FIIDIITracker />}
+            {activeTab === "sector"    && <SectorRotation />}
             {activeTab === "quarterly" && <QuarterlyHub />}
-            {activeTab === "screener" && <Screener />}
+            {activeTab === "screener"  && <Screener />}
             {activeTab === "watchlist" && <WatchlistManager />}
             {activeTab === "portfolio" && <Portfolio />}
-            {activeTab === "legends" && <Legends />}
+            {activeTab === "legends"   && <Legends />}
           </main>
         )}
         {activeTab === "home" && <HomePage setActiveTab={setActiveTab} />}
 
-        <footer style={{ borderTop: `1px solid ${T.walnut}33`, padding: "10px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", background: T.walnutDeeper + "cc", fontSize: 10, color: T.muted }}>
+        <footer style={{ borderTop:`1px solid ${T.walnut}33`, padding:"10px 24px", display:"flex", justifyContent:"space-between", alignItems:"center", background:T.walnutDeeper+"cc", fontSize:10, color:T.muted }}>
           <span>© {new Date().getFullYear()} DNR Capitals · Equity Research Intelligence</span>
-          <span style={{ color: T.walnutLight }}>Powered by Groq AI · For educational purposes only · Not SEBI registered advice</span>
+          <span style={{ color:T.walnutLight }}>Powered by Groq AI · For educational purposes only · Not SEBI registered advice</span>
         </footer>
       </div>
     </>
