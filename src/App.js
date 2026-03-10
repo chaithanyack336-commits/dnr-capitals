@@ -1847,6 +1847,325 @@ function PriceAlerts({ onClose }) {
   );
 }
 
+// ─── INSTITUTIONAL MOMENTUM TRACKER ──────────────────────────────────────────
+function InstitutionalMomentum() {
+  const [stocks, setStocks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [view, setView] = useState("weekly");
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailData, setDetailData] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [history, setHistory] = useState({});
+
+  // Load saved data from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("dnr_inst_stocks");
+      const savedHistory = localStorage.getItem("dnr_inst_history");
+      const savedTime = localStorage.getItem("dnr_inst_updated");
+      if (saved) setStocks(JSON.parse(saved));
+      if (savedHistory) setHistory(JSON.parse(savedHistory));
+      if (savedTime) setLastUpdated(savedTime);
+    } catch(e) {}
+  }, []);
+
+  const fetchStocks = async (period) => {
+    setLoading(true);
+    const prompt = `Generate a list of 20 Indian stocks (NSE listed) where institutional investors (Mutual Funds, FIIs, DIIs) have been INCREASING their holdings over the last 2-3 quarters as of early 2025. Focus on stocks with strong and rising institutional momentum.
+
+Return ONLY a valid JSON array with exactly this structure:
+[{
+  "stock": "STOCK NAME",
+  "symbol": "NSE_SYMBOL",
+  "sector": "Sector Name",
+  "price": "₹XXX",
+  "mf_q1": 12.4,
+  "mf_q2": 13.8,
+  "mf_q3": 15.2,
+  "fii_q1": 18.2,
+  "fii_q2": 19.5,
+  "fii_q3": 21.0,
+  "dii_q1": 22.1,
+  "dii_q2": 23.4,
+  "dii_q3": 25.0,
+  "q1_label": "Q2FY24",
+  "q2_label": "Q3FY24",
+  "q3_label": "Q4FY24",
+  "momentum_score": 87,
+  "signal": "Strong Buy",
+  "reason": "Brief reason why institutions are buying"
+}]
+
+momentum_score should be 60-100 for stocks with rising institutional holdings. signal should be one of: "Strong Buy", "Buy", "Accumulate". Make the data realistic and varied across sectors like Banking, IT, Auto, Pharma, FMCG, Energy, Capital Goods.`;
+
+    const raw = await callGroq(prompt, "Return only valid JSON array. No markdown, no explanation.", null);
+    try {
+      const clean = raw.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(clean);
+      setStocks(parsed);
+
+      // Save to localStorage with timestamp
+      const now = new Date().toLocaleString("en-IN");
+      localStorage.setItem("dnr_inst_stocks", JSON.stringify(parsed));
+      localStorage.setItem("dnr_inst_updated", now);
+
+      // Save to history
+      const newHistory = {...history, [now]: parsed.map(s => ({symbol:s.symbol, mf:s.mf_q3, fii:s.fii_q3, dii:s.dii_q3, score:s.momentum_score}))};
+      setHistory(newHistory);
+      localStorage.setItem("dnr_inst_history", JSON.stringify(newHistory));
+      setLastUpdated(now);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const getDetail = async (stock) => {
+    setSelectedStock(stock);
+    setDetailLoading(true);
+    setDetailData(null);
+    const prompt = `Deep institutional analysis for ${stock.stock} (${stock.symbol}):
+    
+Current Holdings:
+- Mutual Funds: Q1: ${stock.mf_q1}% → Q2: ${stock.mf_q2}% → Q3: ${stock.mf_q3}% (▲${(stock.mf_q3-stock.mf_q1).toFixed(1)}%)
+- FIIs: Q1: ${stock.fii_q1}% → Q2: ${stock.fii_q2}% → Q3: ${stock.fii_q3}% (▲${(stock.fii_q3-stock.fii_q1).toFixed(1)}%)
+- DIIs: Q1: ${stock.dii_q1}% → Q2: ${stock.dii_q2}% → Q3: ${stock.dii_q3}% (▲${(stock.dii_q3-stock.dii_q1).toFixed(1)}%)
+
+Provide:
+1. **Why institutions are accumulating** - specific business reasons
+2. **Key mutual funds holding this stock** - name top 3-4 funds
+3. **FII activity** - which foreign funds and why
+4. **Business catalysts** - what's driving this stock
+5. **Target price** - institutional consensus target
+6. **Risk factors** - what could reverse this trend
+7. **Verdict** - Should retail investors follow institutions here?`;
+
+    const raw = await callGroq(prompt, SYS, null);
+    setDetailData(raw);
+    setDetailLoading(false);
+  };
+
+  const getMomentumColor = (score) => {
+    if (score >= 85) return "#22c55e";
+    if (score >= 70) return T.goldLight;
+    return T.muted;
+  };
+
+  const getMFChange = (s) => (s.mf_q3 - s.mf_q1).toFixed(1);
+  const getFIIChange = (s) => (s.fii_q3 - s.fii_q1).toFixed(1);
+  const getDIIChange = (s) => (s.dii_q3 - s.dii_q1).toFixed(1);
+
+  const filtered = filter === "all" ? stocks :
+    filter === "mf" ? [...stocks].sort((a,b) => (b.mf_q3-b.mf_q1)-(a.mf_q3-a.mf_q1)) :
+    filter === "fii" ? [...stocks].sort((a,b) => (b.fii_q3-b.fii_q1)-(a.fii_q3-a.fii_q1)) :
+    filter === "dii" ? [...stocks].sort((a,b) => (b.dii_q3-b.dii_q1)-(a.dii_q3-a.dii_q1)) :
+    [...stocks].sort((a,b) => b.momentum_score - a.momentum_score);
+
+  const MiniBar = ({v1,v2,v3,color}) => {
+    const max = Math.max(v1,v2,v3);
+    return (
+      <div style={{display:"flex",gap:3,alignItems:"flex-end",height:28}}>
+        {[v1,v2,v3].map((v,i) => (
+          <div key={i} style={{width:10,borderRadius:"2px 2px 0 0",background:i===2?color:color+"55",height:`${(v/max)*100}%`,minHeight:4,transition:"height 0.5s"}}/>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div className="ph">
+        <h1 className="pt">🏦 Institutional Momentum Tracker</h1>
+        <p className="ps">Stocks where MF · FII · DII holdings are consistently increasing — follow the smart money</p>
+      </div>
+
+      {/* Controls */}
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20,alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button className={`hdr-btn ${filter==="all"?"active":""}`} onClick={() => setFilter("all")}>📊 All</button>
+          <button className={`hdr-btn ${filter==="score"?"active":""}`} onClick={() => setFilter("score")}>🔥 Top Momentum</button>
+          <button className={`hdr-btn ${filter==="mf"?"active":""}`} onClick={() => setFilter("mf")}>💛 MF Rising</button>
+          <button className={`hdr-btn ${filter==="fii"?"active":""}`} onClick={() => setFilter("fii")}>🌐 FII Rising</button>
+          <button className={`hdr-btn ${filter==="dii"?"active":""}`} onClick={() => setFilter("dii")}>🏦 DII Rising</button>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {lastUpdated && <span style={{fontSize:10,color:T.muted}}>Last updated: {lastUpdated}</span>}
+          <button className="btn-gold" style={{padding:"8px 20px",fontSize:12}} onClick={() => fetchStocks(view)} disabled={loading}>
+            {loading ? "⏳ Updating..." : "🔄 Update Now"}
+          </button>
+        </div>
+      </div>
+
+      {/* Auto-update schedule info */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
+        {[
+          {icon:"📅",title:"Weekly Update",desc:"Every Monday — Track short-term institutional momentum shifts",action:"weekly"},
+          {icon:"📆",title:"Monthly Update",desc:"1st of every month — Monitor accumulation trends",action:"monthly"},
+          {icon:"🗓️",title:"Quarterly Update",desc:"After results season — Full shareholding pattern analysis",action:"quarterly"},
+        ].map(u => (
+          <div key={u.title} className="card" style={{textAlign:"center",cursor:"pointer",transition:"all 0.2s",border:`1px solid ${view===u.action?T.goldLight:T.walnut+"33"}`}} onClick={() => { setView(u.action); fetchStocks(u.action); }}>
+            <div style={{fontSize:28,marginBottom:8}}>{u.icon}</div>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:16,fontWeight:700,color:T.dun,marginBottom:6}}>{u.title}</div>
+            <div style={{fontSize:11,color:T.muted,lineHeight:1.6}}>{u.desc}</div>
+          </div>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="loading"><div className="spin"/><span>AI scanning institutional holdings across 5,000+ stocks...</span></div>
+      ) : stocks.length === 0 ? (
+        <div style={{textAlign:"center",padding:"60px 20px"}}>
+          <div style={{fontSize:48,marginBottom:16}}>🏦</div>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,color:T.dun,marginBottom:8}}>Track Smart Money</div>
+          <div style={{color:T.muted,fontSize:13,marginBottom:24}}>Click "Update Now" to find stocks where institutions are building positions</div>
+          <button className="btn-gold" style={{padding:"12px 32px"}} onClick={() => fetchStocks("weekly")}>🔍 Find Institutional Picks</button>
+        </div>
+      ) : (
+        <>
+          {/* Summary stats */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
+            {[
+              {l:"Stocks Tracked",v:stocks.length,icon:"📊"},
+              {l:"Strong Buy Signals",v:stocks.filter(s=>s.signal==="Strong Buy").length,icon:"🔥"},
+              {l:"Avg MF Change",v:`+${(stocks.reduce((a,s)=>a+(s.mf_q3-s.mf_q1),0)/stocks.length).toFixed(1)}%`,icon:"💛"},
+              {l:"Avg FII Change",v:`+${(stocks.reduce((a,s)=>a+(s.fii_q3-s.fii_q1),0)/stocks.length).toFixed(1)}%`,icon:"🌐"},
+            ].map(s => (
+              <div key={s.l} className="card" style={{textAlign:"center"}}>
+                <div style={{fontSize:24,marginBottom:6}}>{s.icon}</div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:22,fontWeight:700,color:T.goldLight}}>{s.v}</div>
+                <div style={{fontSize:10,color:T.muted,marginTop:4}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Stock table */}
+          <div className="card" style={{overflowX:"auto",marginBottom:24}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+              <thead>
+                <tr style={{borderBottom:`1px solid ${T.walnut}44`}}>
+                  {["Stock","Sector","Price","MF Holding →","FII Holding →","DII Holding →","Momentum","Signal","Action"].map(h => (
+                    <th key={h} style={{padding:"10px 12px",color:T.muted,fontWeight:500,textAlign:"left",fontSize:10,letterSpacing:"0.5px"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((s,i) => (
+                  <tr key={i} style={{borderBottom:`1px solid ${T.walnut}22`,transition:"background 0.2s",cursor:"pointer"}}
+                    onMouseEnter={e=>e.currentTarget.style.background=T.walnut+"11"}
+                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    <td style={{padding:"12px 12px"}}>
+                      <div style={{fontWeight:700,color:T.dun}}>{s.stock}</div>
+                      <div style={{fontSize:10,color:T.muted}}>{s.symbol}</div>
+                    </td>
+                    <td style={{padding:"12px",fontSize:11,color:T.muted}}>{s.sector}</td>
+                    <td style={{padding:"12px",fontFamily:"'DM Mono',monospace",color:T.goldLight,fontWeight:600}}>{s.price}</td>
+                    <td style={{padding:"12px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <MiniBar v1={s.mf_q1} v2={s.mf_q2} v3={s.mf_q3} color="#f59e0b"/>
+                        <div>
+                          <div style={{fontSize:11,fontWeight:700,color:T.goldLight}}>{s.mf_q3}%</div>
+                          <div style={{fontSize:10,color:"#22c55e"}}>▲{getMFChange(s)}%</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{padding:"12px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <MiniBar v1={s.fii_q1} v2={s.fii_q2} v3={s.fii_q3} color="#3b82f6"/>
+                        <div>
+                          <div style={{fontSize:11,fontWeight:700,color:"#60a5fa"}}>{s.fii_q3}%</div>
+                          <div style={{fontSize:10,color:"#22c55e"}}>▲{getFIIChange(s)}%</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{padding:"12px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <MiniBar v1={s.dii_q1} v2={s.dii_q2} v3={s.dii_q3} color="#a78bfa"/>
+                        <div>
+                          <div style={{fontSize:11,fontWeight:700,color:"#a78bfa"}}>{s.dii_q3}%</div>
+                          <div style={{fontSize:10,color:"#22c55e"}}>▲{getDIIChange(s)}%</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{padding:"12px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:36,height:36,borderRadius:"50%",background:`conic-gradient(${getMomentumColor(s.momentum_score)} ${s.momentum_score*3.6}deg, ${T.walnutDeeper} 0deg)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          <div style={{width:26,height:26,borderRadius:"50%",background:T.walnutDark,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:getMomentumColor(s.momentum_score)}}>{s.momentum_score}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{padding:"12px"}}>
+                      <span style={{fontSize:10,padding:"3px 8px",borderRadius:10,background:s.signal==="Strong Buy"?"#22c55e22":T.gold+"22",color:s.signal==="Strong Buy"?"#22c55e":T.goldLight,border:`1px solid ${s.signal==="Strong Buy"?"#22c55e44":T.gold+"44"}`}}>{s.signal}</span>
+                    </td>
+                    <td style={{padding:"12px"}}>
+                      <button className="hdr-btn" style={{fontSize:10}} onClick={() => getDetail(s)}>🔬 Deep Dive</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Reason column */}
+          <div className="g2" style={{marginBottom:24}}>
+            {filtered.slice(0,6).map((s,i) => (
+              <div key={i} className="card" style={{display:"flex",gap:14,alignItems:"flex-start"}}>
+                <div style={{width:40,height:40,borderRadius:10,background:T.gold+"22",border:`1px solid ${T.gold}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🏦</div>
+                <div>
+                  <div style={{fontWeight:700,color:T.dun,marginBottom:2}}>{s.stock} <span style={{fontSize:10,color:T.muted}}>({s.symbol})</span></div>
+                  <div style={{fontSize:11,color:T.muted,lineHeight:1.6}}>{s.reason}</div>
+                  <div style={{display:"flex",gap:12,marginTop:8,fontSize:10}}>
+                    <span style={{color:"#f59e0b"}}>MF ▲{getMFChange(s)}%</span>
+                    <span style={{color:"#60a5fa"}}>FII ▲{getFIIChange(s)}%</span>
+                    <span style={{color:"#a78bfa"}}>DII ▲{getDIIChange(s)}%</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Deep dive modal */}
+      {selectedStock && (
+        <div className="modal-overlay" onClick={e => e.target.className==="modal-overlay" && setSelectedStock(null)}>
+          <div className="modal-box" style={{maxWidth:680,maxHeight:"85vh",overflowY:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+              <div>
+                <div className="modal-title">{selectedStock.stock}</div>
+                <div style={{fontSize:11,color:T.muted}}>{selectedStock.sector} · {selectedStock.price}</div>
+              </div>
+              <button className="hdr-btn" onClick={() => setSelectedStock(null)}>✕ Close</button>
+            </div>
+
+            {/* Holding progression */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
+              {[
+                {label:"Mutual Funds",q1:selectedStock.mf_q1,q2:selectedStock.mf_q2,q3:selectedStock.mf_q3,color:"#f59e0b"},
+                {label:"FII",q1:selectedStock.fii_q1,q2:selectedStock.fii_q2,q3:selectedStock.fii_q3,color:"#3b82f6"},
+                {label:"DII",q1:selectedStock.dii_q1,q2:selectedStock.dii_q2,q3:selectedStock.dii_q3,color:"#a78bfa"},
+              ].map(h => (
+                <div key={h.label} style={{background:T.walnutDeeper+"88",borderRadius:10,padding:14,border:`1px solid ${h.color}33`}}>
+                  <div style={{fontSize:10,color:h.color,letterSpacing:"1px",marginBottom:10}}>{h.label}</div>
+                  {[{l:selectedStock.q1_label,v:h.q1},{l:selectedStock.q2_label,v:h.q2},{l:selectedStock.q3_label,v:h.q3}].map((q,i) => (
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:11}}>
+                      <span style={{color:T.muted}}>{q.l}</span>
+                      <span style={{color:i===2?h.color:T.dun,fontWeight:i===2?700:400}}>{q.v}%{i===2&&<span style={{color:"#22c55e",marginLeft:4}}>▲{(h.q3-h.q1).toFixed(1)}%</span>}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {detailLoading ? <div className="loading"><div className="spin"/><span>Analyzing institutional activity...</span></div> :
+              detailData && <div className="res-box" style={{fontSize:13,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:detailData.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>")}}/>
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
@@ -1868,6 +2187,7 @@ export default function App() {
     { id:"markets", icon:"📊", label:L.markets },
     { id:"research", icon:"🔬", label:L.research },
     { id:"technical", icon:"📈", label:L.technical },
+    { id:"institutional", icon:"🏦", label:"Inst. Momentum" },
     { id:"news", icon:"📰", label:L.news },
     { id:"ipo", icon:"🏦", label:L.ipo },
     { id:"fii", icon:"🌐", label:L.fii },
@@ -1930,10 +2250,11 @@ export default function App() {
                 <div><strong style={{ color:T.goldLight }}>Groq API Key Required</strong><br />Add REACT_APP_GROQ_API_KEY to your environment variables.</div>
               </div>
             )}
-            {activeTab === "markets"   && <Markets />}
-            {activeTab === "research"  && <StockResearch />}
-            {activeTab === "technical" && <TechnicalCharts />}
-            {activeTab === "news"      && <NewsFeed />}
+            {activeTab === "markets"       && <Markets />}
+            {activeTab === "research"      && <StockResearch />}
+            {activeTab === "technical"     && <TechnicalCharts />}
+            {activeTab === "institutional" && <InstitutionalMomentum />}
+            {activeTab === "news"          && <NewsFeed />}
             {activeTab === "ipo"       && <IPOTracker />}
             {activeTab === "fii"       && <FIIDIITracker />}
             {activeTab === "sector"    && <SectorRotation />}
