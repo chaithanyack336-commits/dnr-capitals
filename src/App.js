@@ -7,7 +7,7 @@ import {
 } from "recharts";
 
 // ─── PASTE YOUR GROQ API KEY HERE ────────────────────────────────────────────
-const GROQ_API_KEY = "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";
+const GROQ_API_KEY = "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";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 // ─────────────────────────────────────────────────────────────────────────────
 
