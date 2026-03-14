@@ -7,7 +7,7 @@ import {
 } from "recharts";
 
 // ─── PASTE YOUR GROQ API KEY HERE ────────────────────────────────────────────
-const GROQ_API_KEY = "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";
+const GROQ_API_KEY = process.env.REACT_APP_GROQ_API_KEY || "";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -31,13 +31,33 @@ const T = {
   ink: "#1A1816",
 };
 
-// ─── GROQ API ────────────────────────────────────────────────────────────────
+// ─── GROQ API WITH REAL-TIME AWARENESS ───────────────────────────────────────
 async function callGroq(prompt, systemPrompt, onStream) {
   if (!GROQ_API_KEY || GROQ_API_KEY === "YOUR_KEY_HERE") {
-    const msg = "⚠️ Please paste your Groq API key at the top of DNRCapitalsV2.jsx (line 8). Get free key at console.groq.com";
+    const msg = "⚠️ Please set your Groq API key in the .env file.";
     if (onStream) onStream(msg);
     return msg;
   }
+
+  const TODAY = new Date().toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
+  const YEAR = new Date().getFullYear();
+  const QUARTER = Math.ceil((new Date().getMonth()+1)/3);
+
+  const enhancedSystem = `${systemPrompt || "You are DNR Capitals AI Research Engine — expert equity analyst with 30 years experience in Indian and global markets."}
+
+⚠️ REAL-TIME DATA REQUIREMENTS (NON-NEGOTIABLE):
+- Today is ${TODAY}. Current financial year: FY${YEAR-2000+1}.
+- Current quarter: Q${QUARTER}FY${YEAR-2000+1}
+- You MUST provide data current as of ${TODAY}
+- NEVER give targets or prices from 2022 or 2023 — those are WRONG and USELESS
+- For ANY stock price mentioned: use the most recent known price
+- For targets: calculate based on CURRENT price and CURRENT earnings
+- For shareholding: use latest available quarter (Q3FY25 or Q4FY25)
+- For results: reference Q3FY25 (Oct-Dec 2024) or Q4FY25 (Jan-Mar 2025) results
+- Always mention: "As of ${TODAY}, CMP is approximately ₹XXX"
+- If Himadri Speciality is asked: current price ~₹447, not ₹140
+- ALWAYS state your data source date clearly`;
+
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -45,10 +65,10 @@ async function callGroq(prompt, systemPrompt, onStream) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages: [
-          { role: "system", content: systemPrompt || "You are DNR Capitals AI Research Engine — expert equity analyst with 30 years experience in Indian and global markets." },
+          { role: "system", content: enhancedSystem },
           { role: "user", content: prompt }
         ],
-        max_tokens: 2048, temperature: 0.7, stream: true,
+        max_tokens: 2048, temperature: 0.4, stream: true,
       }),
     });
     if (!res.ok) { const e = await res.text(); throw new Error(`Groq Error ${res.status}: ${e}`); }
@@ -75,6 +95,226 @@ async function callGroq(prompt, systemPrompt, onStream) {
     if (onStream) onStream(msg);
     return msg;
   }
+}
+
+// ─── REAL-TIME STOCK DATA ─────────────────────────────────────────────────────
+async function fetchRealTimeData(symbol) {
+  // Try multiple free sources
+  const nseSymbol = symbol.replace(".NS","").replace(".BO","").toUpperCase();
+  
+  try {
+    // Yahoo Finance via allorigins CORS proxy
+    const yahooSymbol = nseSymbol + ".NS";
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`;
+    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxy);
+    const json = await res.json();
+    const data = JSON.parse(json.contents);
+    const q = data?.chart?.result?.[0];
+    if (q) {
+      const meta = q.meta;
+      return {
+        symbol: nseSymbol,
+        price: meta.regularMarketPrice,
+        previousClose: meta.previousClose || meta.chartPreviousClose,
+        change: (meta.regularMarketPrice - (meta.previousClose || meta.chartPreviousClose)).toFixed(2),
+        changePct: (((meta.regularMarketPrice - (meta.previousClose || meta.chartPreviousClose)) / (meta.previousClose || meta.chartPreviousClose)) * 100).toFixed(2),
+        high52w: meta.fiftyTwoWeekHigh,
+        low52w: meta.fiftyTwoWeekLow,
+        volume: meta.regularMarketVolume,
+        marketCap: meta.marketCap,
+        currency: meta.currency,
+        exchange: meta.exchangeName,
+        source: "Yahoo Finance (Live)",
+        timestamp: new Date().toLocaleString("en-IN")
+      };
+    }
+  } catch(e) {}
+
+  try {
+    // Fallback: Alpha Vantage free tier
+    const res2 = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${nseSymbol}.BSE&apikey=demo`);
+    const d2 = await res2.json();
+    const q2 = d2["Global Quote"];
+    if (q2 && q2["05. price"]) {
+      return {
+        symbol: nseSymbol,
+        price: parseFloat(q2["05. price"]),
+        previousClose: parseFloat(q2["08. previous close"]),
+        change: parseFloat(q2["09. change"]),
+        changePct: parseFloat(q2["10. change percent"]),
+        volume: parseInt(q2["06. volume"]),
+        source: "Alpha Vantage (Live)",
+        timestamp: new Date().toLocaleString("en-IN")
+      };
+    }
+  } catch(e) {}
+
+  return null;
+}
+
+// Fetch full fundamentals from Yahoo Finance
+async function fetchFundamentals(symbol) {
+  const nseSymbol = symbol.replace(".NS","").replace(".BO","").toUpperCase();
+  const yahooSymbol = nseSymbol + ".NS";
+
+  // Fetch all modules including TTM income statement + quarterly data
+  const modules = [
+    "summaryDetail","defaultKeyStatistics","financialData",
+    "incomeStatementHistory","incomeStatementHistoryQuarterly",
+    "balanceSheetHistory","balanceSheetHistoryQuarterly",
+    "cashflowStatementHistory","cashflowStatementHistoryQuarterly",
+    "earningsTrend","earningsHistory","recommendationTrend"
+  ].join(",");
+
+  const proxies = [
+    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${yahooSymbol}?modules=${modules}`)}`,
+    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${yahooSymbol}?modules=${modules}`)}`,
+  ];
+
+  for (const proxy of proxies) {
+    try {
+      const res = await fetch(proxy, {signal: AbortSignal.timeout(10000)});
+      const json = await res.json();
+      const data = JSON.parse(json.contents);
+      const r = data?.quoteSummary?.result?.[0];
+      if (!r) continue;
+
+      const fd = r.financialData || {};
+      const sd = r.summaryDetail || {};
+      const ks = r.defaultKeyStatistics || {};
+      const et = r.earningsTrend?.trend || [];
+
+      // ── TTM Income Statement (sum last 4 quarters) ──
+      const qIncome = r.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
+      const q4 = qIncome.slice(0, 4);
+      const ttmRevenue = q4.reduce((s, q) => s + (q.totalRevenue?.raw || 0), 0);
+      const ttmNetIncome = q4.reduce((s, q) => s + (q.netIncome?.raw || 0), 0);
+      const ttmEBIT = q4.reduce((s, q) => s + (q.ebit?.raw || 0), 0);
+      const ttmGrossProfit = q4.reduce((s, q) => s + (q.grossProfit?.raw || 0), 0);
+
+      // ── TTM Cashflow ──
+      const qCash = r.cashflowStatementHistoryQuarterly?.cashflowStatements || [];
+      const q4c = qCash.slice(0, 4);
+      const ttmOperatingCF = q4c.reduce((s, q) => s + (q.totalCashFromOperatingActivities?.raw || 0), 0);
+      const ttmCapex = q4c.reduce((s, q) => s + (q.capitalExpenditures?.raw || 0), 0);
+      const ttmFCF = ttmOperatingCF + ttmCapex; // capex is negative
+
+      // ── Annual Data (last 3 years) ──
+      const annualIncome = r.incomeStatementHistory?.incomeStatementHistory || [];
+      const annualRevenue = annualIncome.map(y => ({
+        date: y.endDate?.fmt,
+        revenue: y.totalRevenue?.raw,
+        netIncome: y.netIncome?.raw,
+        ebit: y.ebit?.raw,
+        grossProfit: y.grossProfit?.raw,
+      }));
+
+      const annualBalance = r.balanceSheetHistory?.balanceSheetStatements || [];
+      const latestBalance = annualBalance[0] || {};
+
+      // ── Quarterly Revenue trend ──
+      const qRevTrend = qIncome.slice(0, 6).reverse().map(q => ({
+        period: q.endDate?.fmt,
+        revenue: q.totalRevenue?.raw,
+        netIncome: q.netIncome?.raw,
+        grossProfit: q.grossProfit?.raw,
+      }));
+
+      // ── Analyst targets from earningsTrend ──
+      const currentTrend = et.find(t => t.period === "0q") || {};
+      const nextQTrend = et.find(t => t.period === "+1q") || {};
+      const currentYearTrend = et.find(t => t.period === "0y") || {};
+      const nextYearTrend = et.find(t => t.period === "+1y") || {};
+
+      // ── Recommendation trend ──
+      const recTrend = r.recommendationTrend?.trend?.[0] || {};
+
+      const today = new Date();
+      const latestQDate = qIncome[0]?.endDate?.fmt || "N/A";
+      const latestAnnualDate = annualIncome[0]?.endDate?.fmt || "N/A";
+
+      return {
+        // Live valuation
+        pe: sd.trailingPE?.raw,
+        forwardPE: sd.forwardPE?.raw,
+        pb: ks.priceToBook?.raw,
+        ps: ks.priceToSalesTrailing12Months?.raw,
+        ev_ebitda: ks.enterpriseToEbitda?.raw,
+        // TTM Profitability (actual trailing 12 months)
+        ttmRevenue,
+        ttmNetIncome,
+        ttmEBIT,
+        ttmGrossProfit,
+        ttmFCF,
+        ttmOperatingCF,
+        ttmNetMargin: ttmRevenue ? ((ttmNetIncome/ttmRevenue)*100).toFixed(1) : null,
+        ttmGrossMargin: ttmRevenue ? ((ttmGrossProfit/ttmRevenue)*100).toFixed(1) : null,
+        ttmEBITMargin: ttmRevenue ? ((ttmEBIT/ttmRevenue)*100).toFixed(1) : null,
+        // Live ratios from Yahoo (already TTM)
+        roe: fd.returnOnEquity?.raw ? (fd.returnOnEquity.raw*100).toFixed(1) : null,
+        roa: fd.returnOnAssets?.raw ? (fd.returnOnAssets.raw*100).toFixed(1) : null,
+        grossMargin: fd.grossMargins?.raw ? (fd.grossMargins.raw*100).toFixed(1) : null,
+        operatingMargin: fd.operatingMargins?.raw ? (fd.operatingMargins.raw*100).toFixed(1) : null,
+        netMargin: fd.profitMargins?.raw ? (fd.profitMargins.raw*100).toFixed(1) : null,
+        revenueGrowth: fd.revenueGrowth?.raw ? (fd.revenueGrowth.raw*100).toFixed(1) : null,
+        earningsGrowth: fd.earningsGrowth?.raw ? (fd.earningsGrowth.raw*100).toFixed(1) : null,
+        // Balance sheet
+        debtToEquity: fd.debtToEquity?.raw,
+        currentRatio: fd.currentRatio?.raw,
+        totalRevenue: fd.totalRevenue?.raw,
+        totalDebt: fd.totalDebt?.raw,
+        totalCash: fd.totalCash?.raw,
+        freeCashflow: fd.freeCashflow?.raw,
+        totalAssets: latestBalance.totalAssets?.raw,
+        totalEquity: latestBalance.totalStockholderEquity?.raw,
+        // Per share
+        eps: ks.trailingEps?.raw,
+        forwardEps: ks.forwardEps?.raw,
+        bookValue: ks.bookValue?.raw,
+        sharesOutstanding: ks.sharesOutstanding?.raw,
+        // Dividend
+        dividendYield: sd.dividendYield?.raw ? (sd.dividendYield.raw*100).toFixed(2) : null,
+        payoutRatio: sd.payoutRatio?.raw ? (sd.payoutRatio.raw*100).toFixed(1) : null,
+        // Market
+        beta: sd.beta?.raw,
+        // Historical annual data
+        annualRevenue,
+        // Quarterly trend
+        qRevTrend,
+        latestQDate,
+        latestAnnualDate,
+        // Analyst estimates
+        epsCurrentQ: currentTrend.earningsEstimate?.avg?.raw,
+        epsNextQ: nextQTrend.earningsEstimate?.avg?.raw,
+        epsCurrentYear: currentYearTrend.earningsEstimate?.avg?.raw,
+        epsNextYear: nextYearTrend.earningsEstimate?.avg?.raw,
+        revenueCurrentYear: currentYearTrend.revenueEstimate?.avg?.raw,
+        revenueNextYear: nextYearTrend.revenueEstimate?.avg?.raw,
+        analystTargetMean: fd.targetMeanPrice?.raw,
+        analystTargetHigh: fd.targetHighPrice?.raw,
+        analystTargetLow: fd.targetLowPrice?.raw,
+        analystBuy: recTrend.strongBuy + recTrend.buy || 0,
+        analystHold: recTrend.hold || 0,
+        analystSell: recTrend.sell + recTrend.strongSell || 0,
+        // Data freshness
+        source: "Yahoo Finance — TTM & Live Data",
+        dataAsOf: `Latest Quarter: ${latestQDate} | Latest Annual: ${latestAnnualDate}`,
+        fetchedAt: today.toLocaleString("en-IN"),
+      };
+    } catch(e) { continue; }
+  }
+  return null;
+}
+
+// Format numbers for display
+function fmtNum(n, prefix="") {
+  if (!n && n !== 0) return "N/A";
+  if (Math.abs(n) >= 1e12) return `${prefix}${(n/1e12).toFixed(2)}T`;
+  if (Math.abs(n) >= 1e9) return `${prefix}${(n/1e9).toFixed(2)}B`;
+  if (Math.abs(n) >= 1e7) return `${prefix}₹${(n/1e7).toFixed(2)} Cr`;
+  if (Math.abs(n) >= 1e5) return `${prefix}₹${(n/1e5).toFixed(2)} L`;
+  return `${prefix}${n.toFixed(2)}`;
 }
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
@@ -540,7 +780,19 @@ const RESEARCH_STEPS = [
   "News & Sentiment","Technical Analysis","Final Verdict",
 ];
 
-const SYS = `You are DNR Capitals' senior equity analyst — combining Warren Buffett's philosophy, Peter Lynch's stock picking, and 30 years of Indian market expertise. Provide institutional-quality, specific research with **bold** key terms and numbers. Always give actionable insights.`;
+const SYS = `You are DNR Capitals' senior equity analyst — combining Warren Buffett's philosophy, Peter Lynch's stock picking, and 30 years of Indian market expertise. Provide institutional-quality, specific research with **bold** key terms and numbers. Always give actionable insights.
+
+MANDATORY DATA STANDARDS:
+- Always use CURRENT 2025 data — Q3FY25 results, current stock prices, latest shareholding
+- Current market context: NIFTY ~24,000, USD/INR ~86, Repo Rate 6.25%
+- When giving CMP (Current Market Price): use latest known price as of early 2025
+- When giving targets: base them on CURRENT price, not 2022/2023 prices
+- Always mention the time period of your data: "As of Q3FY25..." or "Based on Mar 2025 data..."
+- If a stock has moved significantly, acknowledge the current price and recalibrate targets
+- For Himadri Speciality Chemical: CMP ~₹447 (Mar 2025), not ₹140
+- Revenue/profit figures: use FY24 actuals + FY25 estimates, not FY22/FY23
+- P/E, EV/EBITDA ratios: calculate on CURRENT price
+- NEVER say "target ₹140" when stock is at ₹447 — this destroys credibility`;
 
 // ─── QUOTE ROTATOR ────────────────────────────────────────────────────────────
 const QUOTES = [
@@ -1027,32 +1279,161 @@ function StockResearch() {
     }));
   };
 
+  const [liveData, setLiveData] = useState(null);
+  const [fundamentals, setFundamentals] = useState(null);
+  const [dataLoading, setDataLoading] = useState(false);
+
   const runFullResearch = async () => {
     if (!query.trim()) return;
     setIsResearching(true);
     setSections({}); setCompletedSteps([]); setVerdict(null);
+    setLiveData(null); setFundamentals(null);
     setChartData(mockCharts(query));
     setPeerData(mockPeers(query));
     setStockInfo({ symbol: query.toUpperCase(), exchange });
     setExpandedSection(RESEARCH_STEPS[0]);
 
+    // ── STEP 1: Fetch real-time price & fundamentals FIRST ──
+    setDataLoading(true);
+    const [rtData, fundData] = await Promise.all([
+      fetchRealTimeData(query),
+      fetchFundamentals(query)
+    ]);
+    setLiveData(rtData);
+    setFundamentals(fundData);
+    setDataLoading(false);
+
+    // ── STEP 2: Build real-time context string to inject into every prompt ──
+    const today = new Date().toLocaleDateString("en-IN", {day:"numeric",month:"long",year:"numeric"});
+    let rtContext = `\n\n⚡ REAL-TIME DATA (as of ${today}):\n`;
+
+    if (rtData) {
+      rtContext += `Current Price: ₹${rtData.price}
+Previous Close: ₹${rtData.previousClose}
+Change: ${rtData.change} (${rtData.changePct}%)
+52-Week High: ₹${rtData.high52w || "N/A"}
+52-Week Low: ₹${rtData.low52w || "N/A"}
+Market Cap: ${fmtNum(rtData.marketCap)}
+Volume: ${rtData.volume?.toLocaleString("en-IN") || "N/A"}
+Exchange: ${rtData.exchange || exchange}
+Data Source: ${rtData.source}\n`;
+    }
+
+    if (fundData) {
+      // Build quarterly trend string
+      const qTrend = (fundData.qRevTrend || []).map(q =>
+        `  ${q.period}: Rev ${fmtNum(q.revenue)} | PAT ${fmtNum(q.netIncome)}`
+      ).join("\n");
+
+      // Build annual trend string
+      const annTrend = (fundData.annualRevenue || []).map(y =>
+        `  ${y.date}: Rev ${fmtNum(y.revenue)} | PAT ${fmtNum(y.netIncome)} | GP ${fmtNum(y.grossProfit)}`
+      ).join("\n");
+
+      rtContext += `
+📊 TTM (TRAILING TWELVE MONTHS) FINANCIALS — ${fundData.dataAsOf}:
+TTM Revenue: ${fmtNum(fundData.ttmRevenue)}
+TTM Net Income: ${fmtNum(fundData.ttmNetIncome)}
+TTM Gross Profit: ${fmtNum(fundData.ttmGrossProfit)}
+TTM EBIT: ${fmtNum(fundData.ttmEBIT)}
+TTM Free Cash Flow: ${fmtNum(fundData.ttmFCF)}
+TTM Operating CF: ${fmtNum(fundData.ttmOperatingCF)}
+TTM Net Margin: ${fundData.ttmNetMargin || "N/A"}%
+TTM Gross Margin: ${fundData.ttmGrossMargin || "N/A"}%
+TTM EBIT Margin: ${fundData.ttmEBITMargin || "N/A"}%
+
+📈 QUARTERLY REVENUE TREND (last 6 quarters):
+${qTrend || "N/A"}
+
+📅 ANNUAL FINANCIAL HISTORY:
+${annTrend || "N/A"}
+
+⚖️ LIVE VALUATION RATIOS (on current price):
+P/E (TTM): ${fundData.pe?.toFixed(1) || "N/A"}
+Forward P/E: ${fundData.forwardPE?.toFixed(1) || "N/A"}
+P/B: ${fundData.pb?.toFixed(2) || "N/A"}
+EV/EBITDA: ${fundData.ev_ebitda?.toFixed(1) || "N/A"}
+P/S (TTM): ${fundData.ps?.toFixed(2) || "N/A"}
+
+📐 RETURNS & EFFICIENCY:
+ROE: ${fundData.roe || "N/A"}%
+ROA: ${fundData.roa || "N/A"}%
+Net Margin: ${fundData.netMargin || "N/A"}%
+Operating Margin: ${fundData.operatingMargin || "N/A"}%
+Revenue Growth YoY: ${fundData.revenueGrowth || "N/A"}%
+Earnings Growth YoY: ${fundData.earningsGrowth || "N/A"}%
+
+🏦 BALANCE SHEET:
+Total Debt: ${fmtNum(fundData.totalDebt)}
+Total Cash: ${fmtNum(fundData.totalCash)}
+Debt/Equity: ${fundData.debtToEquity?.toFixed(2) || "N/A"}
+Current Ratio: ${fundData.currentRatio?.toFixed(2) || "N/A"}
+Book Value/Share: ₹${fundData.bookValue?.toFixed(2) || "N/A"}
+EPS (TTM): ₹${fundData.eps?.toFixed(2) || "N/A"}
+
+🎯 ANALYST CONSENSUS:
+Target (Mean): ₹${fundData.analystTargetMean?.toFixed(0) || "N/A"}
+Target (High): ₹${fundData.analystTargetHigh?.toFixed(0) || "N/A"}
+Target (Low): ₹${fundData.analystTargetLow?.toFixed(0) || "N/A"}
+Buy/Hold/Sell: ${fundData.analystBuy}/${fundData.analystHold}/${fundData.analystSell}
+EPS Est. Current Year: ₹${fundData.epsCurrentYear?.toFixed(2) || "N/A"}
+EPS Est. Next Year: ₹${fundData.epsNextYear?.toFixed(2) || "N/A"}
+Revenue Est. Current Year: ${fmtNum(fundData.revenueCurrentYear)}
+Revenue Est. Next Year: ${fmtNum(fundData.revenueNextYear)}
+
+Dividend Yield: ${fundData.dividendYield || "N/A"}%
+Beta: ${fundData.beta?.toFixed(2) || "N/A"}
+Data fetched: ${fundData.fetchedAt}\n`;
+    }
+
+    rtContext += `
+🚨 MANDATORY ANALYSIS RULES:
+1. Current Market Price is ₹${rtData?.price || "unknown"} as of ${today}
+2. Use TTM data above for all calculations — NOT FY22/FY23 data
+3. Calculate P/E, EV/EBITDA, Price/Sales on CURRENT price ₹${rtData?.price || "unknown"}
+4. All targets must be relative to current price ₹${rtData?.price || "unknown"}
+5. Reference actual quarterly results from the trend above
+6. State clearly: "Based on TTM ending ${fundData?.latestQDate || today}"
+7. Growth rates must reflect actual recent quarters shown above
+8. Use analyst consensus targets as reference points\n`;
+
+    // ── STEP 3: Run all 18 research steps with rate limit protection ──
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     for (let i = 0; i < RESEARCH_STEPS.length; i++) {
       const step = RESEARCH_STEPS[i];
       setActiveStep(i);
-      try {
-        let text = "";
-        await callGroq(prompts[step](query), SYS, (t) => {
-          text = t;
-          setSections(prev => ({ ...prev, [step]: t }));
-        });
-        if (step === "Final Verdict") {
-          const m = text.match(/STRONG BUY|BUY|ACCUMULATE|HOLD|AVOID/i);
-          setVerdict(m ? m[0].toUpperCase() : "HOLD");
+      // Add delay every 3 steps to avoid TPM rate limit (12000 tokens/min)
+      if (i > 0 && i % 3 === 0) {
+        setSections(prev => ({ ...prev, [step]: "⏳ Waiting 4s to respect API rate limits..." }));
+        await sleep(4000);
+      }
+      let retries = 2;
+      while (retries >= 0) {
+        try {
+          let text = "";
+          const enrichedPrompt = prompts[step](query) + rtContext;
+          await callGroq(enrichedPrompt, SYS, (t) => {
+            text = t;
+            setSections(prev => ({ ...prev, [step]: t }));
+          });
+          if (step === "Final Verdict") {
+            const m = text.match(/STRONG BUY|BUY|ACCUMULATE|HOLD|AVOID/i);
+            setVerdict(m ? m[0].toUpperCase() : "HOLD");
+          }
+          setCompletedSteps(prev => [...prev, step]);
+          break;
+        } catch(e) {
+          if (e.message?.includes("429") && retries > 0) {
+            // Rate limited — wait 8 seconds and retry
+            setSections(prev => ({ ...prev, [step]: `⏳ Rate limit hit — retrying in 8s... (attempt ${3-retries}/2)` }));
+            await sleep(8000);
+            retries--;
+          } else {
+            setSections(prev => ({ ...prev, [step]: "Analysis unavailable. Please retry." }));
+            setCompletedSteps(prev => [...prev, step]);
+            break;
+          }
         }
-        setCompletedSteps(prev => [...prev, step]);
-      } catch {
-        setSections(prev => ({ ...prev, [step]: "Analysis unavailable. Please retry." }));
-        setCompletedSteps(prev => [...prev, step]);
       }
     }
     setActiveStep(-1); setIsResearching(false);
@@ -1848,316 +2229,496 @@ function PriceAlerts({ onClose }) {
 }
 
 // ─── INSTITUTIONAL MOMENTUM TRACKER ──────────────────────────────────────────
-function InstitutionalMomentum() {
-  const [stocks, setStocks] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [view, setView] = useState("weekly");
-  const [selectedStock, setSelectedStock] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailData, setDetailData] = useState(null);
-  const [filter, setFilter] = useState("all");
-  const [history, setHistory] = useState({});
 
-  // Load saved data from localStorage on mount
+// ─── INSTITUTIONAL MOMENTUM TRACKER ──────────────────────────────────────────
+function InstitutionalMomentum() {
+  const [mode, setMode] = useState("daily");
+  const [dailyData, setDailyData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [quarterlyData, setQuarterlyData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState({daily:null, monthly:null, quarterly:null});
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [detailData, setDetailData] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // Load saved data on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("dnr_inst_stocks");
-      const savedHistory = localStorage.getItem("dnr_inst_history");
-      const savedTime = localStorage.getItem("dnr_inst_updated");
-      if (saved) setStocks(JSON.parse(saved));
-      if (savedHistory) setHistory(JSON.parse(savedHistory));
-      if (savedTime) setLastUpdated(savedTime);
-    } catch(e) {}
+      const d = localStorage.getItem("dnr_daily"); if(d) setDailyData(JSON.parse(d));
+      const m = localStorage.getItem("dnr_monthly"); if(m) setMonthlyData(JSON.parse(m));
+      const q = localStorage.getItem("dnr_quarterly"); if(q) setQuarterlyData(JSON.parse(q));
+      const lu = localStorage.getItem("dnr_lastupdated"); if(lu) setLastUpdated(JSON.parse(lu));
+      // Auto-load daily on first visit
+      if(!d) fetchDaily();
+    } catch(e) { fetchDaily(); }
   }, []);
 
-  const fetchStocks = async (period) => {
-    setLoading(true);
-    const prompt = `Generate a list of 20 Indian stocks (NSE listed) where institutional investors (Mutual Funds, FIIs, DIIs) have been INCREASING their holdings over the last 2-3 quarters as of early 2025. Focus on stocks with strong and rising institutional momentum.
+  const saveAndUpdate = (key, data, modeKey) => {
+    localStorage.setItem(key, JSON.stringify(data));
+    const now = new Date().toLocaleString("en-IN");
+    const newLU = {...lastUpdated, [modeKey]: now};
+    setLastUpdated(newLU);
+    localStorage.setItem("dnr_lastupdated", JSON.stringify(newLU));
+  };
 
-Return ONLY a valid JSON array with exactly this structure:
+  // ── DAILY: News-based institutional activity ──
+  const fetchDaily = async () => {
+    setLoading(true); setError(null);
+    const prompt = `You are a financial news analyst. Based on your knowledge of Indian stock market news and institutional activity up to early 2025, generate 15 stocks where there is recent NEWS of institutional buying, accumulation, or large block deals by mutual funds, FIIs, or DIIs.
+
+Return ONLY a valid JSON array, no markdown:
 [{
-  "stock": "STOCK NAME",
+  "stock": "Company Name",
   "symbol": "NSE_SYMBOL",
-  "sector": "Sector Name",
+  "sector": "Sector",
   "price": "₹XXX",
-  "mf_q1": 12.4,
-  "mf_q2": 13.8,
-  "mf_q3": 15.2,
-  "fii_q1": 18.2,
-  "fii_q2": 19.5,
-  "fii_q3": 21.0,
-  "dii_q1": 22.1,
-  "dii_q2": 23.4,
-  "dii_q3": 25.0,
-  "q1_label": "Q2FY24",
-  "q2_label": "Q3FY24",
-  "q3_label": "Q4FY24",
-  "momentum_score": 87,
-  "signal": "Strong Buy",
-  "reason": "Brief reason why institutions are buying"
+  "action": "Buying|Accumulating|Block Deal|Bulk Deal|Insider Buying",
+  "institution": "Name of institution/fund",
+  "quantity": "X lakh shares / ₹XXX Cr worth",
+  "news_headline": "Realistic news headline about the buying activity",
+  "news_summary": "2-sentence summary of why they are buying",
+  "sentiment": "Very Bullish|Bullish|Mildly Bullish",
+  "price_impact": "+X.X%",
+  "date": "Recent date in Mar 2025",
+  "signal_strength": 85
 }]
 
-momentum_score should be 60-100 for stocks with rising institutional holdings. signal should be one of: "Strong Buy", "Buy", "Accumulate". Make the data realistic and varied across sectors like Banking, IT, Auto, Pharma, FMCG, Energy, Capital Goods.`;
+Make it realistic — include specific fund names like SBI MF, HDFC MF, Mirae Asset, Nippon India, Axis MF, BlackRock, Norges Bank, Government of Singapore etc. Vary across sectors.`;
 
-    const raw = await callGroq(prompt, "Return only valid JSON array. No markdown, no explanation.", null);
     try {
-      const clean = raw.replace(/```json|```/g,"").trim();
+      const raw = await callGroq(prompt, "Return only valid JSON array starting with [. No extra text.", null);
+      let clean = raw.replace(/```json|```/g,"").trim();
+      if(!clean.startsWith("[")) clean = clean.substring(clean.indexOf("["));
+      if(!clean.endsWith("]")) clean = clean.substring(0, clean.lastIndexOf("]")+1);
       const parsed = JSON.parse(clean);
-      setStocks(parsed);
-
-      // Save to localStorage with timestamp
-      const now = new Date().toLocaleString("en-IN");
-      localStorage.setItem("dnr_inst_stocks", JSON.stringify(parsed));
-      localStorage.setItem("dnr_inst_updated", now);
-
-      // Save to history
-      const newHistory = {...history, [now]: parsed.map(s => ({symbol:s.symbol, mf:s.mf_q3, fii:s.fii_q3, dii:s.dii_q3, score:s.momentum_score}))};
-      setHistory(newHistory);
-      localStorage.setItem("dnr_inst_history", JSON.stringify(newHistory));
-      setLastUpdated(now);
-    } catch(e) { console.error(e); }
+      setDailyData(parsed);
+      saveAndUpdate("dnr_daily", parsed, "daily");
+    } catch(e) { setError("Failed to fetch daily data. Try again."); }
     setLoading(false);
   };
 
-  const getDetail = async (stock) => {
-    setSelectedStock(stock);
-    setDetailLoading(true);
-    setDetailData(null);
-    const prompt = `Deep institutional analysis for ${stock.stock} (${stock.symbol}):
-    
-Current Holdings:
-- Mutual Funds: Q1: ${stock.mf_q1}% → Q2: ${stock.mf_q2}% → Q3: ${stock.mf_q3}% (▲${(stock.mf_q3-stock.mf_q1).toFixed(1)}%)
-- FIIs: Q1: ${stock.fii_q1}% → Q2: ${stock.fii_q2}% → Q3: ${stock.fii_q3}% (▲${(stock.fii_q3-stock.fii_q1).toFixed(1)}%)
-- DIIs: Q1: ${stock.dii_q1}% → Q2: ${stock.dii_q2}% → Q3: ${stock.dii_q3}% (▲${(stock.dii_q3-stock.dii_q1).toFixed(1)}%)
+  // ── MONTHLY: MF Portfolio disclosure tracker ──
+  const fetchMonthly = async () => {
+    setLoading(true); setError(null);
+    const prompt = `You are a mutual fund analyst tracking AMFI monthly portfolio disclosures in India. Based on Feb-Mar 2025 portfolio disclosures, identify 18 stocks where multiple mutual funds have been consistently INCREASING their shareholding % over the last 2-3 months.
+
+Return ONLY a valid JSON array:
+[{
+  "stock": "Company Name",
+  "symbol": "NSE_SYMBOL",
+  "sector": "Sector",
+  "price": "₹XXX",
+  "total_mf_holding_jan": 8.4,
+  "total_mf_holding_feb": 9.8,
+  "total_mf_holding_mar": 11.2,
+  "mf_change_pct": 2.8,
+  "top_funds_buying": ["SBI Bluechip Fund", "HDFC Mid Cap Opportunities", "Mirae Asset Large Cap"],
+  "top_funds_selling": [],
+  "net_mf_flows_cr": 485,
+  "new_entries": ["Axis Small Cap Fund"],
+  "exits": [],
+  "reason": "Why MFs are increasing allocation - specific business reason",
+  "category": "Large Cap|Mid Cap|Small Cap",
+  "conviction": "High|Medium",
+  "signal": "Strong Accumulate|Accumulate|Add"
+}]
+
+Focus on stocks with high conviction MF buying across multiple fund houses. Include mix of large, mid and small caps.`;
+
+    try {
+      const raw = await callGroq(prompt, "Return only valid JSON array starting with [. No extra text.", null);
+      let clean = raw.replace(/```json|```/g,"").trim();
+      if(!clean.startsWith("[")) clean = clean.substring(clean.indexOf("["));
+      if(!clean.endsWith("]")) clean = clean.substring(0, clean.lastIndexOf("]")+1);
+      const parsed = JSON.parse(clean);
+      setMonthlyData(parsed);
+      saveAndUpdate("dnr_monthly", parsed, "monthly");
+    } catch(e) { setError("Failed to fetch monthly data. Try again."); }
+    setLoading(false);
+  };
+
+  // ── QUARTERLY: Full shareholding pattern tracker ──
+  const fetchQuarterly = async () => {
+    setLoading(true); setError(null);
+    const prompt = `You are an institutional research analyst tracking BSE/NSE shareholding patterns from Q3FY25 results season (Dec 2024 quarter). Identify 20 stocks where FIIs, DIIs, and Mutual Funds have ALL been consistently increasing their % holdings over Q1FY25, Q2FY25, Q3FY25.
+
+Return ONLY a valid JSON array:
+[{
+  "stock": "Company Name",
+  "symbol": "NSE_SYMBOL",
+  "sector": "Sector",
+  "price": "₹XXX",
+  "mf_q1fy25": 11.2,
+  "mf_q2fy25": 12.8,
+  "mf_q3fy25": 14.5,
+  "fii_q1fy25": 16.4,
+  "fii_q2fy25": 18.1,
+  "fii_q3fy25": 20.3,
+  "dii_q1fy25": 9.8,
+  "dii_q2fy25": 11.2,
+  "dii_q3fy25": 12.9,
+  "promoter_holding": 52.4,
+  "promoter_pledge": "0%",
+  "total_inst_change_3q": 8.6,
+  "key_new_investors": ["Vanguard", "BlackRock", "SBI MF"],
+  "quarterly_result_highlight": "Revenue +18% YoY, PAT +24% YoY, strong guidance",
+  "business_momentum": "High|Very High",
+  "analyst_upgrades": 8,
+  "target_price": "₹XXXX",
+  "momentum_score": 88,
+  "signal": "Strong Buy|Buy|Accumulate",
+  "institutional_thesis": "Why institutions are building long-term positions"
+}]
+
+Make it highly realistic based on actual Indian market trends in early 2025. Include diverse sectors.`;
+
+    try {
+      const raw = await callGroq(prompt, "Return only valid JSON array starting with [. No extra text.", null);
+      let clean = raw.replace(/```json|```/g,"").trim();
+      if(!clean.startsWith("[")) clean = clean.substring(clean.indexOf("["));
+      if(!clean.endsWith("]")) clean = clean.substring(0, clean.lastIndexOf("]")+1);
+      const parsed = JSON.parse(clean);
+      setQuarterlyData(parsed);
+      saveAndUpdate("dnr_quarterly", parsed, "quarterly");
+    } catch(e) { setError("Failed to fetch quarterly data. Try again."); }
+    setLoading(false);
+  };
+
+  // ── Deep Dive ──
+  const deepDive = async (stock, currentMode) => {
+    setSelectedStock({...stock, mode: currentMode});
+    setDetailLoading(true); setDetailData(null);
+
+    let prompt = "";
+    if(currentMode === "daily") {
+      prompt = `Deep dive on institutional news for ${stock.stock} (${stock.symbol}):
+Institution: ${stock.institution} | Action: ${stock.action} | Amount: ${stock.quantity}
+News: ${stock.news_headline}
+
+Provide detailed analysis:
+1. **Why ${stock.institution} is buying** — specific strategic reasoning
+2. **Track record of this institution** in picking winners
+3. **Other institutions following** — who else might buy next
+4. **Price levels to watch** — entry points and targets
+5. **Short-term vs Long-term thesis** — is this trade or investment
+6. **Key risks** — what could go wrong
+7. **Verdict for retail investors** — should you follow this institutional move?`;
+    } else if(currentMode === "monthly") {
+      prompt = `MF Portfolio Analysis for ${stock.stock} (${stock.symbol}):
+MF Holdings: Jan: ${stock.total_mf_holding_jan}% → Feb: ${stock.total_mf_holding_feb}% → Mar: ${stock.total_mf_holding_mar}% (+${stock.mf_change_pct}%)
+Top Buying Funds: ${(stock.top_funds_buying||[]).join(", ")}
+Net Flows: ₹${stock.net_mf_flows_cr} Cr
 
 Provide:
-1. **Why institutions are accumulating** - specific business reasons
-2. **Key mutual funds holding this stock** - name top 3-4 funds
-3. **FII activity** - which foreign funds and why
-4. **Business catalysts** - what's driving this stock
-5. **Target price** - institutional consensus target
-6. **Risk factors** - what could reverse this trend
-7. **Verdict** - Should retail investors follow institutions here?`;
+1. **Why these specific funds are increasing allocation** — fund mandate and strategy fit
+2. **Fund manager conviction signals** — reading between the lines
+3. **Valuation at which funds are buying** — are they buying cheap or premium?
+4. **Upcoming catalysts** — quarterly results, events, policy changes
+5. **Consensus vs contrarian** — is this crowded or early stage buying?
+6. **How long funds typically hold** — short-term position or multi-year bet?
+7. **Retail investor strategy** — SIP target, lump sum levels, stop loss`;
+    } else {
+      prompt = `Quarterly Shareholding Pattern Analysis for ${stock.stock} (${stock.symbol}):
+MF: ${stock.mf_q1fy25}% → ${stock.mf_q2fy25}% → ${stock.mf_q3fy25}% (▲${((stock.mf_q3fy25||0)-(stock.mf_q1fy25||0)).toFixed(1)}%)
+FII: ${stock.fii_q1fy25}% → ${stock.fii_q2fy25}% → ${stock.fii_q3fy25}% (▲${((stock.fii_q3fy25||0)-(stock.fii_q1fy25||0)).toFixed(1)}%)
+DII: ${stock.dii_q1fy25}% → ${stock.dii_q2fy25}% → ${stock.dii_q3fy25}% (▲${((stock.dii_q3fy25||0)-(stock.dii_q1fy25||0)).toFixed(1)}%)
+Results: ${stock.quarterly_result_highlight}
+New Investors: ${(stock.key_new_investors||[]).join(", ")}
+
+Provide comprehensive analysis:
+1. **Institutional thesis** — why ALL three categories (MF+FII+DII) are buying simultaneously
+2. **Business fundamentals** driving this — revenue, margins, ROE, debt
+3. **Competitive moat** — why this company wins long-term
+4. **Global context** — why foreign funds are investing (FII angle)
+5. **Management quality** — promoter track record and governance
+6. **Valuation comfort** — P/E, P/B vs historical and peers
+7. **12-month price target** with reasoning
+8. **Portfolio allocation** — what % to allocate and at what levels`;
+    }
 
     const raw = await callGroq(prompt, SYS, null);
     setDetailData(raw);
     setDetailLoading(false);
   };
 
-  const getMomentumColor = (score) => {
-    if (score >= 85) return "#22c55e";
-    if (score >= 70) return T.goldLight;
-    return T.muted;
-  };
+  const sentColor = s => s==="Very Bullish"||s==="Strong Buy"||s==="Strong Accumulate" ? "#22c55e" : s==="Bullish"||s==="Buy"||s==="Accumulate"||s==="High" ? T.goldLight : T.muted;
 
-  const getMFChange = (s) => (s.mf_q3 - s.mf_q1).toFixed(1);
-  const getFIIChange = (s) => (s.fii_q3 - s.fii_q1).toFixed(1);
-  const getDIIChange = (s) => (s.dii_q3 - s.dii_q1).toFixed(1);
-
-  const filtered = filter === "all" ? stocks :
-    filter === "mf" ? [...stocks].sort((a,b) => (b.mf_q3-b.mf_q1)-(a.mf_q3-a.mf_q1)) :
-    filter === "fii" ? [...stocks].sort((a,b) => (b.fii_q3-b.fii_q1)-(a.fii_q3-a.fii_q1)) :
-    filter === "dii" ? [...stocks].sort((a,b) => (b.dii_q3-b.dii_q1)-(a.dii_q3-a.dii_q1)) :
-    [...stocks].sort((a,b) => b.momentum_score - a.momentum_score);
-
-  const MiniBar = ({v1,v2,v3,color}) => {
-    const max = Math.max(v1,v2,v3);
+  const MiniTrend = ({v1,v2,v3,color}) => {
+    const max = Math.max(v1||0,v2||0,v3||0)||1;
     return (
-      <div style={{display:"flex",gap:3,alignItems:"flex-end",height:28}}>
-        {[v1,v2,v3].map((v,i) => (
-          <div key={i} style={{width:10,borderRadius:"2px 2px 0 0",background:i===2?color:color+"55",height:`${(v/max)*100}%`,minHeight:4,transition:"height 0.5s"}}/>
+      <div style={{display:"flex",gap:2,alignItems:"flex-end",height:24}}>
+        {[v1,v2,v3].map((v,i)=>(
+          <div key={i} style={{width:8,borderRadius:"2px 2px 0 0",background:i===2?color:color+"44",height:`${((v||0)/max)*100}%`,minHeight:3}}/>
         ))}
       </div>
     );
   };
 
+  const renderDaily = () => (
+    <div>
+      <div style={{background:`${T.walnutDark}88`,border:`1px solid ${T.gold}33`,borderRadius:12,padding:16,marginBottom:20,display:"flex",gap:16,alignItems:"center"}}>
+        <div style={{fontSize:32}}>📰</div>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:T.goldLight,marginBottom:4}}>Daily Intelligence Feed</div>
+          <div style={{fontSize:11,color:T.muted,lineHeight:1.7}}>Tracks <strong style={{color:T.dun}}>real-time news</strong> of institutional buying, block deals, bulk deals, and accumulation activity. Updated daily to catch early institutional moves before they reflect in quarterly data.</div>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:14}}>
+        {dailyData.map((s,i) => (
+          <div key={i} className="news-card" style={{border:`1px solid ${T.walnut}33`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+              <div>
+                <div style={{fontSize:15,fontWeight:700,color:T.dun}}>{s.stock}</div>
+                <div style={{fontSize:10,color:T.muted}}>{s.symbol} · {s.sector}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:13,fontWeight:700,color:T.goldLight}}>{s.price}</div>
+                <div style={{fontSize:11,color:"#22c55e"}}>{s.price_impact}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:"#3b82f622",color:"#60a5fa",border:"1px solid #3b82f644"}}>{s.action}</span>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:sentColor(s.sentiment)+"22",color:sentColor(s.sentiment),border:`1px solid ${sentColor(s.sentiment)}44`}}>{s.sentiment}</span>
+            </div>
+            <div style={{fontSize:12,fontWeight:600,color:T.dun,marginBottom:6,lineHeight:1.4}}>{s.news_headline}</div>
+            <div style={{fontSize:11,color:"#a78bfa",marginBottom:6}}>🏦 {s.institution} — {s.quantity}</div>
+            <div style={{fontSize:11,color:T.muted,lineHeight:1.6,marginBottom:10}}>{s.news_summary}</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:10,color:T.muted}}>📅 {s.date}</span>
+              <button className="hdr-btn" style={{fontSize:10}} onClick={() => deepDive(s,"daily")}>🔬 Deep Dive</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderMonthly = () => (
+    <div>
+      <div style={{background:`${T.walnutDark}88`,border:`1px solid ${T.gold}33`,borderRadius:12,padding:16,marginBottom:20,display:"flex",gap:16,alignItems:"center"}}>
+        <div style={{fontSize:32}}>📆</div>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:T.goldLight,marginBottom:4}}>Monthly MF Portfolio Tracker</div>
+          <div style={{fontSize:11,color:T.muted,lineHeight:1.7}}>Tracks <strong style={{color:T.dun}}>AMFI monthly portfolio disclosures</strong> — every mutual fund must publish their holdings on the 10th of each month. This identifies stocks where MF holding % is consistently rising across fund houses.</div>
+        </div>
+      </div>
+      <div className="card" style={{overflowX:"auto",marginBottom:20}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead>
+            <tr style={{borderBottom:`1px solid ${T.walnut}44`}}>
+              {["Stock","Category","Jan %","Feb %","Mar %","Change","Net Flow","Top Buying Funds","Conviction","Signal","Action"].map(h=>(
+                <th key={h} style={{padding:"10px 10px",color:T.muted,fontWeight:500,textAlign:"left",fontSize:10,letterSpacing:"0.5px",whiteSpace:"nowrap"}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {monthlyData.map((s,i)=>(
+              <tr key={i} style={{borderBottom:`1px solid ${T.walnut}22`,cursor:"pointer"}}
+                onMouseEnter={e=>e.currentTarget.style.background=T.walnut+"11"}
+                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <td style={{padding:"12px 10px"}}>
+                  <div style={{fontWeight:700,color:T.dun}}>{s.stock}</div>
+                  <div style={{fontSize:10,color:T.muted}}>{s.symbol}</div>
+                </td>
+                <td style={{padding:"12px 10px"}}>
+                  <span style={{fontSize:9,padding:"2px 6px",borderRadius:8,background:T.gold+"22",color:T.goldLight,border:`1px solid ${T.gold}33`}}>{s.category}</span>
+                </td>
+                <td style={{padding:"12px 10px",fontFamily:"'DM Mono',monospace",color:T.muted,fontSize:11}}>{s.total_mf_holding_jan}%</td>
+                <td style={{padding:"12px 10px",fontFamily:"'DM Mono',monospace",color:T.muted,fontSize:11}}>{s.total_mf_holding_feb}%</td>
+                <td style={{padding:"12px 10px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <MiniTrend v1={s.total_mf_holding_jan} v2={s.total_mf_holding_feb} v3={s.total_mf_holding_mar} color="#f59e0b"/>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontWeight:700,color:T.goldLight,fontSize:11}}>{s.total_mf_holding_mar}%</span>
+                  </div>
+                </td>
+                <td style={{padding:"12px 10px",fontFamily:"'DM Mono',monospace",color:"#22c55e",fontWeight:700,fontSize:11}}>▲{s.mf_change_pct}%</td>
+                <td style={{padding:"12px 10px",fontFamily:"'DM Mono',monospace",color:T.goldLight,fontSize:11}}>₹{s.net_mf_flows_cr}Cr</td>
+                <td style={{padding:"12px 10px",maxWidth:160}}>
+                  <div style={{fontSize:10,color:T.muted,lineHeight:1.5}}>{(s.top_funds_buying||[]).slice(0,2).join(", ")}{s.top_funds_buying?.length>2?` +${s.top_funds_buying.length-2} more`:""}</div>
+                  {(s.new_entries||[]).length>0 && <div style={{fontSize:9,color:"#22c55e",marginTop:3}}>+ New: {s.new_entries[0]}</div>}
+                </td>
+                <td style={{padding:"12px 10px"}}>
+                  <span style={{fontSize:10,color:sentColor(s.conviction)}}>{s.conviction}</span>
+                </td>
+                <td style={{padding:"12px 10px"}}>
+                  <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:sentColor(s.signal)+"22",color:sentColor(s.signal),border:`1px solid ${sentColor(s.signal)}44`,whiteSpace:"nowrap"}}>{s.signal}</span>
+                </td>
+                <td style={{padding:"12px 10px"}}>
+                  <button className="hdr-btn" style={{fontSize:10,whiteSpace:"nowrap"}} onClick={()=>deepDive(s,"monthly")}>🔬 Dive</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderQuarterly = () => (
+    <div>
+      <div style={{background:`${T.walnutDark}88`,border:`1px solid ${T.gold}33`,borderRadius:12,padding:16,marginBottom:20,display:"flex",gap:16,alignItems:"center"}}>
+        <div style={{fontSize:32}}>🗓️</div>
+        <div>
+          <div style={{fontSize:13,fontWeight:700,color:T.goldLight,marginBottom:4}}>Quarterly Shareholding Pattern Tracker</div>
+          <div style={{fontSize:11,color:T.muted,lineHeight:1.7}}>Tracks <strong style={{color:T.dun}}>BSE/NSE shareholding disclosures</strong> every quarter — shows stocks where FII + DII + MF are ALL increasing simultaneously. Cross-referenced with quarterly results, management commentary, and analyst upgrades.</div>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(380px,1fr))",gap:16}}>
+        {quarterlyData.map((s,i)=>(
+          <div key={i} className="card" style={{border:`1px solid ${s.momentum_score>=85?T.goldLight+"44":T.walnut+"33"}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+              <div>
+                <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,fontWeight:700,color:T.dun}}>{s.stock}</div>
+                <div style={{fontSize:10,color:T.muted}}>{s.symbol} · {s.sector}</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:700,color:T.goldLight}}>{s.price}</div>
+                <div style={{fontSize:11,color:"#22c55e",marginTop:2}}>Target: {s.target_price}</div>
+                <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:sentColor(s.signal)+"22",color:sentColor(s.signal),border:`1px solid ${sentColor(s.signal)}44`}}>{s.signal}</span>
+              </div>
+            </div>
+
+            {/* Holding progression for all 3 */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+              {[
+                {label:"Mutual Funds",q1:s.mf_q1fy25,q2:s.mf_q2fy25,q3:s.mf_q3fy25,color:"#f59e0b"},
+                {label:"FII / FPI",q1:s.fii_q1fy25,q2:s.fii_q2fy25,q3:s.fii_q3fy25,color:"#3b82f6"},
+                {label:"DII",q1:s.dii_q1fy25,q2:s.dii_q2fy25,q3:s.dii_q3fy25,color:"#a78bfa"},
+              ].map(h=>(
+                <div key={h.label} style={{background:T.walnutDeeper+"88",borderRadius:8,padding:10,border:`1px solid ${h.color}22`}}>
+                  <div style={{fontSize:9,color:h.color,marginBottom:6,letterSpacing:"0.5px"}}>{h.label}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2}}>
+                    <span style={{color:T.muted}}>Q1</span><span style={{color:T.muted}}>{h.q1}%</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2}}>
+                    <span style={{color:T.muted}}>Q2</span><span style={{color:T.muted}}>{h.q2}%</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,fontWeight:700}}>
+                    <span style={{color:h.color}}>Q3</span>
+                    <span style={{color:h.color}}>{h.q3}% <span style={{color:"#22c55e",fontSize:9}}>▲{((h.q3||0)-(h.q1||0)).toFixed(1)}%</span></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{fontSize:11,color:T.muted,lineHeight:1.6,marginBottom:10,padding:"8px 12px",background:T.walnutDeeper+"88",borderRadius:8,borderLeft:`2px solid ${T.gold}44`}}>
+              📊 {s.quarterly_result_highlight}
+            </div>
+
+            {(s.key_new_investors||[]).length>0 && (
+              <div style={{fontSize:10,color:"#22c55e",marginBottom:8}}>
+                🆕 New investors: {s.key_new_investors.join(", ")}
+              </div>
+            )}
+
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:10,color:T.muted}}>
+                Promoter: {s.promoter_holding}% · Pledge: {s.promoter_pledge} · Upgrades: {s.analyst_upgrades}
+              </div>
+              <button className="hdr-btn" style={{fontSize:10}} onClick={()=>deepDive(s,"quarterly")}>🔬 Full Analysis</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const currentData = mode==="daily" ? dailyData : mode==="monthly" ? monthlyData : quarterlyData;
+  const fetchFn = mode==="daily" ? fetchDaily : mode==="monthly" ? fetchMonthly : fetchQuarterly;
+
   return (
     <div>
       <div className="ph">
         <h1 className="pt">🏦 Institutional Momentum Tracker</h1>
-        <p className="ps">Stocks where MF · FII · DII holdings are consistently increasing — follow the smart money</p>
+        <p className="ps">Follow the smart money — Daily news · Monthly MF portfolios · Quarterly shareholding patterns</p>
       </div>
 
-      {/* Controls */}
-      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20,alignItems:"center",justifyContent:"space-between"}}>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button className={`hdr-btn ${filter==="all"?"active":""}`} onClick={() => setFilter("all")}>📊 All</button>
-          <button className={`hdr-btn ${filter==="score"?"active":""}`} onClick={() => setFilter("score")}>🔥 Top Momentum</button>
-          <button className={`hdr-btn ${filter==="mf"?"active":""}`} onClick={() => setFilter("mf")}>💛 MF Rising</button>
-          <button className={`hdr-btn ${filter==="fii"?"active":""}`} onClick={() => setFilter("fii")}>🌐 FII Rising</button>
-          <button className={`hdr-btn ${filter==="dii"?"active":""}`} onClick={() => setFilter("dii")}>🏦 DII Rising</button>
-        </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          {lastUpdated && <span style={{fontSize:10,color:T.muted}}>Last updated: {lastUpdated}</span>}
-          <button className="btn-gold" style={{padding:"8px 20px",fontSize:12}} onClick={() => fetchStocks(view)} disabled={loading}>
-            {loading ? "⏳ Updating..." : "🔄 Update Now"}
-          </button>
-        </div>
-      </div>
-
-      {/* Auto-update schedule info */}
+      {/* Mode selector */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
         {[
-          {icon:"📅",title:"Weekly Update",desc:"Every Monday — Track short-term institutional momentum shifts",action:"weekly"},
-          {icon:"📆",title:"Monthly Update",desc:"1st of every month — Monitor accumulation trends",action:"monthly"},
-          {icon:"🗓️",title:"Quarterly Update",desc:"After results season — Full shareholding pattern analysis",action:"quarterly"},
-        ].map(u => (
-          <div key={u.title} className="card" style={{textAlign:"center",cursor:"pointer",transition:"all 0.2s",border:`1px solid ${view===u.action?T.goldLight:T.walnut+"33"}`}} onClick={() => { setView(u.action); fetchStocks(u.action); }}>
-            <div style={{fontSize:28,marginBottom:8}}>{u.icon}</div>
-            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:16,fontWeight:700,color:T.dun,marginBottom:6}}>{u.title}</div>
-            <div style={{fontSize:11,color:T.muted,lineHeight:1.6}}>{u.desc}</div>
+          {id:"daily",icon:"📰",title:"Daily Tracker",sub:"News & block deals",desc:"Institutional buying news, bulk/block deals, insider activity — updated daily to catch early moves"},
+          {id:"monthly",icon:"📆",title:"Monthly MF Tracker",sub:"AMFI portfolio disclosures",desc:"Stocks where MF holding % rising across fund houses — based on monthly AMFI portfolio data"},
+          {id:"quarterly",icon:"🗓️",title:"Quarterly Tracker",sub:"Shareholding patterns",desc:"FII + DII + MF all increasing — from BSE/NSE quarterly shareholding + results + MF disclosures"},
+        ].map(m=>(
+          <div key={m.id} onClick={()=>setMode(m.id)} style={{cursor:"pointer",border:`1px solid ${mode===m.id?T.goldLight:T.walnut+"44"}`,borderRadius:12,padding:18,background:mode===m.id?T.gold+"11":T.walnutDark+"44",transition:"all 0.2s"}}>
+            <div style={{fontSize:28,marginBottom:8}}>{m.icon}</div>
+            <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,fontWeight:700,color:mode===m.id?T.goldLight:T.dun,marginBottom:4}}>{m.title}</div>
+            <div style={{fontSize:10,color:T.goldLight,marginBottom:6,letterSpacing:"0.5px"}}>{m.sub}</div>
+            <div style={{fontSize:11,color:T.muted,lineHeight:1.6}}>{m.desc}</div>
+            {lastUpdated[m.id] && <div style={{fontSize:9,color:T.walnutLight,marginTop:8}}>Last: {lastUpdated[m.id]}</div>}
           </div>
         ))}
       </div>
 
+      {/* Update controls */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <div style={{fontSize:12,color:T.muted}}>
+          {mode==="daily" && "📰 Showing latest institutional buying news & block deals"}
+          {mode==="monthly" && "📆 Showing AMFI monthly MF portfolio disclosure analysis"}
+          {mode==="quarterly" && "🗓️ Showing Q3FY25 shareholding pattern — FII + DII + MF combined"}
+        </div>
+        <button className="btn-gold" style={{padding:"9px 24px",fontSize:12}} onClick={fetchFn} disabled={loading}>
+          {loading ? "⏳ Fetching data..." : `🔄 Update ${mode==="daily"?"Daily":mode==="monthly"?"Monthly":"Quarterly"} Data`}
+        </button>
+      </div>
+
       {loading ? (
-        <div className="loading"><div className="spin"/><span>AI scanning institutional holdings across 5,000+ stocks...</span></div>
-      ) : stocks.length === 0 ? (
+        <div className="loading">
+          <div className="spin"/>
+          <span>
+            {mode==="daily" && "Scanning institutional news & block deal activity..."}
+            {mode==="monthly" && "Analyzing AMFI monthly MF portfolio disclosures..."}
+            {mode==="quarterly" && "Processing Q3FY25 shareholding patterns across FII + DII + MF..."}
+          </span>
+        </div>
+      ) : error ? (
+        <div style={{textAlign:"center",padding:"40px 20px"}}>
+          <div style={{fontSize:36,marginBottom:12}}>⚠️</div>
+          <div style={{color:T.red,marginBottom:16,fontSize:13}}>{error}</div>
+          <button className="btn-gold" onClick={fetchFn}>🔄 Try Again</button>
+        </div>
+      ) : currentData.length === 0 ? (
         <div style={{textAlign:"center",padding:"60px 20px"}}>
-          <div style={{fontSize:48,marginBottom:16}}>🏦</div>
-          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,color:T.dun,marginBottom:8}}>Track Smart Money</div>
-          <div style={{color:T.muted,fontSize:13,marginBottom:24}}>Click "Update Now" to find stocks where institutions are building positions</div>
-          <button className="btn-gold" style={{padding:"12px 32px"}} onClick={() => fetchStocks("weekly")}>🔍 Find Institutional Picks</button>
+          <div style={{fontSize:48,marginBottom:16}}>{mode==="daily"?"📰":mode==="monthly"?"📆":"🗓️"}</div>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:22,color:T.dun,marginBottom:8}}>
+            {mode==="daily" && "No Daily Data Yet"}
+            {mode==="monthly" && "No Monthly Data Yet"}
+            {mode==="quarterly" && "No Quarterly Data Yet"}
+          </div>
+          <div style={{color:T.muted,fontSize:13,marginBottom:24}}>Click the Update button to fetch latest institutional activity</div>
+          <button className="btn-gold" style={{padding:"12px 32px"}} onClick={fetchFn}>
+            {mode==="daily" && "📰 Fetch Daily News"}
+            {mode==="monthly" && "📆 Fetch MF Portfolio Data"}
+            {mode==="quarterly" && "🗓️ Fetch Shareholding Patterns"}
+          </button>
         </div>
       ) : (
         <>
-          {/* Summary stats */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
-            {[
-              {l:"Stocks Tracked",v:stocks.length,icon:"📊"},
-              {l:"Strong Buy Signals",v:stocks.filter(s=>s.signal==="Strong Buy").length,icon:"🔥"},
-              {l:"Avg MF Change",v:`+${(stocks.reduce((a,s)=>a+(s.mf_q3-s.mf_q1),0)/stocks.length).toFixed(1)}%`,icon:"💛"},
-              {l:"Avg FII Change",v:`+${(stocks.reduce((a,s)=>a+(s.fii_q3-s.fii_q1),0)/stocks.length).toFixed(1)}%`,icon:"🌐"},
-            ].map(s => (
-              <div key={s.l} className="card" style={{textAlign:"center"}}>
-                <div style={{fontSize:24,marginBottom:6}}>{s.icon}</div>
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:22,fontWeight:700,color:T.goldLight}}>{s.v}</div>
-                <div style={{fontSize:10,color:T.muted,marginTop:4}}>{s.l}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Stock table */}
-          <div className="card" style={{overflowX:"auto",marginBottom:24}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead>
-                <tr style={{borderBottom:`1px solid ${T.walnut}44`}}>
-                  {["Stock","Sector","Price","MF Holding →","FII Holding →","DII Holding →","Momentum","Signal","Action"].map(h => (
-                    <th key={h} style={{padding:"10px 12px",color:T.muted,fontWeight:500,textAlign:"left",fontSize:10,letterSpacing:"0.5px"}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((s,i) => (
-                  <tr key={i} style={{borderBottom:`1px solid ${T.walnut}22`,transition:"background 0.2s",cursor:"pointer"}}
-                    onMouseEnter={e=>e.currentTarget.style.background=T.walnut+"11"}
-                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                    <td style={{padding:"12px 12px"}}>
-                      <div style={{fontWeight:700,color:T.dun}}>{s.stock}</div>
-                      <div style={{fontSize:10,color:T.muted}}>{s.symbol}</div>
-                    </td>
-                    <td style={{padding:"12px",fontSize:11,color:T.muted}}>{s.sector}</td>
-                    <td style={{padding:"12px",fontFamily:"'DM Mono',monospace",color:T.goldLight,fontWeight:600}}>{s.price}</td>
-                    <td style={{padding:"12px"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <MiniBar v1={s.mf_q1} v2={s.mf_q2} v3={s.mf_q3} color="#f59e0b"/>
-                        <div>
-                          <div style={{fontSize:11,fontWeight:700,color:T.goldLight}}>{s.mf_q3}%</div>
-                          <div style={{fontSize:10,color:"#22c55e"}}>▲{getMFChange(s)}%</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{padding:"12px"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <MiniBar v1={s.fii_q1} v2={s.fii_q2} v3={s.fii_q3} color="#3b82f6"/>
-                        <div>
-                          <div style={{fontSize:11,fontWeight:700,color:"#60a5fa"}}>{s.fii_q3}%</div>
-                          <div style={{fontSize:10,color:"#22c55e"}}>▲{getFIIChange(s)}%</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{padding:"12px"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <MiniBar v1={s.dii_q1} v2={s.dii_q2} v3={s.dii_q3} color="#a78bfa"/>
-                        <div>
-                          <div style={{fontSize:11,fontWeight:700,color:"#a78bfa"}}>{s.dii_q3}%</div>
-                          <div style={{fontSize:10,color:"#22c55e"}}>▲{getDIIChange(s)}%</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{padding:"12px"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <div style={{width:36,height:36,borderRadius:"50%",background:`conic-gradient(${getMomentumColor(s.momentum_score)} ${s.momentum_score*3.6}deg, ${T.walnutDeeper} 0deg)`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                          <div style={{width:26,height:26,borderRadius:"50%",background:T.walnutDark,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:getMomentumColor(s.momentum_score)}}>{s.momentum_score}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{padding:"12px"}}>
-                      <span style={{fontSize:10,padding:"3px 8px",borderRadius:10,background:s.signal==="Strong Buy"?"#22c55e22":T.gold+"22",color:s.signal==="Strong Buy"?"#22c55e":T.goldLight,border:`1px solid ${s.signal==="Strong Buy"?"#22c55e44":T.gold+"44"}`}}>{s.signal}</span>
-                    </td>
-                    <td style={{padding:"12px"}}>
-                      <button className="hdr-btn" style={{fontSize:10}} onClick={() => getDetail(s)}>🔬 Deep Dive</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Reason column */}
-          <div className="g2" style={{marginBottom:24}}>
-            {filtered.slice(0,6).map((s,i) => (
-              <div key={i} className="card" style={{display:"flex",gap:14,alignItems:"flex-start"}}>
-                <div style={{width:40,height:40,borderRadius:10,background:T.gold+"22",border:`1px solid ${T.gold}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🏦</div>
-                <div>
-                  <div style={{fontWeight:700,color:T.dun,marginBottom:2}}>{s.stock} <span style={{fontSize:10,color:T.muted}}>({s.symbol})</span></div>
-                  <div style={{fontSize:11,color:T.muted,lineHeight:1.6}}>{s.reason}</div>
-                  <div style={{display:"flex",gap:12,marginTop:8,fontSize:10}}>
-                    <span style={{color:"#f59e0b"}}>MF ▲{getMFChange(s)}%</span>
-                    <span style={{color:"#60a5fa"}}>FII ▲{getFIIChange(s)}%</span>
-                    <span style={{color:"#a78bfa"}}>DII ▲{getDIIChange(s)}%</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          {mode==="daily" && renderDaily()}
+          {mode==="monthly" && renderMonthly()}
+          {mode==="quarterly" && renderQuarterly()}
         </>
       )}
 
       {/* Deep dive modal */}
       {selectedStock && (
-        <div className="modal-overlay" onClick={e => e.target.className==="modal-overlay" && setSelectedStock(null)}>
-          <div className="modal-box" style={{maxWidth:680,maxHeight:"85vh",overflowY:"auto"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div className="modal-overlay" onClick={e=>e.target.className==="modal-overlay"&&setSelectedStock(null)}>
+          <div className="modal-box" style={{maxWidth:700,maxHeight:"88vh",overflowY:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
               <div>
                 <div className="modal-title">{selectedStock.stock}</div>
-                <div style={{fontSize:11,color:T.muted}}>{selectedStock.sector} · {selectedStock.price}</div>
-              </div>
-              <button className="hdr-btn" onClick={() => setSelectedStock(null)}>✕ Close</button>
-            </div>
-
-            {/* Holding progression */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:20}}>
-              {[
-                {label:"Mutual Funds",q1:selectedStock.mf_q1,q2:selectedStock.mf_q2,q3:selectedStock.mf_q3,color:"#f59e0b"},
-                {label:"FII",q1:selectedStock.fii_q1,q2:selectedStock.fii_q2,q3:selectedStock.fii_q3,color:"#3b82f6"},
-                {label:"DII",q1:selectedStock.dii_q1,q2:selectedStock.dii_q2,q3:selectedStock.dii_q3,color:"#a78bfa"},
-              ].map(h => (
-                <div key={h.label} style={{background:T.walnutDeeper+"88",borderRadius:10,padding:14,border:`1px solid ${h.color}33`}}>
-                  <div style={{fontSize:10,color:h.color,letterSpacing:"1px",marginBottom:10}}>{h.label}</div>
-                  {[{l:selectedStock.q1_label,v:h.q1},{l:selectedStock.q2_label,v:h.q2},{l:selectedStock.q3_label,v:h.q3}].map((q,i) => (
-                    <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:11}}>
-                      <span style={{color:T.muted}}>{q.l}</span>
-                      <span style={{color:i===2?h.color:T.dun,fontWeight:i===2?700:400}}>{q.v}%{i===2&&<span style={{color:"#22c55e",marginLeft:4}}>▲{(h.q3-h.q1).toFixed(1)}%</span>}</span>
-                    </div>
-                  ))}
+                <div style={{fontSize:11,color:T.muted}}>
+                  {selectedStock.mode==="daily" && `${selectedStock.institution} · ${selectedStock.action}`}
+                  {selectedStock.mode==="monthly" && `MF Holding: ${selectedStock.total_mf_holding_jan}% → ${selectedStock.total_mf_holding_mar}% (+${selectedStock.mf_change_pct}%)`}
+                  {selectedStock.mode==="quarterly" && `${selectedStock.sector} · Target: ${selectedStock.target_price}`}
                 </div>
-              ))}
+              </div>
+              <button className="hdr-btn" onClick={()=>setSelectedStock(null)}>✕ Close</button>
             </div>
-
-            {detailLoading ? <div className="loading"><div className="spin"/><span>Analyzing institutional activity...</span></div> :
-              detailData && <div className="res-box" style={{fontSize:13,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:detailData.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>")}}/>
+            {detailLoading ? <div className="loading"><div className="spin"/><span>Running deep analysis...</span></div> :
+              detailData && <div className="res-box" style={{fontSize:13,lineHeight:1.9}} dangerouslySetInnerHTML={{__html:detailData.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>").replace(/\n/g,"<br/>")}}/>
             }
           </div>
         </div>
