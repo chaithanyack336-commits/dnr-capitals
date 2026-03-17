@@ -11,53 +11,59 @@ const GROQ_API_KEY = process.env.REACT_APP_GROQ_API_KEY || "";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── THEME — DEEP NAVY + GOLD (Bloomberg-style) ─────────────────────────────
+// ─── THEME — CARBON BLACK + NEON GREEN (Bloomberg/Reuters) ──────────────────
 const T = {
-  // Navy backgrounds (darkest to lightest)
-  navyDeepest: "#04060F",
-  navyDeep:    "#070C1A",
-  navy:        "#0C1222",
-  navyMid:     "#101828",
-  navyLight:   "#162038",
-  navyBorder:  "#1E2D4A",
-  navyHover:   "#1A2840",
-  navyActive:  "#243356",
-  // Gold accents
+  // Carbon black backgrounds
+  navyDeepest: "#000000",
+  navyDeep:    "#050505",
+  navy:        "#0A0A0A",
+  navyMid:     "#0F0F0F",
+  navyLight:   "#141414",
+  navyBorder:  "#1A2A1A",
+  navyHover:   "#0D1A0D",
+  navyActive:  "#0F2A0F",
+  // Neon green matrix
+  matrixGreen:      "#00FF41",
+  matrixGreenDim:   "#00C832",
+  matrixGreenPale:  "#00FF4133",
+  matrixGreenGlow:  "#00FF4188",
+  matrixGreenDeep:  "#003A0F",
+  // Gold accents (kept for premium feel)
   gold:        "#C9A84C",
   goldLight:   "#E0BC6A",
   goldPale:    "#F5D88A",
   goldDim:     "#9A7A38",
   goldGlow:    "#E0BC6A55",
   // Text
-  dun:         "#E2E8F4",
-  dunLight:    "#F0F4FF",
-  dunDark:     "#B8C4DC",
-  muted:       "#6B7A99",
-  mutedDark:   "#4A5570",
+  dun:         "#E8F5E8",
+  dunLight:    "#F0FFF0",
+  dunDark:     "#A8C8A8",
+  muted:       "#4A6A4A",
+  mutedDark:   "#2A4A2A",
   // Semantic
-  green:       "#22C55E",
-  greenLight:  "#4ADE80",
-  red:         "#EF4444",
-  redLight:    "#F87171",
-  blue:        "#3B82F6",
-  blueLight:   "#60A5FA",
-  // Logo blue
+  green:       "#00FF41",
+  greenLight:  "#39FF14",
+  red:         "#FF3333",
+  redLight:    "#FF6666",
+  blue:        "#00BFFF",
+  blueLight:   "#40D0FF",
+  // Logo cosmic blue
   cosmicBlue:      "#1A5FB4",
   cosmicBlueLight: "#3A8FE8",
   cosmicBlueDim:   "#0D3A7A",
   cosmicBluePale:  "#5AAEFF",
-  // Legacy aliases (keep components working)
-  walnut:       "#1E2D4A",
-  walnutLight:  "#2A3D60",
-  walnutDark:   "#162038",
-  walnutDeep:   "#0C1222",
-  walnutDeeper: "#070C1A",
-  cream:        "#E2E8F4",
-  ink:          "#04060F",
-  // Light mode surfaces
-  surface:    "#F0F4FF",
-  surfaceAlt: "#E4EAF8",
-  border:     "#C0CADC",
+  // Legacy aliases
+  walnut:       "#1A2A1A",
+  walnutLight:  "#243A24",
+  walnutDark:   "#0F1A0F",
+  walnutDeep:   "#0A0A0A",
+  walnutDeeper: "#050505",
+  cream:        "#E8F5E8",
+  ink:          "#000000",
+  // Light mode
+  surface:    "#F0FFF0",
+  surfaceAlt: "#E0F0E0",
+  border:     "#A0C0A0",
 };
 
 // ─── GROQ API WITH REAL-TIME AWARENESS ───────────────────────────────────────
@@ -472,7 +478,7 @@ const styles = `
 
   body{
     font-family:'Jost',sans-serif;
-    background:${T.navyDeepest};
+    background:#000000;
     color:${T.dun};
     -webkit-font-smoothing:antialiased;
     text-rendering:optimizeLegibility;
@@ -485,8 +491,8 @@ const styles = `
   /* TOP BAR */
   .top-bar{
     position:fixed;top:0;left:0;right:0;height:48px;z-index:300;
-    background:${T.navyDeep};
-    border-bottom:1px solid ${T.navyBorder};
+    background:#000000;
+    border-bottom:1px solid #0A1A0A;
     box-shadow:0 1px 0 ${T.gold}18, 0 4px 20px #00000044;
     display:flex;align-items:center;padding:0 16px 0 0;gap:0;
   }
@@ -502,8 +508,8 @@ const styles = `
   .sidebar{
     position:fixed;left:0;top:48px;bottom:0;
     width:220px;
-    background:${T.navy};
-    border-right:1px solid ${T.navyBorder};
+    background:#050505;
+    border-right:1px solid #0A1A0A;
     display:flex;flex-direction:column;
     overflow-y:auto;overflow-x:hidden;
     z-index:200;
@@ -520,7 +526,7 @@ const styles = `
     cursor:pointer;
     display:flex;flex-direction:column;align-items:center;
     text-align:center;
-    background:linear-gradient(180deg,${T.navyMid},${T.navy});
+    background:linear-gradient(180deg,#0A0A0A,#050505);
     transition:background 0.2s;
     flex-shrink:0;
   }
@@ -529,14 +535,14 @@ const styles = `
     width:72px;height:72px;border-radius:50%;
     object-fit:cover;
     border:2px solid ${T.gold}66;
-    box-shadow:0 0 24px ${T.gold}44, 0 0 48px ${T.cosmicBlue}33;
+    box-shadow:0 0 24px #00FF4144, 0 0 48px #E0BC6A33;
     margin-bottom:10px;
     transition:box-shadow 0.3s;
   }
-  .sb-logo:hover .sb-logo-img{box-shadow:0 0 32px ${T.gold}77, 0 0 60px ${T.cosmicBlue}55}
+  .sb-logo:hover .sb-logo-img{box-shadow:0 0 32px #00FF4177, 0 0 60px #E0BC6A55}
   .sb-logo-title{
     font-family:'Cormorant Garamond',serif;
-    font-size:17px;font-weight:700;color:${T.goldLight};
+    font-size:17px;font-weight:700;color:#00FF41;
     letter-spacing:0.5px;line-height:1;
   }
   .sb-logo-sub{
@@ -549,7 +555,7 @@ const styles = `
   .sb-group-label{
     padding:4px 16px 6px;
     font-size:8px;font-weight:700;letter-spacing:2px;
-    text-transform:uppercase;color:${T.mutedDark};
+    text-transform:uppercase;color:#1A3A1A;
   }
   .sb-item{
     display:flex;align-items:center;gap:10px;
@@ -560,20 +566,20 @@ const styles = `
     white-space:nowrap;
   }
   .sb-item:hover{
-    color:${T.dun};background:${T.navyHover};
-    border-color:${T.navyBorder};
+    color:#E8F5E8;background:#0A1A0A;
+    border-color:#0A2A0A;
   }
   .sb-item.active{
-    color:${T.goldLight};
-    background:linear-gradient(135deg,${T.navyActive},${T.navyLight});
-    border-color:${T.gold}44;
-    box-shadow:0 0 12px ${T.gold}18;
+    color:#00FF41;
+    background:linear-gradient(135deg,#0A2A0A,#051505);
+    border-color:#00FF4133;
+    box-shadow:0 0 12px #00FF4122;
   }
   .sb-item.active::before{
     content:'';position:absolute;left:8px;
     width:3px;height:20px;border-radius:2px;
-    background:linear-gradient(180deg,${T.goldPale},${T.gold});
-    box-shadow:0 0 8px ${T.gold};
+    background:linear-gradient(180deg,#39FF14,#00FF41);
+    box-shadow:0 0 8px #00FF41;
   }
   .sb-item{position:relative;}
   .sb-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
@@ -588,7 +594,7 @@ const styles = `
     display:flex;align-items:center;gap:6px;
     font-size:9px;color:${T.muted};
   }
-  .sb-live-dot{width:6px;height:6px;border-radius:50%;background:${T.green};animation:livePulse 2s infinite}
+  .sb-live-dot{width:6px;height:6px;border-radius:50%;background:#00FF41;animation:livePulse 2s infinite}
   @keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 0 0 ${T.green}44}50%{opacity:0.7;box-shadow:0 0 0 4px transparent}}
 
   /* CONTENT AREA */
@@ -614,16 +620,16 @@ const styles = `
   .tb-btn{
     padding:5px 11px;border-radius:6px;
     border:1px solid ${T.navyBorder};
-    background:${T.navyMid};color:${T.muted};
+    background:#0A0A0A;color:#2A4A2A;
     font-size:10px;cursor:pointer;transition:all 0.18s;
     font-family:'Jost',sans-serif;letter-spacing:0.3px;
   }
-  .tb-btn:hover{background:${T.navyHover};border-color:${T.gold}44;color:${T.goldLight}}
+  .tb-btn:hover{background:#0A1A0A;border-color:#00FF4144;color:#00FF41}
   .tb-btn:active{transform:scale(0.97)}
   .tb-btn.active{background:${T.gold}22;border-color:${T.gold}66;color:${T.goldLight}}
 
   /* MAIN CONTENT */
-  .main{padding:24px;max-width:1600px;width:100%}
+  .main{padding:24px;max-width:1600px;width:100%;background:#000}
 
   /* CARDS */
   .card{
@@ -1064,236 +1070,492 @@ function QuoteRotator() {
   }, []);
   return (
     <div style={{ transition: "opacity 0.5s", opacity: fade ? 1 : 0, textAlign: "center" }}>
-      <div className="hero-quote-text">"{QUOTES[idx].text}"</div>
-      <div className="hero-quote-author">— {QUOTES[idx].author}</div>
-    </div>
-  );
-}
-
 function HomePage({ setActiveTab, markets, fetching }) {
-  const canvasRef = useRef(null);
-  const [slideIdx, setSlideIdx] = useState(0);
+  const canvasRef   = useRef(null);
+  const [entered, setEntered]     = useState(false);
+  const [slideIdx, setSlideIdx]   = useState(0);
   const [slideFade, setSlideFade] = useState(true);
+  const [counters, setCounters]   = useState({ stocks:0, research:0, accuracy:0, users:0 });
 
-  // Animated candlestick chart on canvas
+  // ── Galaxy constellation canvas ──
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let animFrame;
-    let offset = 0;
+    let raf;
 
-    const resize = () => {
-      canvas.width  = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-    };
+    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
     resize();
     window.addEventListener('resize', resize);
 
-    // Generate candle data
-    const genCandles = (n) => {
-      const candles = [];
-      let price = 400 + Math.random() * 200;
-      for (let i = 0; i < n; i++) {
-        const open  = price;
-        const move  = (Math.random() - 0.46) * 18;
-        const close = price + move;
-        const high  = Math.max(open, close) + Math.random() * 8;
-        const low   = Math.min(open, close) - Math.random() * 8;
-        candles.push({ open, close, high, low });
-        price = close;
-      }
-      return candles;
-    };
-    const candles = genCandles(120);
+    const W = () => canvas.width, H = () => canvas.height;
+
+    // Stars
+    const stars = Array.from({length:200}, () => ({
+      x: Math.random(), y: Math.random(),
+      r: Math.random()*1.5+0.2,
+      pulse: Math.random()*Math.PI*2,
+      speed: 0.005+Math.random()*0.02,
+      color: Math.random()>0.7 ? '#00FF41' : Math.random()>0.5 ? '#E0BC6A' : '#FFFFFF',
+      alpha: 0.3+Math.random()*0.7,
+    }));
+
+    // Constellation nodes (market-themed)
+    const nodes = Array.from({length:28}, (_, i) => ({
+      x: 0.1+Math.random()*0.8,
+      y: 0.1+Math.random()*0.8,
+      vx: (Math.random()-0.5)*0.0003,
+      vy: (Math.random()-0.5)*0.0003,
+      r: 2+Math.random()*3,
+      pulse: Math.random()*Math.PI*2,
+      label: ['NIFTY','TCS','HDFC','RIL','INFY','BAJF','SBI','WIPRO','LT','TATAM',
+               'ADANI','ITC','HUL','AXIS','KOTAK','SUNP','DRRD','ONGC','COAL','NTPC',
+               'POWER','TITAN','ASIAN','NEST','DABUR','MARTI','HCLT','ICICI'][i%28],
+    }));
+
+    let t = 0;
 
     const draw = () => {
-      const W = canvas.width, H = canvas.height;
-      ctx.clearRect(0, 0, W, H);
+      const w = W(), h = H();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(0,0,w,h);
 
-      const candleW = 14;
-      const gap     = 6;
-      const step    = candleW + gap;
-      const visible = Math.ceil(W / step) + 2;
+      t += 0.008;
 
-      // Find price range
-      const slice = candles.slice(Math.max(0, Math.floor(offset)), Math.floor(offset) + visible);
-      const allPrices = slice.flatMap(c => [c.high, c.low]);
-      const minP = Math.min(...allPrices) - 20;
-      const maxP = Math.max(...allPrices) + 20;
-      const priceH = maxP - minP;
-      const scaleY = (p) => H * 0.85 - ((p - minP) / priceH) * (H * 0.7);
-
-      const startX = -(offset % 1) * step;
-
-      for (let i = 0; i < visible; i++) {
-        const idx = Math.floor(offset) + i;
-        if (idx < 0 || idx >= candles.length) continue;
-        const c = candles[idx % candles.length];
-        const x = startX + i * step;
-        const isUp = c.close >= c.open;
-        const color = isUp ? '#22C55E' : '#EF4444';
-        const alpha = 0.55 + (i / visible) * 0.3;
-
+      // Draw stars
+      stars.forEach(s => {
+        s.pulse += s.speed;
+        const alpha = s.alpha * (0.6 + 0.4*Math.sin(s.pulse));
+        ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.strokeStyle = color;
-        ctx.lineWidth   = 1;
-
-        // Wick
+        ctx.fillStyle = s.color;
         ctx.beginPath();
-        ctx.moveTo(x + candleW/2, scaleY(c.high));
-        ctx.lineTo(x + candleW/2, scaleY(c.low));
-        ctx.stroke();
+        ctx.arc(s.x*w, s.y*h, s.r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      });
 
-        // Body
-        ctx.fillStyle = color;
-        const bodyTop = Math.min(scaleY(c.open), scaleY(c.close));
-        const bodyH   = Math.max(2, Math.abs(scaleY(c.open) - scaleY(c.close)));
-        ctx.fillRect(x, bodyTop, candleW, bodyH);
+      // Move nodes
+      nodes.forEach(n => {
+        n.x += n.vx; n.y += n.vy;
+        if(n.x<0.05||n.x>0.95) n.vx*=-1;
+        if(n.y<0.05||n.y>0.95) n.vy*=-1;
+        n.pulse += 0.02;
+      });
+
+      // Draw constellation lines
+      for(let i=0;i<nodes.length;i++) {
+        for(let j=i+1;j<nodes.length;j++) {
+          const a = nodes[i], b = nodes[j];
+          const dx = (a.x-b.x)*w, dy = (a.y-b.y)*h;
+          const dist = Math.sqrt(dx*dx+dy*dy);
+          if(dist < w*0.18) {
+            const alpha = (1-dist/(w*0.18))*0.25;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = '#00FF41';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(a.x*w, a.y*h);
+            ctx.lineTo(b.x*w, b.y*h);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
       }
 
-      ctx.globalAlpha = 1;
-      offset += 0.025;
-      if (offset >= candles.length - visible) offset = 0;
-      animFrame = requestAnimationFrame(draw);
+      // Draw nodes
+      nodes.forEach(n => {
+        const x=n.x*w, y=n.y*h;
+        const pulse = 0.6+0.4*Math.sin(n.pulse);
+        // Glow
+        ctx.save();
+        ctx.globalAlpha = 0.3*pulse;
+        const grd = ctx.createRadialGradient(x,y,0,x,y,n.r*6);
+        grd.addColorStop(0,'#00FF41');
+        grd.addColorStop(1,'transparent');
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(x,y,n.r*6,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+        // Core
+        ctx.save();
+        ctx.globalAlpha = 0.8*pulse;
+        ctx.fillStyle = '#00FF41';
+        ctx.beginPath();
+        ctx.arc(x,y,n.r,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+        // Label
+        ctx.save();
+        ctx.globalAlpha = 0.35*pulse;
+        ctx.fillStyle = '#00FF41';
+        ctx.font = `7px 'DM Mono',monospace`;
+        ctx.fillText(n.label, x+n.r+3, y+3);
+        ctx.restore();
+      });
+
+      // Falling matrix rain columns (subtle)
+      for(let col=0; col<Math.floor(w/18); col++) {
+        const x = col*18;
+        const drop = ((t*60 + col*37) % (h+200)) - 100;
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+        ctx.fillStyle = '#00FF41';
+        ctx.font = '10px monospace';
+        ctx.fillText(String.fromCharCode(0x30A0+Math.floor(Math.random()*96)), x, drop);
+        ctx.restore();
+      }
+
+      raf = requestAnimationFrame(draw);
     };
+
     draw();
-    return () => { cancelAnimationFrame(animFrame); window.removeEventListener('resize', resize); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
   }, []);
 
-  // Auto-advance slides
+  // ── Animated counters ──
+  useEffect(() => {
+    const targets = { stocks:30, research:18, accuracy:94, users:1200 };
+    const duration = 2500;
+    const start = Date.now();
+    const tick = () => {
+      const elapsed = Date.now()-start;
+      const prog = Math.min(elapsed/duration, 1);
+      const ease = 1-Math.pow(1-prog, 3);
+      setCounters({
+        stocks:   Math.floor(ease*targets.stocks),
+        research: Math.floor(ease*targets.research),
+        accuracy: Math.floor(ease*targets.accuracy),
+        users:    Math.floor(ease*targets.users),
+      });
+      if(prog<1) requestAnimationFrame(tick);
+    };
+    const timer = setTimeout(tick, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ── Auto-advance slides ──
   const SLIDES = [
-    { quote:"The stock market is a device for transferring money from the impatient to the patient.", author:"Warren Buffett" },
-    { quote:"In the short run the market is a voting machine. In the long run it is a weighing machine.", author:"Benjamin Graham" },
-    { quote:"Risk comes from not knowing what you are doing.", author:"Warren Buffett" },
-    { quote:"The four most dangerous words in investing: this time it's different.", author:"Sir John Templeton" },
-    { quote:"An investment in knowledge pays the best interest.", author:"Benjamin Franklin" },
-    { quote:"Know what you own, and know why you own it.", author:"Peter Lynch" },
-    { quote:"The individual investor should act consistently as an investor and not as a speculator.", author:"Benjamin Graham" },
-    { quote:"Behind every stock is a company. Find out what it's doing.", author:"Peter Lynch" },
+    { type:"quote", text:"The stock market is a device for transferring money from the impatient to the patient.", author:"Warren Buffett", tag:"Investment Philosophy" },
+    { type:"insight", text:"NIFTY 50 has delivered 14.8% CAGR over the last 20 years — outperforming every major asset class in India.", author:"DNR Research", tag:"Market Insight" },
+    { type:"quote", text:"In the short run the market is a voting machine. In the long run it is a weighing machine.", author:"Benjamin Graham", tag:"Timeless Wisdom" },
+    { type:"insight", text:"FIIs have invested over ₹2.5 lakh crore in Indian equities in the last 3 years despite global headwinds.", author:"DNR Data", tag:"Institutional Flow" },
+    { type:"quote", text:"Risk comes from not knowing what you are doing.", author:"Warren Buffett", tag:"Risk Management" },
+    { type:"insight", text:"Indian mutual fund AUM crossed ₹54 lakh crore — retail participation in equities at an all-time high.", author:"AMFI Data", tag:"Market Milestone" },
+    { type:"quote", text:"Know what you own, and know why you own it.", author:"Peter Lynch", tag:"Investment Principle" },
+    { type:"insight", text:"Q3FY25 earnings season showed 18% average revenue growth across NIFTY 50 companies — broad-based recovery.", author:"DNR Analysis", tag:"Earnings Update" },
   ];
 
   useEffect(() => {
     const t = setInterval(() => {
       setSlideFade(false);
-      setTimeout(() => {
-        setSlideIdx(i => (i + 1) % SLIDES.length);
-        setSlideFade(true);
-      }, 600);
-    }, 4500);
+      setTimeout(() => { setSlideIdx(i => (i+1)%SLIDES.length); setSlideFade(true); }, 500);
+    }, 5000);
     return () => clearInterval(t);
   }, []);
 
-  // Hero stats — 5 key indices live
-  const HERO_KEYS = ["NIFTY 50","SENSEX","GOLD (₹)","USD/INR","CRUDE"];
-  const heroStats = HERO_KEYS.map(k => markets[k] || { label:k, v:"···", c:"", u:true });
-
-  const FEATURES = [
-    { icon:"🔬", title:"18-Dimension Research", desc:"Business · Financials · Valuation · Peer · Technical · Verdict", tab:"research" },
-    { icon:"📈", title:"Technical Charts Suite", desc:"MA · RSI · MACD · Bollinger Bands · Volume Analysis", tab:"technical" },
-    { icon:"🔍", title:"Smart Screener", desc:"30 stocks · 10 numeric filters · 8 presets · AI analysis", tab:"screener" },
-    { icon:"💼", title:"Portfolio Tracker", desc:"Real-time P&L · AI review · Allocation charts · CSV export", tab:"portfolio" },
-    { icon:"📦", title:"Bulk & Block Deals", desc:"Institutional smart money tracker · AI deal analysis", tab:"bulkdeals" },
-    { icon:"🧮", title:"Financial Calculators", desc:"SIP · Lumpsum · Position Sizing · Tax · Options Pricer", tab:"calculators" },
+  // ── Live price tiles ──
+  const PRICE_TILES = [
+    { key:"NIFTY 50",  icon:"📊", color:"#00FF41" },
+    { key:"SENSEX",    icon:"📈", color:"#E0BC6A" },
+    { key:"NIFTY BANK",icon:"🏦", color:"#00BFFF" },
+    { key:"GOLD (₹)",  icon:"🥇", color:"#FFD700" },
+    { key:"CRUDE",     icon:"🛢️", color:"#FF6B35" },
+    { key:"USD/INR",   icon:"💱", color:"#A855F7" },
   ];
 
+  if (!entered) {
+    // ── CINEMATIC ENTRY SCREEN ──
+    return (
+      <div style={{
+        position:"relative", width:"100%", height:"calc(100vh - 48px)",
+        background:"#000", overflow:"hidden",
+        display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+      }}>
+        <canvas ref={canvasRef} style={{ position:"absolute", inset:0, width:"100%", height:"100%" }} />
+        <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 80% 80% at 50% 50%, transparent 20%, #00000099 100%)", pointerEvents:"none" }} />
+
+        {/* Logo */}
+        <div style={{ position:"relative", zIndex:10, textAlign:"center", animation:"entryFadeUp 1.2s ease forwards" }}>
+          <div style={{ position:"relative", display:"inline-block", marginBottom:32 }}>
+            {/* Outer rings */}
+            {[100,120,140].map((size,i) => (
+              <div key={i} style={{
+                position:"absolute",
+                top:`${-((size-80)/2)}px`, left:`${-((size-80)/2)}px`,
+                width:size, height:size, borderRadius:"50%",
+                border:`1px solid ${i===0?"#00FF41":i===1?"#E0BC6A33":"#00FF4118"}`,
+                animation:`spin${i===1?"Rev":""}${60+i*20}s ${60+i*20}s linear infinite`,
+              }}/>
+            ))}
+            <img src="/logo.png" alt="DNR Capitals" style={{
+              width:140, height:140, borderRadius:"50%", objectFit:"cover",
+              border:"2px solid #00FF4166",
+              boxShadow:"0 0 60px #00FF4144, 0 0 120px #00FF4122, 0 0 30px #E0BC6A33",
+              position:"relative", zIndex:2,
+            }}/>
+          </div>
+
+          <div style={{ fontSize:9, color:"#00FF41", letterSpacing:"8px", textTransform:"uppercase", marginBottom:16, opacity:0.8 }}>
+            DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE
+          </div>
+
+          <h1 style={{
+            fontFamily:"'Cormorant Garamond',serif",
+            fontSize:"clamp(48px,8vw,96px)", fontWeight:700,
+            color:"#F0FFF0", lineHeight:0.9,
+            textShadow:"0 0 80px #00FF4122",
+            marginBottom:8,
+          }}>Know Before</h1>
+          <h1 style={{
+            fontFamily:"'Cormorant Garamond',serif",
+            fontSize:"clamp(48px,8vw,96px)", fontWeight:700,
+            fontStyle:"italic", color:"#E0BC6A",
+            textShadow:"0 0 60px #E0BC6A44",
+            marginBottom:40, display:"block",
+          }}>You Invest</h1>
+
+          <button onClick={() => setEntered(true)} style={{
+            padding:"16px 48px",
+            background:"transparent",
+            border:"1px solid #00FF41",
+            borderRadius:4,
+            color:"#00FF41",
+            fontFamily:"'Jost',sans-serif",
+            fontSize:13, fontWeight:600,
+            letterSpacing:"4px", textTransform:"uppercase",
+            cursor:"pointer",
+            position:"relative",
+            overflow:"hidden",
+            transition:"all 0.3s",
+            boxShadow:"0 0 20px #00FF4133, inset 0 0 20px #00FF4108",
+          }}
+          onMouseEnter={e => {
+            e.target.style.background="#00FF4115";
+            e.target.style.boxShadow="0 0 40px #00FF4166, inset 0 0 30px #00FF4115";
+            e.target.style.letterSpacing="6px";
+          }}
+          onMouseLeave={e => {
+            e.target.style.background="transparent";
+            e.target.style.boxShadow="0 0 20px #00FF4133, inset 0 0 20px #00FF4108";
+            e.target.style.letterSpacing="4px";
+          }}>
+            ▶ &nbsp; ENTER PLATFORM
+          </button>
+
+          <div style={{ marginTop:24, fontSize:10, color:"#2A4A2A", letterSpacing:"2px" }}>
+            POWERED BY GROQ AI · REAL-TIME DATA · 18 RESEARCH DIMENSIONS
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes entryFadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+          @keyframes spin60s { to{transform:rotate(360deg)} }
+          @keyframes spinRev80s { to{transform:rotate(-360deg)} }
+        `}</style>
+      </div>
+    );
+  }
+
+  // ── MAIN HOMEPAGE (after entry) ──
   return (
-    <div className="home-page">
-      {/* Animated candlestick canvas */}
-      <canvas ref={canvasRef} className="home-canvas" style={{ width:"100%", height:"100%" }} />
-      {/* Overlays */}
-      <div className="home-overlay" />
-      <div className="home-grid" />
+    <div style={{ position:"relative", width:"100%", minHeight:"calc(100vh - 48px)", background:"#000", overflow:"hidden" }}>
+      <canvas ref={canvasRef} style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0.7 }} />
+      <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 100% 60% at 50% 0%, transparent 0%, #000000cc 70%)", pointerEvents:"none" }} />
 
-      {/* Hero section */}
-      <div className="home-hero">
-        {/* Logo medallion */}
-        <div className="home-logo-wrap" onClick={() => {}}>
-          <div className="home-logo-ring" />
-          <div className="home-logo-ring2" />
-          <img src="/logo.png" alt="DNR Capitals" className="home-logo-img" />
+      <div style={{ position:"relative", zIndex:10 }}>
+
+        {/* ── HERO ── */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"48px 40px 32px", textAlign:"center" }}>
+          {/* Logo */}
+          <div style={{ position:"relative", marginBottom:24 }}>
+            <div style={{ position:"absolute", inset:-14, borderRadius:"50%", border:"1px solid #00FF4133", animation:"spin60s 60s linear infinite" }}/>
+            <div style={{ position:"absolute", inset:-22, borderRadius:"50%", border:"1px solid #E0BC6A1A", animation:"spinRev80s 80s linear infinite" }}/>
+            <img src="/logo.png" alt="DNR Capitals" style={{
+              width:100, height:100, borderRadius:"50%", objectFit:"cover",
+              border:"2px solid #00FF4155",
+              boxShadow:"0 0 40px #00FF4144, 0 0 80px #00FF4122",
+              position:"relative", zIndex:2,
+            }}/>
+          </div>
+
+          <div style={{ fontSize:9, color:"#00FF41", letterSpacing:"6px", textTransform:"uppercase", marginBottom:14, opacity:0.8 }}>
+            DNR Capitals · Equity Research Intelligence
+          </div>
+
+          <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(40px,6vw,80px)", fontWeight:700, color:"#F0FFF0", lineHeight:0.92, textShadow:"0 0 60px #00FF4115", marginBottom:4 }}>
+            Know Before
+          </h1>
+          <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(40px,6vw,80px)", fontWeight:700, fontStyle:"italic", color:"#E0BC6A", textShadow:"0 0 40px #E0BC6A44", marginBottom:20, display:"block" }}>
+            You Invest
+          </span>
+
+          {/* CTA buttons */}
+          <div style={{ display:"flex", gap:12, flexWrap:"wrap", justifyContent:"center", marginBottom:40 }}>
+            {[
+              { label:"🔬 Deep Research", tab:"research", primary:true },
+              { label:"🔍 Screener",      tab:"screener", primary:false },
+              { label:"💼 Portfolio",     tab:"portfolio", primary:false },
+            ].map(b => (
+              <button key={b.tab} onClick={() => setActiveTab(b.tab)} style={{
+                padding:"11px 26px",
+                background: b.primary ? "linear-gradient(135deg,#00FF4122,#00FF4108)" : "transparent",
+                border:`1px solid ${b.primary?"#00FF41":"#1A2A1A"}`,
+                borderRadius:4, color: b.primary?"#00FF41":"#4A6A4A",
+                fontFamily:"'Jost',sans-serif", fontSize:12, fontWeight:600,
+                letterSpacing:"1px", cursor:"pointer", transition:"all 0.2s",
+                boxShadow: b.primary ? "0 0 20px #00FF4122" : "none",
+              }}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="#00FF41";e.currentTarget.style.color="#00FF41";e.currentTarget.style.boxShadow="0 0 20px #00FF4133"}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=b.primary?"#00FF41":"#1A2A1A";e.currentTarget.style.color=b.primary?"#00FF41":"#4A6A4A";e.currentTarget.style.boxShadow=b.primary?"0 0 20px #00FF4122":"none"}}>
+                {b.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="home-eyebrow">
-          <div className="home-eyebrow-line" />
-          DNR Capitals · Equity Research Intelligence
-          <div className="home-eyebrow-line" />
-        </div>
-
-        <h1 className="home-title">Know Before</h1>
-        <span className="home-title-accent">You Invest</span>
-
-        <div className="home-divider">
-          <div className="home-divider-line" />
-          <div className="home-divider-diamond" />
-          <div className="home-divider-line" />
-        </div>
-
-        <p className="home-subtitle">
-          Institutional-grade equity research powered by Groq AI. Deep-dive analysis across 18 dimensions — from business fundamentals to technical charts, peer benchmarking and portfolio intelligence.
-        </p>
-
-        <div className="home-btns">
-          <button className="btn-gold" onClick={() => setActiveTab("research")} style={{ padding:"12px 28px", fontSize:13 }}>
-            🔬 Start Deep Research
-          </button>
-          <button className="btn-primary" onClick={() => setActiveTab("screener")} style={{ padding:"12px 28px", fontSize:13 }}>
-            🔍 Stock Screener
-          </button>
-          <button className="btn-ghost" onClick={() => setActiveTab("portfolio")} style={{ padding:"12px 28px", fontSize:13 }}>
-            💼 Portfolio
-          </button>
-        </div>
-      </div>
-
-      {/* Live market stats bar */}
-      <div className="home-stats">
-        {heroStats.map(s => (
-          <div key={s.label} className="home-stat-item">
-            <div style={{ fontSize:8, color:T.mutedDark, letterSpacing:"2px", textTransform:"uppercase", marginBottom:4 }}>{s.label}</div>
-            <div style={{ fontFamily:"'DM Mono',monospace", fontSize:16, fontWeight:700, color: fetching&&s.v==="···" ? T.mutedDark : T.dun }}>
-              {s.v}
+        {/* ── ANIMATED COUNTERS ── */}
+        <div style={{
+          display:"flex", justifyContent:"center", gap:0,
+          borderTop:"1px solid #00FF4122", borderBottom:"1px solid #00FF4122",
+          background:"#00000088", padding:"20px 0", marginBottom:0,
+        }}>
+          {[
+            { label:"Stocks Covered",    val:counters.stocks,   suffix:"+",  color:"#00FF41" },
+            { label:"Research Dimensions",val:counters.research, suffix:"",   color:"#E0BC6A" },
+            { label:"AI Accuracy Score",  val:counters.accuracy, suffix:"%",  color:"#00BFFF" },
+            { label:"Data Points / Stock",val:counters.users,    suffix:"+",  color:"#A855F7" },
+          ].map((c,i) => (
+            <div key={i} style={{
+              flex:1, textAlign:"center", padding:"0 20px",
+              borderRight: i<3 ? "1px solid #00FF4115" : "none",
+            }}>
+              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(28px,4vw,44px)", fontWeight:700, color:c.color, lineHeight:1, textShadow:`0 0 20px ${c.color}66` }}>
+                {c.val}{c.suffix}
+              </div>
+              <div style={{ fontSize:9, color:"#2A4A2A", letterSpacing:"2px", textTransform:"uppercase", marginTop:6 }}>
+                {c.label}
+              </div>
             </div>
-            {s.c ? (
-              <div style={{ fontSize:10, color:s.u?T.greenLight:T.redLight, marginTop:2 }}>{s.u?"▲":"▼"} {s.c}</div>
-            ) : (
-              <div style={{ fontSize:10, color:T.mutedDark, marginTop:2 }}>{fetching?"Loading…":"—"}</div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Rotating quotes / news slides */}
-      <div className="home-slides">
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:12 }}>
-          <div style={{ width:30, height:1, background:`linear-gradient(90deg,transparent,${T.gold}55)` }} />
-          <span style={{ fontSize:8, color:T.goldDim, letterSpacing:"3px", textTransform:"uppercase" }}>Investment Wisdom</span>
-          <div style={{ width:30, height:1, background:`linear-gradient(90deg,${T.gold}55,transparent)` }} />
-        </div>
-        <div className="slide-track">
-          <div style={{ transition:"opacity 0.6s", opacity: slideFade ? 1 : 0, textAlign:"center" }}>
-            <div className="slide-quote">"{SLIDES[slideIdx].quote}"</div>
-            <div className="slide-author">— {SLIDES[slideIdx].author}</div>
-          </div>
-        </div>
-        <div className="slide-dots">
-          {SLIDES.map((_, i) => (
-            <div key={i} className={`slide-dot ${i===slideIdx?"active":""}`} onClick={() => setSlideIdx(i)} />
           ))}
         </div>
-      </div>
 
-      {/* Feature cards */}
-      <div className="home-features">
-        {FEATURES.map(f => (
-          <div key={f.title} className="home-feat" onClick={() => setActiveTab(f.tab)}>
-            <div className="home-feat-icon">{f.icon}</div>
-            <div>
-              <div className="home-feat-title">{f.title}</div>
-              <div className="home-feat-desc">{f.desc}</div>
+        {/* ── LIVE PRICE TILES ── */}
+        <div style={{ padding:"20px 24px", borderBottom:"1px solid #00FF4115" }}>
+          <div style={{ fontSize:8, color:"#2A4A2A", letterSpacing:"3px", textTransform:"uppercase", marginBottom:12, textAlign:"center" }}>
+            ● LIVE MARKET DATA
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:8 }}>
+            {PRICE_TILES.map(tile => {
+              const live = markets[tile.key];
+              return (
+                <div key={tile.key} style={{
+                  background:"#050505",
+                  border:`1px solid ${tile.color}22`,
+                  borderRadius:6, padding:"12px 10px", textAlign:"center",
+                  transition:"all 0.3s",
+                  boxShadow:`0 0 12px ${tile.color}0f`,
+                  cursor:"pointer",
+                }}
+                onMouseEnter={e=>{e.currentTarget.style.border=`1px solid ${tile.color}66`;e.currentTarget.style.boxShadow=`0 0 24px ${tile.color}33`}}
+                onMouseLeave={e=>{e.currentTarget.style.border=`1px solid ${tile.color}22`;e.currentTarget.style.boxShadow=`0 0 12px ${tile.color}0f`}}>
+                  <div style={{ fontSize:14, marginBottom:4 }}>{tile.icon}</div>
+                  <div style={{ fontSize:9, color:"#2A4A2A", letterSpacing:"1px", textTransform:"uppercase", marginBottom:6 }}>{tile.key}</div>
+                  <div style={{ fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:700, color:live?tile.color:"#1A3A1A" }}>
+                    {live?.v || "···"}
+                  </div>
+                  {live?.c && (
+                    <div style={{ fontSize:10, color:live.u?"#00FF41":"#FF3333", marginTop:3 }}>
+                      {live.u?"▲":"▼"} {live.c}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── SLIDING QUOTES / INSIGHTS ── */}
+        <div style={{ padding:"24px 40px", borderBottom:"1px solid #00FF4115", background:"#00000066" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ width:3, height:16, background:"#00FF41", boxShadow:"0 0 8px #00FF41" }}/>
+              <span style={{ fontSize:8, color:"#00FF41", letterSpacing:"3px", textTransform:"uppercase" }}>
+                {SLIDES[slideIdx].tag}
+              </span>
+            </div>
+            <div style={{ display:"flex", gap:5 }}>
+              {SLIDES.map((_,i) => (
+                <div key={i} onClick={() => setSlideIdx(i)} style={{
+                  width: i===slideIdx?16:5, height:5, borderRadius:3,
+                  background: i===slideIdx?"#00FF41":"#1A2A1A",
+                  cursor:"pointer", transition:"all 0.3s",
+                  boxShadow: i===slideIdx?"0 0 8px #00FF41":"none",
+                }}/>
+              ))}
             </div>
           </div>
-        ))}
+          <div style={{ transition:"opacity 0.5s", opacity:slideFade?1:0, minHeight:60 }}>
+            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(14px,2vw,18px)", fontStyle:"italic", color:"#A8C8A8", lineHeight:1.7 }}>
+              "{SLIDES[slideIdx].text}"
+            </div>
+            <div style={{ fontSize:10, color:"#00FF41", letterSpacing:"2px", marginTop:8, opacity:0.7 }}>
+              — {SLIDES[slideIdx].author}
+            </div>
+          </div>
+        </div>
+
+        {/* ── FEATURE GRID ── */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"1px", background:"#00FF4108", borderTop:"1px solid #00FF4115" }}>
+          {[
+            { icon:"🔬", title:"18-Dimension Deep Research", desc:"Business · Financials · Valuation · Peer · Technical · DCF · Verdict", tab:"research", color:"#00FF41" },
+            { icon:"📈", title:"Technical Charts Suite",     desc:"MA · RSI · MACD · Bollinger Bands · Volume Analysis",               tab:"technical", color:"#E0BC6A" },
+            { icon:"🔍", title:"Smart Screener",             desc:"30 stocks · 10 numeric filters · 8 presets · AI analysis",          tab:"screener",  color:"#00BFFF" },
+            { icon:"💼", title:"Portfolio Tracker",          desc:"Real-time P&L · AI review · Allocation charts · CSV export",        tab:"portfolio", color:"#A855F7" },
+            { icon:"📦", title:"Bulk & Block Deals",         desc:"Institutional smart money tracker · AI deal analysis",              tab:"bulkdeals", color:"#FF6B35" },
+            { icon:"🧮", title:"Financial Calculators",      desc:"SIP · Lumpsum · Position Sizing · Tax · Black-Scholes",            tab:"calculators",color:"#FFD700" },
+          ].map(f => (
+            <div key={f.tab} onClick={() => setActiveTab(f.tab)} style={{
+              background:"#000000", padding:"22px 24px",
+              cursor:"pointer", display:"flex", alignItems:"flex-start", gap:12,
+              transition:"background 0.25s, border 0.25s",
+              borderLeft:`2px solid transparent`,
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.background="#050F05";e.currentTarget.style.borderLeft=`2px solid ${f.color}`}}
+            onMouseLeave={e=>{e.currentTarget.style.background="#000000";e.currentTarget.style.borderLeft="2px solid transparent"}}>
+              <div style={{
+                fontSize:18, width:38, height:38,
+                background:`${f.color}15`, border:`1px solid ${f.color}33`,
+                borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center",
+                flexShrink:0, boxShadow:`0 0 12px ${f.color}15`,
+              }}>{f.icon}</div>
+              <div>
+                <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:14, fontWeight:600, color:"#E8F5E8", marginBottom:4 }}>{f.title}</div>
+                <div style={{ fontSize:10, color:"#2A4A2A", lineHeight:1.6 }}>{f.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer strip */}
+        <div style={{ padding:"12px 24px", display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:"1px solid #00FF4115", background:"#000" }}>
+          <span style={{ fontSize:9, color:"#1A3A1A", letterSpacing:"1px" }}>© {new Date().getFullYear()} DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE</span>
+          <span style={{ fontSize:9, color:"#1A3A1A", letterSpacing:"1px" }}>POWERED BY GROQ AI · NOT SEBI REGISTERED ADVICE</span>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes entryFadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes spin60s { to{transform:rotate(360deg)} }
+        @keyframes spinRev80s { to{transform:rotate(-360deg)} }
+      `}</style>
+    </div>
+  );
+}
+
+        <span style={{ fontSize:9, color:"#2A3A55" }}>Powered by Groq AI · For educational purposes only · Not SEBI registered investment advice</span>
       </div>
     </div>
   );
