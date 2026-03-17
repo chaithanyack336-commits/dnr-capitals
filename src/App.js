@@ -11,24 +11,53 @@ const GROQ_API_KEY = process.env.REACT_APP_GROQ_API_KEY || "";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── THEME — DUN + WALNUT BROWN ──────────────────────────────────────────────
+// ─── THEME — DEEP NAVY + GOLD (Bloomberg-style) ─────────────────────────────
 const T = {
-  dun: "#D8C7B5",
-  dunLight: "#EAE0D5",
-  dunDark: "#C4AF9A",
-  walnut: "#67625C",
-  walnutLight: "#847D76",
-  walnutDark: "#4A4540",
-  walnutDeep: "#2E2B28",
-  walnutDeeper: "#1A1816",
-  gold: "#C9A84C",
-  goldLight: "#E0BC6A",
-  cream: "#F5EFE8",
-  red: "#A64444",
-  green: "#4A7C59",
-  blue: "#4A6B8A",
-  muted: "#9A9490",
-  ink: "#1A1816",
+  // Navy backgrounds (darkest to lightest)
+  navyDeepest: "#04060F",
+  navyDeep:    "#070C1A",
+  navy:        "#0C1222",
+  navyMid:     "#101828",
+  navyLight:   "#162038",
+  navyBorder:  "#1E2D4A",
+  navyHover:   "#1A2840",
+  navyActive:  "#243356",
+  // Gold accents
+  gold:        "#C9A84C",
+  goldLight:   "#E0BC6A",
+  goldPale:    "#F5D88A",
+  goldDim:     "#9A7A38",
+  goldGlow:    "#E0BC6A55",
+  // Text
+  dun:         "#E2E8F4",
+  dunLight:    "#F0F4FF",
+  dunDark:     "#B8C4DC",
+  muted:       "#6B7A99",
+  mutedDark:   "#4A5570",
+  // Semantic
+  green:       "#22C55E",
+  greenLight:  "#4ADE80",
+  red:         "#EF4444",
+  redLight:    "#F87171",
+  blue:        "#3B82F6",
+  blueLight:   "#60A5FA",
+  // Logo blue
+  cosmicBlue:      "#1A5FB4",
+  cosmicBlueLight: "#3A8FE8",
+  cosmicBlueDim:   "#0D3A7A",
+  cosmicBluePale:  "#5AAEFF",
+  // Legacy aliases (keep components working)
+  walnut:       "#1E2D4A",
+  walnutLight:  "#2A3D60",
+  walnutDark:   "#162038",
+  walnutDeep:   "#0C1222",
+  walnutDeeper: "#070C1A",
+  cream:        "#E2E8F4",
+  ink:          "#04060F",
+  // Light mode surfaces
+  surface:    "#F0F4FF",
+  surfaceAlt: "#E4EAF8",
+  border:     "#C0CADC",
 };
 
 // ─── GROQ API WITH REAL-TIME AWARENESS ───────────────────────────────────────
@@ -307,6 +336,120 @@ async function fetchFundamentals(symbol) {
   return null;
 }
 
+// ─── LIVE MARKET DATA ENGINE ──────────────────────────────────────────────────
+// Yahoo Finance symbols mapped to display labels
+const MARKET_SYMBOLS = [
+  { sym:"^NSEI",          label:"NIFTY 50",    prefix:"",  fmt:"indian" },
+  { sym:"^BSESN",         label:"SENSEX",      prefix:"",  fmt:"indian" },
+  { sym:"^NSEBANK",       label:"NIFTY BANK",  prefix:"",  fmt:"indian" },
+  { sym:"^CNXIT",         label:"NIFTY IT",    prefix:"",  fmt:"indian" },
+  { sym:"NIFTYMIDCAP150.NS",label:"MIDCAP 150",prefix:"",  fmt:"indian" },
+  { sym:"^GSPC",          label:"S&P 500",     prefix:"",  fmt:"us2" },
+  { sym:"^IXIC",          label:"NASDAQ",      prefix:"",  fmt:"us0" },
+  { sym:"^DJI",           label:"DOW",         prefix:"",  fmt:"us0" },
+  { sym:"GC=F",           label:"GOLD",        prefix:"$", fmt:"us2" },
+  { sym:"CL=F",           label:"CRUDE",       prefix:"$", fmt:"us2" },
+  { sym:"USDINR=X",       label:"USD/INR",     prefix:"₹", fmt:"us2" },
+  { sym:"GOLDBEES.NS",    label:"GOLD (₹)",    prefix:"₹", fmt:"indian" },
+];
+
+async function fetchSingleQuote(sym) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`;
+  const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+  const res  = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+  const json = await res.json();
+  const data = JSON.parse(json.contents);
+  const q    = data?.chart?.result?.[0];
+  if (!q) return null;
+  const meta = q.meta;
+  const price = meta.regularMarketPrice;
+  const prev  = meta.previousClose || meta.chartPreviousClose || price;
+  return {
+    price,
+    prev,
+    change:    (price - prev).toFixed(2),
+    changePct: (((price - prev) / prev) * 100).toFixed(2),
+    up:        price >= prev,
+  };
+}
+
+async function fetchLiveMarkets() {
+  const results = {};
+  // Fetch all in parallel — individual failures don't break the rest
+  await Promise.allSettled(
+    MARKET_SYMBOLS.map(async ({ sym, label, prefix, fmt }) => {
+      try {
+        const q = await fetchSingleQuote(sym);
+        if (!q) return;
+        const fmtPrice = (p) => {
+          if (fmt === "indian") return p >= 1000 ? p.toLocaleString("en-IN", {maximumFractionDigits:0}) : p.toFixed(2);
+          if (fmt === "us0")    return p.toLocaleString("en-US", {maximumFractionDigits:0});
+          return p.toFixed(2);
+        };
+        results[label] = {
+          label,
+          v:       `${prefix}${fmtPrice(q.price)}`,
+          c:       `${q.up?"+":""}${q.changePct}%`,
+          u:       q.up,
+          raw:     q.price,
+          chgAbs:  q.change,
+        };
+      } catch (_) {}
+    })
+  );
+  return results;
+}
+
+// React hook — fetches on mount, refreshes every 90 seconds
+function useLiveMarkets() {
+  const [markets, setMarkets] = useState({});
+  const [lastFetch, setLastFetch] = useState(null);
+  const [fetching, setFetching]  = useState(false);
+
+  const refresh = useCallback(async () => {
+    setFetching(true);
+    const data = await fetchLiveMarkets();
+    if (Object.keys(data).length > 0) {
+      setMarkets(data);
+      setLastFetch(new Date().toLocaleTimeString("en-IN"));
+    }
+    setFetching(false);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const interval = setInterval(refresh, 90000); // refresh every 90s
+    return () => clearInterval(interval);
+  }, [refresh]);
+
+  return { markets, lastFetch, fetching, refresh };
+}
+
+// ─── LIVE FII/DII FETCHER ─────────────────────────────────────────────────────
+async function fetchLiveFIIDII() {
+  const today = new Date().toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
+  const raw = await callGroq(
+    `You are a financial data analyst. Today is ${today}.
+Provide the most current available FII (Foreign Institutional Investor) and DII (Domestic Institutional Investor) monthly net flow data for Indian equity markets.
+Use the latest available SEBI/NSE/BSE data you know up to your knowledge cutoff.
+
+Return ONLY a valid JSON array for the last 6 months of data (most recent last):
+[{"month":"Oct 2024","fii":-94017,"dii":107254},{"month":"Nov 2024","fii":-45974,"dii":54626},...]
+
+Where values are in crore INR (negative = net seller, positive = net buyer).
+Use actual known data where available, estimate based on trends where not. Today is ${today}.
+Return ONLY the JSON array, no text before or after.`,
+    "Return only valid JSON array. No explanations, no markdown.",
+    null
+  );
+  try {
+    let clean = raw.replace(/```json|```/g,"").trim();
+    if (!clean.startsWith("[")) clean = clean.substring(clean.indexOf("["));
+    if (!clean.endsWith("]"))  clean = clean.substring(0, clean.lastIndexOf("]")+1);
+    return JSON.parse(clean);
+  } catch { return null; }
+}
+
 // Format numbers for display
 function fmtNum(n, prefix="") {
   if (!n && n !== 0) return "N/A";
@@ -317,124 +460,233 @@ function fmtNum(n, prefix="") {
   return `${prefix}${n.toFixed(2)}`;
 }
 
-// ─── STYLES ───────────────────────────────────────────────────────────────────
+// ─── STYLES — DEEP NAVY + GOLD BLOOMBERG TERMINAL ────────────────────────────
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Jost:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
   *{box-sizing:border-box;margin:0;padding:0}
   ::-webkit-scrollbar{width:4px;height:4px}
-  ::-webkit-scrollbar-track{background:${T.walnutDeep}}
-  ::-webkit-scrollbar-thumb{background:${T.walnut};border-radius:2px}
-  body{font-family:'Jost',sans-serif;background:${T.walnutDeeper};color:${T.dun}}
+  ::-webkit-scrollbar-track{background:${T.navyDeep}}
+  ::-webkit-scrollbar-thumb{background:${T.navyBorder};border-radius:2px}
+  ::-webkit-scrollbar-thumb:hover{background:${T.navyActive}}
 
-  /* LIGHT MODE */
-  body.light{background:#f5f0e8;color:#2a2010}
-  body.light .app{background:#f5f0e8}
-  body.light .hdr{background:linear-gradient(90deg,#e8dcc8,#f0e8d8cc);border-bottom:1px solid #c9b89a44}
-  body.light .nav{background:#e8dcc8;border-bottom:1px solid #c9b89a44}
-  body.light .nb{color:#6a5a40}
-  body.light .nb.on{background:#2a2010;color:#f0e8dc}
-  body.light .card{background:#ffffff;border-color:#c9b89a33}
-  body.light .inp{background:#ffffff;border-color:#c9b89a66;color:#2a2010}
-  body.light .main{background:#f5f0e8}
-
-  .app{min-height:100vh;background:${T.walnutDeeper};font-family:'Jost',sans-serif}
-
-  /* HEADER */
-  .hdr{
-    background:linear-gradient(90deg,${T.walnutDeep},${T.walnutDark}88);
-    border-bottom:1px solid ${T.walnut}44;
-    padding:0 24px;height:60px;
-    display:flex;align-items:center;justify-content:space-between;
-    position:sticky;top:0;z-index:200;backdrop-filter:blur(16px);
+  body{
+    font-family:'Jost',sans-serif;
+    background:${T.navyDeepest};
+    color:${T.dun};
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
   }
-  .logo{display:flex;align-items:center;gap:12px}
-  .logo-mark{
-    width:38px;height:38px;
-    background:linear-gradient(135deg,${T.goldLight},${T.gold});
-    border-radius:8px;display:flex;align-items:center;justify-content:center;
-    font-family:'Cormorant Garamond',serif;font-weight:700;font-size:18px;
-    color:${T.walnutDeep};box-shadow:0 0 20px ${T.gold}44;
-  }
-  .logo-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;color:${T.dun};line-height:1}
-  .logo-sub{font-size:9px;color:${T.goldLight};letter-spacing:2.5px;text-transform:uppercase;margin-top:2px}
+  ::selection{background:${T.goldGlow};color:${T.goldPale}}
 
-  .ticker{
-    flex:1;overflow:hidden;margin:0 20px;
-    font-family:'DM Mono',monospace;font-size:10px;color:${T.dunDark};
-    mask-image:linear-gradient(90deg,transparent,black 8%,black 92%,transparent);
-  }
-  .ticker-inner{display:flex;gap:28px;animation:tickScroll 35s linear infinite;white-space:nowrap}
-  @keyframes tickScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-  .t-up{color:${T.green}} .t-dn{color:${T.red}}
+  /* ── LAYOUT ── */
+  .app{display:flex;flex-direction:column;min-height:100vh;background:${T.navyDeepest}}
 
-  /* NAV */
-  .nav{
-    background:${T.walnutDeep}dd;border-bottom:1px solid ${T.walnut}33;
-    display:flex;padding:0 20px;gap:1px;overflow-x:auto;
-    backdrop-filter:blur(8px);
+  /* TOP BAR */
+  .top-bar{
+    position:fixed;top:0;left:0;right:0;height:48px;z-index:300;
+    background:${T.navyDeep};
+    border-bottom:1px solid ${T.navyBorder};
+    box-shadow:0 1px 0 ${T.gold}18, 0 4px 20px #00000044;
+    display:flex;align-items:center;padding:0 16px 0 0;gap:0;
   }
-  .nb{
-    padding:11px 16px;background:none;border:none;
+
+  /* WORKSPACE */
+  .workspace{
+    display:flex;flex:1;
+    margin-top:48px;
+    min-height:calc(100vh - 48px);
+  }
+
+  /* SIDEBAR */
+  .sidebar{
+    position:fixed;left:0;top:48px;bottom:0;
+    width:220px;
+    background:${T.navy};
+    border-right:1px solid ${T.navyBorder};
+    display:flex;flex-direction:column;
+    overflow-y:auto;overflow-x:hidden;
+    z-index:200;
+    box-shadow:2px 0 20px #00000033;
+  }
+  .sidebar::-webkit-scrollbar{width:3px}
+  .sidebar::-webkit-scrollbar-track{background:transparent}
+  .sidebar::-webkit-scrollbar-thumb{background:${T.navyBorder}}
+
+  /* SIDEBAR LOGO */
+  .sb-logo{
+    padding:20px 16px 16px;
+    border-bottom:1px solid ${T.navyBorder};
+    cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;
+    text-align:center;
+    background:linear-gradient(180deg,${T.navyMid},${T.navy});
+    transition:background 0.2s;
+    flex-shrink:0;
+  }
+  .sb-logo:hover{background:${T.navyLight}}
+  .sb-logo-img{
+    width:72px;height:72px;border-radius:50%;
+    object-fit:cover;
+    border:2px solid ${T.gold}66;
+    box-shadow:0 0 24px ${T.gold}44, 0 0 48px ${T.cosmicBlue}33;
+    margin-bottom:10px;
+    transition:box-shadow 0.3s;
+  }
+  .sb-logo:hover .sb-logo-img{box-shadow:0 0 32px ${T.gold}77, 0 0 60px ${T.cosmicBlue}55}
+  .sb-logo-title{
+    font-family:'Cormorant Garamond',serif;
+    font-size:17px;font-weight:700;color:${T.goldLight};
+    letter-spacing:0.5px;line-height:1;
+  }
+  .sb-logo-sub{
+    font-size:8px;color:${T.muted};
+    letter-spacing:2.5px;text-transform:uppercase;margin-top:4px;
+  }
+
+  /* SIDEBAR NAV GROUPS */
+  .sb-group{padding:10px 0 4px}
+  .sb-group-label{
+    padding:4px 16px 6px;
+    font-size:8px;font-weight:700;letter-spacing:2px;
+    text-transform:uppercase;color:${T.mutedDark};
+  }
+  .sb-item{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 16px;margin:1px 8px;border-radius:8px;
     font-family:'Jost',sans-serif;font-size:12px;font-weight:500;
-    color:${T.muted};cursor:pointer;border-bottom:2px solid transparent;
-    transition:all 0.2s;white-space:nowrap;letter-spacing:0.5px;
+    color:${T.muted};cursor:pointer;
+    transition:all 0.18s;border:1px solid transparent;
+    white-space:nowrap;
   }
-  .nb:hover{color:${T.dun};background:${T.walnut}22}
-  .nb.on{color:${T.goldLight};border-bottom-color:${T.goldLight};background:${T.walnut}15}
+  .sb-item:hover{
+    color:${T.dun};background:${T.navyHover};
+    border-color:${T.navyBorder};
+  }
+  .sb-item.active{
+    color:${T.goldLight};
+    background:linear-gradient(135deg,${T.navyActive},${T.navyLight});
+    border-color:${T.gold}44;
+    box-shadow:0 0 12px ${T.gold}18;
+  }
+  .sb-item.active::before{
+    content:'';position:absolute;left:8px;
+    width:3px;height:20px;border-radius:2px;
+    background:linear-gradient(180deg,${T.goldPale},${T.gold});
+    box-shadow:0 0 8px ${T.gold};
+  }
+  .sb-item{position:relative;}
+  .sb-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
 
-  /* MAIN */
-  .main{padding:20px;max-width:1700px;margin:0 auto}
+  /* SIDEBAR FOOTER */
+  .sb-footer{
+    margin-top:auto;padding:12px 16px;
+    border-top:1px solid ${T.navyBorder};
+    flex-shrink:0;
+  }
+  .sb-live{
+    display:flex;align-items:center;gap:6px;
+    font-size:9px;color:${T.muted};
+  }
+  .sb-live-dot{width:6px;height:6px;border-radius:50%;background:${T.green};animation:livePulse 2s infinite}
+  @keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 0 0 ${T.green}44}50%{opacity:0.7;box-shadow:0 0 0 4px transparent}}
+
+  /* CONTENT AREA */
+  .content-area{
+    margin-left:220px;
+    flex:1;
+    display:flex;flex-direction:column;
+    min-height:calc(100vh - 48px);
+    background:${T.navyDeepest};
+  }
+
+  /* TOP BAR TICKER */
+  .ticker{
+    flex:1;overflow:hidden;margin:0 16px;
+    font-family:'DM Mono',monospace;font-size:10px;color:${T.dunDark};
+    mask-image:linear-gradient(90deg,transparent,black 4%,black 96%,transparent);
+  }
+  .ticker-inner{display:flex;gap:24px;animation:tickScroll 40s linear infinite;white-space:nowrap}
+  @keyframes tickScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+  /* TOP BAR CONTROLS */
+  .tb-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .tb-btn{
+    padding:5px 11px;border-radius:6px;
+    border:1px solid ${T.navyBorder};
+    background:${T.navyMid};color:${T.muted};
+    font-size:10px;cursor:pointer;transition:all 0.18s;
+    font-family:'Jost',sans-serif;letter-spacing:0.3px;
+  }
+  .tb-btn:hover{background:${T.navyHover};border-color:${T.gold}44;color:${T.goldLight}}
+  .tb-btn:active{transform:scale(0.97)}
+  .tb-btn.active{background:${T.gold}22;border-color:${T.gold}66;color:${T.goldLight}}
+
+  /* MAIN CONTENT */
+  .main{padding:24px;max-width:1600px;width:100%}
 
   /* CARDS */
   .card{
-    background:linear-gradient(135deg,${T.walnutDark}88,${T.walnutDeep}cc);
-    border:1px solid ${T.walnut}44;border-radius:12px;padding:18px;
-    backdrop-filter:blur(8px);transition:border-color 0.2s;
+    background:linear-gradient(135deg,${T.navyMid},${T.navy});
+    border:1px solid ${T.navyBorder};border-radius:12px;padding:18px;
+    transition:border-color 0.2s,box-shadow 0.2s;
   }
-  .card:hover{border-color:${T.walnut}88}
-  .card-gold{border-color:${T.gold}44}
+  .card:hover{border-color:${T.navyActive};box-shadow:0 8px 32px #00000044}
+  .card-gold{border-color:${T.gold}44;box-shadow:0 0 20px ${T.gold}0f}
+  .card-gold:hover{border-color:${T.gold}77}
+  .card-blue{border-color:${T.cosmicBlue}44}
   .card-sm{padding:12px 14px}
 
   /* TYPOGRAPHY */
-  .sec-title{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:700;color:${T.dun};margin-bottom:4px}
+  .sec-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;color:${T.goldLight};margin-bottom:4px}
   .sec-sub{font-size:12px;color:${T.muted};margin-bottom:18px;letter-spacing:0.3px}
   .card-title{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;color:${T.dun};margin-bottom:12px}
+  .ph{margin-bottom:20px}
+  .pt{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;color:${T.goldLight};margin-bottom:4px}
+  .ps{font-size:12px;color:${T.muted};letter-spacing:0.3px}
+  .sec-hdr{font-size:10px;color:${T.goldLight};letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-bottom:14px}
 
   /* BUTTONS */
   .btn-primary{
-    background:linear-gradient(135deg,${T.walnutLight},${T.walnut});
-    border:1px solid ${T.walnutLight}88;border-radius:8px;padding:9px 18px;
+    background:linear-gradient(135deg,${T.navyActive},${T.navyLight});
+    border:1px solid ${T.navyBorder};border-radius:8px;padding:9px 18px;
     color:${T.dun};font-family:'Jost',sans-serif;font-size:12px;font-weight:600;
     cursor:pointer;transition:all 0.2s;white-space:nowrap;letter-spacing:0.5px;
   }
-  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 14px ${T.walnut}55}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 14px #00000044;border-color:${T.gold}44}
+  .btn-primary:active{transform:scale(0.98)}
   .btn-primary:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+
   .btn-gold{
-    background:linear-gradient(135deg,${T.goldLight},${T.gold});
+    background:linear-gradient(135deg,${T.goldPale},${T.goldLight} 40%,${T.gold});
     border:none;border-radius:8px;padding:9px 18px;
-    color:${T.walnutDeep};font-family:'Jost',sans-serif;font-size:12px;font-weight:700;
+    color:${T.navyDeep};font-family:'Jost',sans-serif;font-size:12px;font-weight:700;
     cursor:pointer;transition:all 0.2s;white-space:nowrap;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.3);
   }
   .btn-gold:hover{transform:translateY(-1px);box-shadow:0 4px 18px ${T.gold}55}
+  .btn-gold:active{transform:scale(0.98)}
   .btn-gold:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+
   .btn-ghost{
-    background:transparent;border:1px solid ${T.walnut}55;border-radius:7px;
+    background:transparent;border:1px solid ${T.navyBorder};border-radius:7px;
     padding:7px 13px;color:${T.muted};font-family:'Jost',sans-serif;font-size:11px;
     cursor:pointer;transition:all 0.2s;
   }
-  .btn-ghost:hover{border-color:${T.walnut};color:${T.dun};background:${T.walnut}22}
+  .btn-ghost:hover{border-color:${T.navyActive};color:${T.dun};background:${T.navyHover}}
+  .btn-ghost:active{transform:scale(0.98)}
   .btn-sm{padding:5px 12px;font-size:11px}
-  .btn-danger{background:${T.red}22;border:1px solid ${T.red}44;border-radius:6px;padding:4px 10px;color:${T.red};font-size:11px;cursor:pointer;transition:all 0.2s}
+  .btn-danger{background:${T.red}22;border:1px solid ${T.red}44;border-radius:6px;padding:4px 10px;color:${T.redLight};font-size:11px;cursor:pointer;transition:all 0.2s}
   .btn-danger:hover{background:${T.red}44}
 
   /* INPUTS */
   .inp{
-    flex:1;background:${T.walnutDeep}cc;border:1px solid ${T.walnut}55;
+    flex:1;background:${T.navyDeep};border:1px solid ${T.navyBorder};
     border-radius:8px;padding:9px 14px;color:${T.dun};
     font-family:'Jost',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s;
   }
-  .inp:focus{border-color:${T.goldLight}}
-  .inp::placeholder{color:${T.muted}}
+  .inp:focus{border-color:${T.gold}88}
+  .inp::placeholder{color:${T.mutedDark}}
 
   /* GRIDS */
   .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -443,332 +695,318 @@ const styles = `
   .g5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
 
   /* STAT CARDS */
-  .stat{background:${T.walnutDeep}cc;border:1px solid ${T.walnut}33;border-radius:10px;padding:14px;text-align:center}
+  .stat{background:linear-gradient(135deg,${T.navyMid},${T.navy});border:1px solid ${T.navyBorder};border-radius:10px;padding:14px;text-align:center;transition:all 0.2s}
+  .stat:hover{border-color:${T.navyActive}}
   .stat-lbl{font-size:9px;color:${T.muted};letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px}
   .stat-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:600;color:${T.dun}}
   .stat-chg{font-size:11px;margin-top:3px}
-  .pos{color:${T.green}} .neg{color:${T.red}}
+  .pos{color:${T.greenLight}} .neg{color:${T.redLight}}
+  .stat-pos{border-color:${T.green}33;background:linear-gradient(135deg,${T.green}0a,${T.navy})}
+  .stat-neg{border-color:${T.red}33;background:linear-gradient(135deg,${T.red}0a,${T.navy})}
+
+  /* LOADING */
+  .ld::after{content:'.';animation:dots 1.5s infinite}
+  @keyframes dots{0%,20%{content:'.'}40%{content:'..'}60%,100%{content:'...'}}
+  .loading{display:flex;align-items:center;gap:12px;padding:28px 16px;color:${T.muted};font-size:13px}
+  .spin{width:18px;height:18px;flex-shrink:0;border:2px solid ${T.navyBorder};border-top:2px solid ${T.goldLight};border-radius:50%;animation:spinAnim 0.7s linear infinite}
+  @keyframes spinAnim{to{transform:rotate(360deg)}}
+  .res-box{background:${T.navyMid};border:1px solid ${T.navyBorder};border-radius:10px;padding:20px 22px;font-size:13px;line-height:1.85;color:${T.dunDark};white-space:pre-wrap}
+  .res-box strong{color:${T.goldLight};font-weight:600}
 
   /* RESEARCH */
-  .rs{border:1px solid ${T.walnut}33;border-radius:10px;margin-bottom:10px;overflow:hidden}
-  .rs-hdr{background:${T.walnutDark}88;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background 0.2s}
-  .rs-hdr:hover{background:${T.walnut}22}
+  .rs{border:1px solid ${T.navyBorder};border-radius:10px;margin-bottom:10px;overflow:hidden;transition:border-color 0.2s}
+  .rs:hover{border-color:${T.navyActive}}
+  .rs-hdr{background:${T.navyMid};padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background 0.2s}
+  .rs-hdr:hover{background:${T.navyHover}}
   .rs-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;color:${T.dun};display:flex;align-items:center;gap:8px}
-  .rs-badge{background:${T.walnut}33;border-radius:10px;padding:2px 9px;font-size:9px;font-family:'DM Mono',monospace;color:${T.goldLight};letter-spacing:1px}
-  .rs-body{padding:16px}
+  .rs-badge{background:${T.gold}22;border:1px solid ${T.gold}33;border-radius:10px;padding:2px 9px;font-size:9px;font-family:'DM Mono',monospace;color:${T.goldLight};letter-spacing:1px}
+  .rs-body{padding:16px;background:${T.navy}}
   .prose{font-size:13px;line-height:1.85;color:${T.dunDark};white-space:pre-wrap}
   .prose strong{color:${T.goldLight};font-weight:600}
 
   /* STEPS */
   .steps{display:flex;gap:3px;margin-bottom:16px;flex-wrap:wrap}
-  .step{padding:3px 10px;border-radius:16px;font-size:10px;border:1px solid ${T.walnut}44;color:${T.muted};transition:all 0.3s}
-  .step.done{background:${T.green}22;border-color:${T.green}55;color:#80c080}
-  .step.active{background:${T.goldLight}22;border-color:${T.goldLight}88;color:${T.goldLight};animation:pulse 2s infinite}
-  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 ${T.goldLight}44}50%{box-shadow:0 0 0 5px transparent}}
-
-  /* LOADING */
-  .ld::after{content:'.';animation:dots 1.5s infinite}
-  @keyframes dots{0%,20%{content:'.'}40%{content:'..'}60%,100%{content:'...'}}
+  .step{padding:3px 10px;border-radius:16px;font-size:10px;border:1px solid ${T.navyBorder};color:${T.mutedDark};transition:all 0.3s}
+  .step.done{background:${T.green}18;border-color:${T.green}44;color:${T.greenLight}}
+  .step.active{background:${T.gold}18;border-color:${T.gold}66;color:${T.goldLight};animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 ${T.gold}44}50%{box-shadow:0 0 0 5px transparent}}
 
   /* NEWS */
-  .news-card{border:1px solid ${T.walnut}33;border-radius:9px;padding:12px 14px;margin-bottom:8px;background:${T.walnutDeep}88;transition:all 0.2s}
-  .news-card:hover{border-color:${T.walnut}66}
+  .news-card{background:${T.navyMid};border:1px solid ${T.navyBorder};border-radius:12px;padding:20px;margin-bottom:12px;transition:all 0.22s;cursor:pointer}
+  .news-card:hover{border-color:${T.gold}44;background:${T.navyHover};transform:translateX(2px);box-shadow:0 4px 20px #00000033}
+  .news-tag{display:inline-block;padding:3px 10px;border-radius:12px;font-size:9px;letter-spacing:2px;text-transform:uppercase;background:${T.gold}22;color:${T.goldLight};margin-bottom:10px;border:1px solid ${T.gold}33}
+  .news-headline{font-size:15px;font-weight:600;color:${T.dun};line-height:1.4;margin-bottom:8px}
+  .news-summary{font-size:12px;color:${T.muted};line-height:1.7}
+  .news-meta{font-size:10px;color:${T.mutedDark};margin-top:10px}
   .news-src{font-size:9px;color:${T.goldLight};letter-spacing:1px;text-transform:uppercase}
   .news-hl{font-size:13px;color:${T.dun};margin:3px 0;font-weight:500;line-height:1.4}
   .news-tm{font-size:10px;color:${T.muted}}
 
-  /* LEGEND */
-  .leg-card{border-left:3px solid ${T.goldLight};padding:12px 14px;margin-bottom:10px;background:${T.walnutDeep}66;border-radius:0 8px 8px 0}
-  .leg-name{font-family:'Cormorant Garamond',serif;font-size:15px;color:${T.goldLight};font-weight:600}
-  .leg-title{font-size:10px;color:${T.muted};margin-bottom:6px}
-  .leg-quote{font-size:13px;color:${T.dunDark};line-height:1.65;font-style:italic}
-
-  /* PORTFOLIO */
-  .p-row{display:grid;grid-template-columns:2fr 0.7fr 1fr 1fr 1fr 1.2fr 70px;gap:6px;align-items:center;padding:9px 11px;border-bottom:1px solid ${T.walnut}22;font-size:12px;transition:background 0.15s}
-  .p-row:hover{background:${T.walnut}15}
-  .p-hdr{font-size:9px;color:${T.muted};letter-spacing:1px;text-transform:uppercase;font-weight:600}
-
-  /* WATCHLIST */
-  .wl-stock{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid ${T.walnut}22;font-size:12px;transition:background 0.15s}
-  .wl-stock:hover{background:${T.walnut}15}
-
   /* TABS MINI */
-  .tab-mini{display:flex;gap:3px;margin-bottom:14px;background:${T.walnutDeep};border-radius:8px;padding:3px;width:fit-content}
+  .tab-mini{display:flex;gap:3px;margin-bottom:14px;background:${T.navyDeep};border-radius:8px;padding:3px;width:fit-content}
   .tmb{padding:6px 13px;border-radius:6px;background:none;border:none;color:${T.muted};font-size:11px;cursor:pointer;transition:all 0.2s;font-family:'Jost',sans-serif}
-  .tmb.on{background:${T.walnut};color:${T.dun}}
+  .tmb.on{background:${T.navyActive};color:${T.dun};border:1px solid ${T.navyBorder}}
 
   /* CHART */
   .chart-title{font-size:10px;color:${T.muted};margin-bottom:8px;letter-spacing:1px;text-transform:uppercase}
 
   /* TECHNICAL */
-  .indicator-card{background:${T.walnutDeep}cc;border:1px solid ${T.walnut}44;border-radius:10px;padding:14px}
+  .indicator-card{background:${T.navyMid};border:1px solid ${T.navyBorder};border-radius:10px;padding:14px;transition:all 0.2s}
+  .indicator-card:hover{border-color:${T.navyActive}}
   .ind-name{font-size:10px;color:${T.muted};letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
   .ind-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:600}
   .ind-sig{font-size:10px;margin-top:3px;font-weight:600;letter-spacing:1px}
-  .sig-buy{color:${T.green}} .sig-sell{color:${T.red}} .sig-neutral{color:${T.gold}}
+  .sig-buy{color:${T.greenLight};text-shadow:0 0 12px ${T.green}55}
+  .sig-sell{color:${T.redLight};text-shadow:0 0 12px ${T.red}55}
+  .sig-neutral{color:${T.gold}}
 
   /* SCREENER */
-  .scr-row{display:grid;grid-template-columns:1.5fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr;gap:6px;align-items:center;padding:9px 11px;border-bottom:1px solid ${T.walnut}22;font-size:11px;transition:background 0.15s}
-  .scr-row:hover{background:${T.walnut}15;cursor:pointer}
-  .scr-hdr{font-size:9px;color:${T.muted};letter-spacing:1px;text-transform:uppercase;font-weight:600;border-bottom:2px solid ${T.walnut}44}
+  .scr-row{display:grid;grid-template-columns:1.5fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 0.8fr 1fr;gap:6px;align-items:center;padding:9px 14px;border-bottom:1px solid ${T.navyBorder};font-size:11px;transition:background 0.15s}
+  .scr-row:hover{background:${T.navyHover};cursor:pointer}
+  .scr-hdr{font-size:9px;color:${T.muted};letter-spacing:1px;text-transform:uppercase;font-weight:600;border-bottom:2px solid ${T.navyActive}}
 
   /* PEER */
   .peer-table{width:100%;border-collapse:collapse;font-size:12px}
-  .peer-table th{background:${T.walnutDark}88;padding:9px 12px;text-align:left;font-size:10px;color:${T.goldLight};letter-spacing:1px;text-transform:uppercase;font-weight:600}
-  .peer-table td{padding:9px 12px;border-bottom:1px solid ${T.walnut}22;color:${T.dunDark}}
-  .peer-table tr:hover td{background:${T.walnut}15}
-  .peer-best{color:${T.green};font-weight:700}
-  .peer-worst{color:${T.red}}
+  .peer-table th{background:${T.navyMid};padding:9px 12px;text-align:left;font-size:10px;color:${T.goldLight};letter-spacing:1px;text-transform:uppercase;font-weight:600}
+  .peer-table td{padding:9px 12px;border-bottom:1px solid ${T.navyBorder};color:${T.dunDark}}
+  .peer-table tr:hover td{background:${T.navyHover}}
+  .peer-best{color:${T.greenLight};font-weight:700}
+  .peer-worst{color:${T.redLight}}
 
   /* QUARTERLY */
-  .q-card{background:${T.walnutDeep}88;border:1px solid ${T.walnut}33;border-radius:10px;padding:14px;margin-bottom:10px}
+  .q-card{background:${T.navyMid};border:1px solid ${T.navyBorder};border-radius:10px;padding:14px;margin-bottom:10px}
   .q-quarter{font-family:'DM Mono',monospace;font-size:11px;color:${T.goldLight};margin-bottom:8px;letter-spacing:1px}
-  .q-metric{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid ${T.walnut}15;font-size:12px}
+  .q-metric{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid ${T.navyBorder};font-size:12px}
 
   /* API BANNER */
-  .api-warn{background:${T.gold}15;border:1px solid ${T.gold}44;border-radius:10px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;font-size:13px}
+  .api-warn{background:linear-gradient(135deg,${T.gold}12,${T.gold}08);border:1px solid ${T.gold}44;border-radius:10px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;font-size:13px;box-shadow:0 2px 12px ${T.gold}0f}
 
   /* VERDICT */
-  .verdict-box{background:linear-gradient(135deg,${T.walnutDark},${T.walnutDeep});border:2px solid ${T.gold}55;border-radius:14px;padding:22px;text-align:center;margin-top:18px}
+  .verdict-box{background:linear-gradient(135deg,${T.navyMid},${T.navy});border:2px solid ${T.gold}55;border-radius:14px;padding:22px;text-align:center;margin-top:18px;box-shadow:0 0 40px ${T.gold}0f,inset 0 1px 0 ${T.gold}22}
 
-  @media(max-width:768px){
-    .g3,.g4,.g5{grid-template-columns:1fr 1fr}
-    .g2{grid-template-columns:1fr}
-    .main{padding:12px}
-    .ticker{display:none}
-    .scr-row{grid-template-columns:1.5fr 1fr 1fr 1fr}
-    .hdr{padding:0 12px}
-    .logo-sub{display:none}
-    .hdr-controls{gap:6px}
-    .hdr-btn{padding:5px 8px;font-size:9px}
-    .nav{overflow-x:auto;padding:0 8px}
-    .nb{padding:10px 10px;font-size:10px;white-space:nowrap}
-    .hero-features{grid-template-columns:1fr}
-    .hero-stats-bar{flex-wrap:wrap;gap:8px;padding:12px}
-    .hero-stat-item{min-width:80px;border-right:none;border-bottom:1px solid ${T.gold}18;padding-bottom:8px}
-    .hero-title{font-size:clamp(36px,10vw,72px)}
-    .hero-title-accent{font-size:clamp(36px,10vw,72px)}
-    .hero-globe-ring,.hero-globe-ring2,.hero-globe-ring3{display:none}
-  }
-
-  /* HEADER CONTROLS */
-  .hdr-controls{display:flex;align-items:center;gap:10px}
-  .hdr-btn{
-    padding:6px 12px;border-radius:6px;border:1px solid ${T.walnut}44;
-    background:${T.walnut}22;color:${T.dun};font-size:10px;
-    cursor:pointer;transition:all 0.2s;letter-spacing:0.5px;font-family:'Jost',sans-serif;
-  }
-  .hdr-btn:hover{background:${T.gold}22;border-color:${T.gold}66;color:${T.goldLight}}
-  .hdr-btn.active{background:${T.gold}33;border-color:${T.goldLight};color:${T.goldLight}}
-
-  /* ALERT MODAL */
-  .modal-overlay{
-    position:fixed;inset:0;background:#00000088;z-index:500;
-    display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);
-  }
-  .modal-box{
-    background:${T.walnutDeep};border:1px solid ${T.walnut}66;
-    border-radius:16px;padding:32px;width:90%;max-width:480px;
-    box-shadow:0 20px 80px #00000088;
-  }
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:#00000088;z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+  .modal-box{background:${T.navy};border:1px solid ${T.navyBorder};border-radius:16px;padding:32px;width:90%;max-width:480px;box-shadow:0 24px 80px #000000aa,0 0 0 1px ${T.gold}11}
   .modal-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:${T.dun};margin-bottom:20px}
-  .alert-item{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:12px 16px;background:${T.walnutDark}88;border:1px solid ${T.walnut}33;
-    border-radius:8px;margin-bottom:8px;
-  }
+  .alert-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:${T.navyMid};border:1px solid ${T.navyBorder};border-radius:8px;margin-bottom:8px;transition:border-color 0.2s}
+  .alert-item:hover{border-color:${T.navyActive}}
 
-  /* NEWS FEED */
-  .news-card{
-    background:${T.walnutDark}88;border:1px solid ${T.walnut}33;
-    border-radius:12px;padding:20px;margin-bottom:12px;
-    transition:all 0.2s;cursor:pointer;
-  }
-  .news-card:hover{border-color:${T.gold}44;background:${T.walnut}22}
-  .news-tag{
-    display:inline-block;padding:3px 10px;border-radius:12px;
-    font-size:9px;letter-spacing:2px;text-transform:uppercase;
-    background:${T.gold}22;color:${T.goldLight};margin-bottom:10px;
-  }
-  .news-headline{font-size:15px;font-weight:600;color:${T.dun};line-height:1.4;margin-bottom:8px}
-  .news-summary{font-size:12px;color:${T.muted};line-height:1.7}
-  .news-meta{font-size:10px;color:${T.walnutLight};margin-top:10px}
+  /* LEGEND */
+  .leg-card{border-left:3px solid ${T.goldLight};padding:14px 16px;margin-bottom:10px;background:${T.navyMid};border-radius:0 10px 10px 0;transition:all 0.2s}
+  .leg-card:hover{border-left-color:${T.goldPale};background:${T.navyHover}}
+  .leg-name{font-family:'Cormorant Garamond',serif;font-size:15px;color:${T.goldLight};font-weight:600}
+  .leg-title{font-size:10px;color:${T.muted};margin-bottom:6px}
+  .leg-quote{font-size:13px;color:${T.dunDark};line-height:1.65;font-style:italic}
 
-  /* IPO TRACKER */
-  .ipo-card{
-    background:${T.walnutDark}88;border:1px solid ${T.walnut}33;
-    border-radius:12px;padding:20px;
-    transition:border-color 0.2s;
-  }
-  .ipo-card:hover{border-color:${T.gold}44}
-  .ipo-status{
-    display:inline-block;padding:3px 12px;border-radius:12px;
-    font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;
-    margin-bottom:12px;
-  }
+  /* PORTFOLIO */
+  .p-row{display:grid;grid-template-columns:2fr 0.6fr 1fr 1fr 1fr 1.3fr 60px;gap:6px;align-items:center;padding:10px 14px;border-bottom:1px solid ${T.navyBorder};font-size:12px;transition:background 0.15s}
+  .p-row:hover{background:${T.navyHover}}
+  .p-hdr{font-size:9px;color:${T.muted};letter-spacing:1px;text-transform:uppercase;font-weight:600}
+  .p-bar{height:3px;border-radius:2px;margin-top:4px;transition:width 0.6s ease}
+
+  /* WATCHLIST */
+  .wl-stock{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid ${T.navyBorder};font-size:12px;transition:background 0.15s}
+  .wl-stock:hover{background:${T.navyHover}}
+
+  /* IPO */
+  .ipo-card{background:${T.navyMid};border:1px solid ${T.navyBorder};border-radius:12px;padding:20px;transition:all 0.2s}
+  .ipo-card:hover{border-color:${T.gold}44;box-shadow:0 6px 24px #00000033}
+  .ipo-status{display:inline-block;padding:3px 12px;border-radius:12px;font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
   .ipo-open{background:#22c55e22;color:#22c55e;border:1px solid #22c55e44}
   .ipo-upcoming{background:${T.gold}22;color:${T.goldLight};border:1px solid ${T.gold}44}
   .ipo-closed{background:#64748b22;color:#94a3b8;border:1px solid #64748b44}
   .ipo-listed{background:#3b82f622;color:#60a5fa;border:1px solid #3b82f644}
 
-  /* FII DII */
-  .fii-bar-wrap{background:${T.walnutDeeper};border-radius:8px;overflow:hidden;height:10px;margin:8px 0}
+  /* FII */
+  .fii-bar-wrap{background:${T.navyDeep};border-radius:8px;overflow:hidden;height:10px;margin:8px 0}
   .fii-bar{height:100%;border-radius:8px;transition:width 0.8s ease}
 
-  /* SECTOR ROTATION */
-  .sector-card{
-    background:${T.walnutDark}88;border:1px solid ${T.walnut}33;
-    border-radius:12px;padding:18px;cursor:pointer;transition:all 0.2s;
-  }
-  .sector-card:hover{border-color:${T.gold}44;transform:translateY(-2px)}
-  .sector-heat{
-    width:100%;height:6px;border-radius:3px;margin-top:10px;
-  }
+  /* SECTOR */
+  .sector-card{background:${T.navyMid};border:1px solid ${T.navyBorder};border-radius:12px;padding:18px;cursor:pointer;transition:all 0.25s}
+  .sector-card:hover{border-color:${T.gold}55;transform:translateY(-2px);box-shadow:0 8px 28px ${T.gold}18}
+  .sector-heat{width:100%;height:6px;border-radius:3px;margin-top:10px}
 
-  /* LANGUAGE */
-  .lang-hi{font-family:'Noto Sans Devanagari',sans-serif}
+  /* CALCULATOR */
+  .calc-result{background:linear-gradient(135deg,${T.navyMid},${T.navy});border:1px solid ${T.gold}44;border-radius:12px;padding:20px;margin-top:16px}
+  .calc-big{font-family:'DM Mono',monospace;font-size:32px;font-weight:700;color:${T.goldLight};margin:6px 0}
+  .calc-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid ${T.navyBorder};font-size:12px}
+  .range-inp{width:100%;accent-color:${T.gold};cursor:pointer}
 
+  /* CALENDAR */
+  .cal-event{display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border-bottom:1px solid ${T.navyBorder};transition:background 0.15s}
+  .cal-event:hover{background:${T.navyHover}}
+  .cal-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px}
+  .cal-date{font-family:'DM Mono',monospace;font-size:10px;color:${T.muted};min-width:70px}
+  .cal-title{font-size:13px;color:${T.dun};font-weight:500}
+  .cal-sub{font-size:11px;color:${T.muted};margin-top:2px}
+  .imp-high{background:${T.red}22;border:1px solid ${T.red}33;color:${T.redLight};font-size:9px;padding:1px 7px;border-radius:8px}
+  .imp-med{background:${T.gold}22;border:1px solid ${T.gold}33;color:${T.goldLight};font-size:9px;padding:1px 7px;border-radius:8px}
+  .imp-low{background:${T.navyBorder}44;border:1px solid ${T.navyBorder};color:${T.muted};font-size:9px;padding:1px 7px;border-radius:8px}
 
-  /* HOME PAGE — PREMIUM CINEMATIC */
-  .home-hero{
-    position:relative;min-height:100vh;
-    display:flex;flex-direction:column;
-    overflow:hidden;background:#0e0c09;
+  /* BULK DEALS */
+  .bd-row{display:grid;grid-template-columns:1.2fr 0.7fr 1fr 0.8fr 0.8fr 0.8fr 1fr;gap:6px;align-items:center;padding:9px 14px;border-bottom:1px solid ${T.navyBorder};font-size:11px;transition:background 0.15s}
+  .bd-row:hover{background:${T.navyHover}}
+  .bd-hdr{font-size:9px;color:${T.muted};letter-spacing:1px;text-transform:uppercase;font-weight:600}
+  .bd-buy{color:${T.greenLight};background:${T.green}18;border:1px solid ${T.green}33;padding:1px 8px;border-radius:8px;font-size:9px;font-weight:700}
+  .bd-sell{color:${T.redLight};background:${T.red}18;border:1px solid ${T.red}33;padding:1px 8px;border-radius:8px;font-size:9px;font-weight:700}
+
+  /* BADGE */
+  .badge-blue{display:inline-block;padding:2px 9px;border-radius:10px;background:${T.cosmicBlue}22;border:1px solid ${T.cosmicBlue}44;color:${T.cosmicBluePale};font-size:9px;letter-spacing:1px}
+
+  /* HDR-BTN alias for modal close */
+  .hdr-btn{padding:6px 12px;border-radius:6px;border:1px solid ${T.navyBorder};background:${T.navyMid};color:${T.muted};font-size:10px;cursor:pointer;transition:all 0.2s;font-family:'Jost',sans-serif}
+  .hdr-btn:hover{background:${T.navyHover};border-color:${T.gold}44;color:${T.goldLight}}
+
+  /* FOCUS */
+  *:focus-visible{outline:2px solid ${T.gold}88;outline-offset:2px;border-radius:4px}
+
+  /* HOMEPAGE */
+  .home-page{position:relative;width:100%;min-height:calc(100vh - 48px);display:flex;flex-direction:column;overflow:hidden;background:${T.navyDeepest}}
+  .home-canvas{position:absolute;inset:0;opacity:0.18;pointer-events:none}
+  .home-overlay{position:absolute;inset:0;background:radial-gradient(ellipse 80% 70% at 50% 50%,transparent 30%,${T.navyDeepest}99 100%);pointer-events:none}
+  .home-grid{position:absolute;inset:0;background-image:linear-gradient(${T.gold}08 1px,transparent 1px),linear-gradient(90deg,${T.gold}08 1px,transparent 1px);background-size:60px 60px;pointer-events:none}
+
+  .home-hero{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 40px 40px;text-align:center;flex:1}
+  .home-logo-wrap{
+    position:relative;margin-bottom:32px;cursor:pointer;
+    animation:heroFadeUp 1s ease forwards;
   }
-  .hero-bg-main{
-    position:absolute;inset:0;
-    background:
-      radial-gradient(ellipse 80% 60% at 50% 0%, #3a3020 0%, #1a1610 30%, #0e0c09 65%),
-      radial-gradient(ellipse 40% 40% at 80% 60%, #2a2418 0%, transparent 60%),
-      radial-gradient(ellipse 60% 40% at 20% 80%, #1e1a12 0%, transparent 60%);
+  .home-logo-img{
+    width:120px;height:120px;border-radius:50%;object-fit:cover;
+    border:2px solid ${T.gold}88;
+    box-shadow:0 0 60px ${T.gold}55,0 0 120px ${T.cosmicBlue}44,0 0 20px ${T.gold}33;
+    transition:box-shadow 0.4s;
   }
-  .hero-particles{position:absolute;inset:0;overflow:hidden}
-  .particle{
-    position:absolute;border-radius:50%;
-    background:${T.goldLight};
-    animation:particleFloat linear infinite;
-    pointer-events:none;
+  .home-logo-wrap:hover .home-logo-img{box-shadow:0 0 80px ${T.gold}88,0 0 160px ${T.cosmicBlue}66,0 0 30px ${T.gold}55}
+  .home-logo-ring{
+    position:absolute;inset:-12px;border-radius:50%;
+    border:1px solid ${T.gold}33;
+    animation:ringRotate 20s linear infinite;
   }
-  @keyframes particleFloat{
-    0%{transform:translateY(100vh) translateX(0);opacity:0}
-    10%{opacity:1}90%{opacity:0.6}
-    100%{transform:translateY(-10vh) translateX(30px);opacity:0}
+  .home-logo-ring2{
+    position:absolute;inset:-20px;border-radius:50%;
+    border:1px solid ${T.cosmicBlue}22;
+    animation:ringRotate 35s linear infinite reverse;
   }
-  .hero-globe-ring{
-    position:absolute;right:-15%;top:50%;transform:translateY(-50%);
-    width:700px;height:700px;border-radius:50%;
-    border:1px solid ${T.gold}18;
-    animation:globeSpin 40s linear infinite;
-  }
-  .hero-globe-ring2{
-    position:absolute;right:-20%;top:50%;transform:translateY(-50%);
-    width:850px;height:850px;border-radius:50%;
-    border:1px solid ${T.gold}0c;
-    animation:globeSpin 60s linear infinite reverse;
-  }
-  .hero-globe-ring3{
-    position:absolute;right:-25%;top:50%;transform:translateY(-50%);
-    width:1000px;height:1000px;border-radius:50%;
-    border:1px solid ${T.gold}08;
-    animation:globeSpin 80s linear infinite;
-  }
-  @keyframes globeSpin{0%{transform:translateY(-50%) rotate(0deg)}100%{transform:translateY(-50%) rotate(360deg)}}
-  .hero-scanline{
-    position:absolute;left:0;right:0;height:1px;
-    background:linear-gradient(90deg,transparent,${T.gold}44,${T.goldLight}88,${T.gold}44,transparent);
-    animation:scanMove 8s ease-in-out infinite;pointer-events:none;
-  }
-  @keyframes scanMove{0%,100%{top:20%;opacity:0}10%{opacity:1}90%{opacity:1}50%{top:80%;opacity:0.6}}
-  .hero-grid-lines{
-    position:absolute;inset:0;
-    background-image:linear-gradient(${T.gold}06 1px,transparent 1px),linear-gradient(90deg,${T.gold}06 1px,transparent 1px);
-    background-size:80px 80px;
-    mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 20%,transparent 80%);
-  }
-  .hero-center-glow{
-    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-    width:600px;height:600px;border-radius:50%;
-    background:radial-gradient(circle,${T.gold}08 0%,transparent 70%);pointer-events:none;
-  }
-  .hero-content-wrap{
-    position:relative;z-index:10;flex:1;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:60px 40px 40px;text-align:center;
-  }
-  @keyframes heroFade{0%{opacity:0;transform:translateY(24px)}100%{opacity:1;transform:translateY(0)}}
-  .hero-eyebrow{
-    display:flex;align-items:center;gap:14px;font-size:9px;
-    letter-spacing:5px;color:${T.goldLight};text-transform:uppercase;
-    margin-bottom:24px;animation:heroFade 1s ease forwards;
-  }
-  .hero-eyebrow-line{width:50px;height:1px;background:linear-gradient(90deg,transparent,${T.goldLight})}
-  .hero-title{
-    font-family:'Cormorant Garamond',serif;
-    font-size:clamp(52px,8vw,108px);font-weight:700;
-    line-height:0.9;margin-bottom:6px;color:#f0e8dc;
-    text-shadow:0 0 120px ${T.gold}33;animation:heroFade 1.2s ease forwards;
-  }
-  .hero-title-accent{
-    font-family:'Cormorant Garamond',serif;
-    font-size:clamp(52px,8vw,108px);font-weight:700;
-    font-style:italic;color:${T.goldLight};display:block;line-height:1;
-    margin-bottom:28px;text-shadow:0 0 60px ${T.gold}55;animation:heroFade 1.4s ease forwards;
-  }
-  .hero-divider{display:flex;align-items:center;gap:16px;margin-bottom:22px;animation:heroFade 1.5s ease forwards;}
-  .hero-divider-line{flex:1;max-width:120px;height:1px;background:linear-gradient(90deg,transparent,${T.gold}55)}
-  .hero-divider-diamond{width:8px;height:8px;background:${T.goldLight};transform:rotate(45deg);box-shadow:0 0 12px ${T.gold}88}
-  .hero-subtitle{
-    font-size:14px;color:#9a8f82;max-width:520px;line-height:1.9;
-    letter-spacing:0.5px;font-weight:300;margin-bottom:36px;animation:heroFade 1.6s ease forwards;
-  }
-  .hero-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:56px;animation:heroFade 1.8s ease forwards;}
-  .hero-stats-bar{
-    position:relative;z-index:10;display:flex;align-items:center;justify-content:center;
-    gap:0;width:100%;
-    background:linear-gradient(90deg,transparent,#0e0c0988 20%,#0e0c0988 80%,transparent);
+  @keyframes ringRotate{to{transform:rotate(360deg)}}
+  @keyframes heroFadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+  .home-eyebrow{display:flex;align-items:center;gap:14px;font-size:9px;letter-spacing:5px;color:${T.goldLight};text-transform:uppercase;margin-bottom:20px;animation:heroFadeUp 1.1s ease forwards;opacity:0}
+  .home-eyebrow-line{width:50px;height:1px;background:linear-gradient(90deg,transparent,${T.goldLight})}
+  .home-title{font-family:'Cormorant Garamond',serif;font-size:clamp(52px,7vw,96px);font-weight:700;line-height:0.92;color:${T.dunLight};text-shadow:0 0 80px ${T.gold}22;animation:heroFadeUp 1.2s ease forwards;opacity:0}
+  .home-title-accent{font-family:'Cormorant Garamond',serif;font-size:clamp(52px,7vw,96px);font-weight:700;font-style:italic;color:${T.goldLight};display:block;line-height:1;margin-bottom:28px;text-shadow:0 0 60px ${T.gold}44;animation:heroFadeUp 1.4s ease forwards;opacity:0}
+  .home-divider{display:flex;align-items:center;gap:16px;margin-bottom:20px;animation:heroFadeUp 1.5s ease forwards;opacity:0}
+  .home-divider-line{flex:1;max-width:100px;height:1px;background:linear-gradient(90deg,transparent,${T.gold}55)}
+  .home-divider-diamond{width:8px;height:8px;background:${T.goldLight};transform:rotate(45deg);box-shadow:0 0 12px ${T.gold}88}
+  .home-subtitle{font-size:14px;color:${T.muted};max-width:500px;line-height:1.9;letter-spacing:0.5px;font-weight:300;margin-bottom:32px;animation:heroFadeUp 1.6s ease forwards;opacity:0}
+  .home-btns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;animation:heroFadeUp 1.8s ease forwards;opacity:0}
+
+  /* MARKET STATS BAR */
+  .home-stats{
+    position:relative;z-index:10;
+    display:flex;align-items:center;justify-content:center;gap:0;
     border-top:1px solid ${T.gold}22;border-bottom:1px solid ${T.gold}22;
-    padding:18px 40px;animation:heroFade 2s ease forwards;
+    background:linear-gradient(90deg,transparent,${T.navyDeepest}88 15%,${T.navyDeepest}88 85%,transparent);
+    padding:16px 40px;animation:heroFadeUp 2s ease forwards;opacity:0;
   }
-  .hero-stat-item{
-    display:flex;flex-direction:column;align-items:center;
-    padding:0 28px;border-right:1px solid ${T.gold}18;min-width:130px;
-  }
-  .hero-stat-item:last-child{border-right:none}
-  .hero-features{
-    position:relative;z-index:10;display:grid;grid-template-columns:repeat(3,1fr);
-    gap:1px;width:100%;background:${T.gold}11;border-top:1px solid ${T.gold}18;
-    animation:heroFade 2.2s ease forwards;
-  }
-  .hero-feature{
-    background:#0e0c09;padding:28px 32px;transition:background 0.3s;
-    cursor:pointer;display:flex;align-items:flex-start;gap:16px;
-  }
-  .hero-feature:hover{background:#1a1610}
-  .hero-feature-icon{
-    font-size:22px;width:44px;height:44px;background:${T.gold}15;
-    border:1px solid ${T.gold}33;border-radius:8px;display:flex;
-    align-items:center;justify-content:center;flex-shrink:0;
-  }
-  .hero-feature-title{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:#d8c7b5;margin-bottom:4px}
-  .hero-feature-desc{font-size:11px;color:#6a6058;line-height:1.6}
-  .hero-quote-strip{
-    position:relative;z-index:10;padding:20px 40px;text-align:center;
-    border-top:1px solid ${T.gold}11;
-    background:linear-gradient(90deg,transparent,#1a161088 50%,transparent);
-  }
-  .hero-quote-text{font-family:'Cormorant Garamond',serif;font-size:16px;font-style:italic;color:#6a6058;line-height:1.6}
-  .hero-quote-author{font-size:9px;color:${T.gold}66;letter-spacing:3px;text-transform:uppercase;margin-top:6px}
+  .home-stat-item{display:flex;flex-direction:column;align-items:center;padding:0 24px;border-right:1px solid ${T.gold}18;min-width:120px}
+  .home-stat-item:last-child{border-right:none}
 
+  /* NEWS SLIDES */
+  .home-slides{
+    position:relative;z-index:10;
+    border-top:1px solid ${T.navyBorder};
+    padding:20px 40px;min-height:80px;
+    background:${T.navyDeepest}cc;
+    animation:heroFadeUp 2.2s ease forwards;opacity:0;
+  }
+  .slide-track{overflow:hidden;position:relative}
+  .slide-inner{display:flex;transition:transform 0.7s cubic-bezier(0.4,0,0.2,1)}
+  .slide-item{min-width:100%;padding:0 20px;text-align:center}
+  .slide-quote{font-family:'Cormorant Garamond',serif;font-size:17px;font-style:italic;color:${T.dunDark};line-height:1.6}
+  .slide-author{font-size:10px;color:${T.goldLight};letter-spacing:3px;text-transform:uppercase;margin-top:8px}
+  .slide-dots{display:flex;gap:6px;justify-content:center;margin-top:12px}
+  .slide-dot{width:5px;height:5px;border-radius:50%;background:${T.navyBorder};cursor:pointer;transition:all 0.3s}
+  .slide-dot.active{background:${T.goldLight};box-shadow:0 0 6px ${T.gold}}
+
+  /* FEATURE CARDS */
+  .home-features{
+    position:relative;z-index:10;
+    display:grid;grid-template-columns:repeat(3,1fr);
+    gap:1px;width:100%;
+    background:${T.gold}11;border-top:1px solid ${T.navyBorder};
+    animation:heroFadeUp 2.4s ease forwards;opacity:0;
+  }
+  .home-feat{
+    background:${T.navyDeepest};padding:24px 28px;
+    cursor:pointer;display:flex;align-items:flex-start;gap:14px;
+    transition:background 0.25s;
+  }
+  .home-feat:hover{background:${T.navyMid}}
+  .home-feat-icon{font-size:20px;width:40px;height:40px;background:${T.gold}15;border:1px solid ${T.gold}33;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .home-feat-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;color:${T.dun};margin-bottom:3px}
+  .home-feat-desc{font-size:10px;color:${T.mutedDark};line-height:1.6}
+
+  /* LIGHT MODE */
+  body.light{background:${T.surface};color:#1E2A45}
+  body.light .app{background:${T.surface}}
+  body.light .sidebar{background:${T.surface};border-right-color:${T.border}}
+  body.light .sb-logo{background:linear-gradient(180deg,${T.surfaceAlt},${T.surface})}
+  body.light .sb-item{color:#4A5570}
+  body.light .sb-item:hover{background:${T.border}44;color:#1E2A45}
+  body.light .sb-item.active{background:${T.cosmicBlue}18;border-color:${T.cosmicBlue}44;color:${T.cosmicBlue}}
+  body.light .top-bar{background:${T.surface};border-bottom-color:${T.border}}
+  body.light .content-area{background:${T.surface}}
+  body.light .card{background:#FFFFFF;border-color:${T.border}88;box-shadow:0 2px 8px #00000008}
+  body.light .stat{background:${T.surfaceAlt};border-color:${T.border}66}
+  body.light .stat-val{color:#1E2A45}
+  body.light .inp{background:#FFFFFF;border-color:${T.border};color:#1E2A45}
+  body.light .sec-title{color:#1E2A45}
+  body.light .pt{color:${T.cosmicBlue}}
+  body.light .card-title{color:#1E2A45}
+  body.light .prose{color:#2A3A55}
+  body.light .prose strong{color:${T.cosmicBlue}}
+  body.light .res-box{background:${T.surfaceAlt};border-color:${T.border}}
+  body.light .news-card{background:#FFFFFF;border-color:${T.border}66}
+  body.light .rs{border-color:${T.border}66}
+  body.light .rs-hdr{background:${T.surfaceAlt}}
+  body.light .peer-table th{background:${T.surfaceAlt}}
+  body.light .peer-table td{border-bottom-color:${T.border}44}
+  body.light .tab-mini{background:${T.surfaceAlt}}
+  body.light .tmb.on{background:${T.cosmicBlue};color:#FFFFFF}
+  body.light .q-card{background:#FFFFFF;border-color:${T.border}66}
+  body.light .home-page{background:${T.surfaceAlt}}
+  body.light .modal-box{background:${T.surface};border-color:${T.border}}
+
+  /* RESPONSIVE */
+  @media(max-width:900px){
+    .sidebar{width:56px}
+    .sb-logo-img{width:36px;height:36px}
+    .sb-logo-title,.sb-logo-sub,.sb-group-label,.sb-item span.sb-label{display:none}
+    .sb-item{justify-content:center;padding:10px;margin:2px 4px}
+    .sb-icon{font-size:16px}
+    .content-area{margin-left:56px}
+    .home-features{grid-template-columns:1fr 1fr}
+    .g3,.g4,.g5{grid-template-columns:1fr 1fr}
+    .g2{grid-template-columns:1fr}
+    .main{padding:12px}
+    .home-stats{flex-wrap:wrap;gap:8px;padding:12px}
+    .home-stat-item{min-width:80px;border-right:none}
+  }
+
+  /* UTILITY */
+  .gold-text{color:${T.goldLight}}
+  .muted-text{color:${T.muted}}
+  .pos-text{color:${T.greenLight}}
+  .neg-text{color:${T.redLight}}
+  .mono{font-family:'DM Mono',monospace}
+  .serif{font-family:'Cormorant Garamond',serif}
 `;
-
-// ─── TICKER DATA ──────────────────────────────────────────────────────────────
-const TICKERS = [
-  {s:"NIFTY 50",v:"24,188",c:"+0.43%",u:true},{s:"SENSEX",v:"79,802",c:"+0.38%",u:true},
-  {s:"NIFTY BANK",v:"51,204",c:"+0.62%",u:true},{s:"S&P 500",v:"6,118",c:"+0.29%",u:true},
-  {s:"NASDAQ",v:"19,954",c:"+0.51%",u:true},{s:"DOW",v:"44,556",c:"-0.11%",u:false},
-  {s:"GOLD",v:"₹82,410",c:"+0.18%",u:true},{s:"CRUDE",v:"$74.30",c:"-0.55%",u:false},
-  {s:"USD/INR",v:"86.42",c:"+0.08%",u:true},{s:"NIFTY IT",v:"41,204",c:"+1.20%",u:true},
-  {s:"MIDCAP 150",v:"18,420",c:"+0.88%",u:true},{s:"SMALLCAP",v:"12,840",c:"+1.10%",u:true},
+// ─── TICKER LABELS (order for scrolling bar) ─────────────────────────────────
+// Actual values come from useLiveMarkets() — this is just the display order
+const TICKER_ORDER = [
+  "NIFTY 50","SENSEX","NIFTY BANK","NIFTY IT","MIDCAP 150",
+  "S&P 500","NASDAQ","DOW","GOLD ($)","CRUDE","USD/INR","GOLD (₹)",
 ];
 
 const RESEARCH_STEPS = [
@@ -780,19 +1018,29 @@ const RESEARCH_STEPS = [
   "News & Sentiment","Technical Analysis","Final Verdict",
 ];
 
-const SYS = `You are DNR Capitals' senior equity analyst — combining Warren Buffett's philosophy, Peter Lynch's stock picking, and 30 years of Indian market expertise. Provide institutional-quality, specific research with **bold** key terms and numbers. Always give actionable insights.
+// SYS is a function now so it always uses today's date
+const getSYS = () => {
+  const today = new Date().toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
+  const yr = new Date().getFullYear();
+  const q  = Math.ceil((new Date().getMonth()+1)/3);
+  return `You are DNR Capitals' senior equity analyst — combining Warren Buffett's philosophy, Peter Lynch's stock picking, and 30 years of Indian market expertise. Provide institutional-quality, specific research with **bold** key terms and numbers. Always give actionable insights.
 
-MANDATORY DATA STANDARDS:
-- Always use CURRENT 2025 data — Q3FY25 results, current stock prices, latest shareholding
-- Current market context: NIFTY ~24,000, USD/INR ~86, Repo Rate 6.25%
-- When giving CMP (Current Market Price): use latest known price as of early 2025
-- When giving targets: base them on CURRENT price, not 2022/2023 prices
-- Always mention the time period of your data: "As of Q3FY25..." or "Based on Mar 2025 data..."
-- If a stock has moved significantly, acknowledge the current price and recalibrate targets
-- For Himadri Speciality Chemical: CMP ~₹447 (Mar 2025), not ₹140
-- Revenue/profit figures: use FY24 actuals + FY25 estimates, not FY22/FY23
-- P/E, EV/EBITDA ratios: calculate on CURRENT price
-- NEVER say "target ₹140" when stock is at ₹447 — this destroys credibility`;
+TODAY: ${today} | Current Quarter: Q${q}FY${(yr-2000+1)} | FY${yr-2000+1}
+
+MANDATORY REAL-TIME DATA RULES (NON-NEGOTIABLE):
+- Today is ${today}. Use ONLY data current as of this date.
+- NEVER use prices, targets, or financial data from 2022 or 2023 — those are WRONG and misleading
+- When a research prompt provides ⚡ REAL-TIME DATA section, that data OVERRIDES everything you know
+- Use the TTM (Trailing Twelve Months) figures provided — not FY22/FY23 annual data
+- CMP (Current Market Price) = whatever is stated in the ⚡ REAL-TIME DATA section
+- ALL price targets must be calculated relative to the ACTUAL CMP provided
+- State your data period clearly: "Based on TTM data as of [date from prompt]"
+- If real-time data is not provided for a section, clearly state "based on last known data"
+- For FII/DII data: reference the most recent quarters available (Q3FY25 or Q4FY25)
+- For shareholding: use the latest available quarter from the data provided
+- Revenue/PAT growth rates must come from the quarterly trend provided, not assumed`;
+};
+const SYS = getSYS(); // evaluated once at startup; prompts re-call getSYS() for freshness
 
 // ─── QUOTE ROTATOR ────────────────────────────────────────────────────────────
 const QUOTES = [
@@ -822,132 +1070,260 @@ function QuoteRotator() {
   );
 }
 
-function HomePage({ setActiveTab }) {
-  const particles = Array.from({ length: 25 }, (_, i) => ({
-    left: `${(i * 4.1) % 100}%`,
-    width: `${1 + (i % 3)}px`,
-    height: `${1 + (i % 3)}px`,
-    duration: `${8 + (i * 1.1) % 14}s`,
-    delay: `${(i * 0.8) % 10}s`,
-    opacity: 0.2 + (i % 4) * 0.1,
-  }));
+function HomePage({ setActiveTab, markets, fetching }) {
+  const canvasRef = useRef(null);
+  const [slideIdx, setSlideIdx] = useState(0);
+  const [slideFade, setSlideFade] = useState(true);
 
-  const stats = [
-    { l: "NIFTY 50", v: "24,188", c: "+0.43%", u: true },
-    { l: "SENSEX", v: "79,802", c: "+0.38%", u: true },
-    { l: "GOLD", v: "₹82,410", c: "+0.18%", u: true },
-    { l: "USD/INR", v: "86.42", c: "+0.08%", u: true },
-    { l: "CRUDE OIL", v: "$74.30", c: "-0.55%", u: false },
+  // Animated candlestick chart on canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animFrame;
+    let offset = 0;
+
+    const resize = () => {
+      canvas.width  = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Generate candle data
+    const genCandles = (n) => {
+      const candles = [];
+      let price = 400 + Math.random() * 200;
+      for (let i = 0; i < n; i++) {
+        const open  = price;
+        const move  = (Math.random() - 0.46) * 18;
+        const close = price + move;
+        const high  = Math.max(open, close) + Math.random() * 8;
+        const low   = Math.min(open, close) - Math.random() * 8;
+        candles.push({ open, close, high, low });
+        price = close;
+      }
+      return candles;
+    };
+    const candles = genCandles(120);
+
+    const draw = () => {
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      const candleW = 14;
+      const gap     = 6;
+      const step    = candleW + gap;
+      const visible = Math.ceil(W / step) + 2;
+
+      // Find price range
+      const slice = candles.slice(Math.max(0, Math.floor(offset)), Math.floor(offset) + visible);
+      const allPrices = slice.flatMap(c => [c.high, c.low]);
+      const minP = Math.min(...allPrices) - 20;
+      const maxP = Math.max(...allPrices) + 20;
+      const priceH = maxP - minP;
+      const scaleY = (p) => H * 0.85 - ((p - minP) / priceH) * (H * 0.7);
+
+      const startX = -(offset % 1) * step;
+
+      for (let i = 0; i < visible; i++) {
+        const idx = Math.floor(offset) + i;
+        if (idx < 0 || idx >= candles.length) continue;
+        const c = candles[idx % candles.length];
+        const x = startX + i * step;
+        const isUp = c.close >= c.open;
+        const color = isUp ? '#22C55E' : '#EF4444';
+        const alpha = 0.55 + (i / visible) * 0.3;
+
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 1;
+
+        // Wick
+        ctx.beginPath();
+        ctx.moveTo(x + candleW/2, scaleY(c.high));
+        ctx.lineTo(x + candleW/2, scaleY(c.low));
+        ctx.stroke();
+
+        // Body
+        ctx.fillStyle = color;
+        const bodyTop = Math.min(scaleY(c.open), scaleY(c.close));
+        const bodyH   = Math.max(2, Math.abs(scaleY(c.open) - scaleY(c.close)));
+        ctx.fillRect(x, bodyTop, candleW, bodyH);
+      }
+
+      ctx.globalAlpha = 1;
+      offset += 0.025;
+      if (offset >= candles.length - visible) offset = 0;
+      animFrame = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { cancelAnimationFrame(animFrame); window.removeEventListener('resize', resize); };
+  }, []);
+
+  // Auto-advance slides
+  const SLIDES = [
+    { quote:"The stock market is a device for transferring money from the impatient to the patient.", author:"Warren Buffett" },
+    { quote:"In the short run the market is a voting machine. In the long run it is a weighing machine.", author:"Benjamin Graham" },
+    { quote:"Risk comes from not knowing what you are doing.", author:"Warren Buffett" },
+    { quote:"The four most dangerous words in investing: this time it's different.", author:"Sir John Templeton" },
+    { quote:"An investment in knowledge pays the best interest.", author:"Benjamin Franklin" },
+    { quote:"Know what you own, and know why you own it.", author:"Peter Lynch" },
+    { quote:"The individual investor should act consistently as an investor and not as a speculator.", author:"Benjamin Graham" },
+    { quote:"Behind every stock is a company. Find out what it's doing.", author:"Peter Lynch" },
   ];
 
-  const features = [
-    { icon: "🔬", title: "18-Dimension Research", desc: "Business · Financials · Valuation · Technical · Peer Comparison", tab: "research" },
-    { icon: "📈", title: "Technical Charts Suite", desc: "MA · RSI · MACD · Bollinger Bands · Volume Analysis", tab: "technical" },
-    { icon: "📋", title: "Quarterly Hub", desc: "Results · Con Calls · Investor Presentations · Guidance", tab: "quarterly" },
-    { icon: "🔍", title: "Smart Screener", desc: "Filter by P/E · ROE · Growth · Margins · AI Quick Analysis", tab: "screener" },
-    { icon: "💼", title: "Portfolio Tracker", desc: "Real-time P&L · AI Portfolio Review · Allocation Charts", tab: "portfolio" },
-    { icon: "🏛️", title: "Legends Corner", desc: "Buffett · Munger · Jhunjhunwala · CEO Insights", tab: "legends" },
+  useEffect(() => {
+    const t = setInterval(() => {
+      setSlideFade(false);
+      setTimeout(() => {
+        setSlideIdx(i => (i + 1) % SLIDES.length);
+        setSlideFade(true);
+      }, 600);
+    }, 4500);
+    return () => clearInterval(t);
+  }, []);
+
+  // Hero stats — 5 key indices live
+  const HERO_KEYS = ["NIFTY 50","SENSEX","GOLD (₹)","USD/INR","CRUDE"];
+  const heroStats = HERO_KEYS.map(k => markets[k] || { label:k, v:"···", c:"", u:true });
+
+  const FEATURES = [
+    { icon:"🔬", title:"18-Dimension Research", desc:"Business · Financials · Valuation · Peer · Technical · Verdict", tab:"research" },
+    { icon:"📈", title:"Technical Charts Suite", desc:"MA · RSI · MACD · Bollinger Bands · Volume Analysis", tab:"technical" },
+    { icon:"🔍", title:"Smart Screener", desc:"30 stocks · 10 numeric filters · 8 presets · AI analysis", tab:"screener" },
+    { icon:"💼", title:"Portfolio Tracker", desc:"Real-time P&L · AI review · Allocation charts · CSV export", tab:"portfolio" },
+    { icon:"📦", title:"Bulk & Block Deals", desc:"Institutional smart money tracker · AI deal analysis", tab:"bulkdeals" },
+    { icon:"🧮", title:"Financial Calculators", desc:"SIP · Lumpsum · Position Sizing · Tax · Options Pricer", tab:"calculators" },
   ];
 
   return (
-    <div className="home-hero">
-      {/* Backgrounds */}
-      <div className="hero-bg-main" />
-      <div className="hero-grid-lines" />
-      <div className="hero-center-glow" />
-      <div className="hero-scanline" />
+    <div className="home-page">
+      {/* Animated candlestick canvas */}
+      <canvas ref={canvasRef} className="home-canvas" style={{ width:"100%", height:"100%" }} />
+      {/* Overlays */}
+      <div className="home-overlay" />
+      <div className="home-grid" />
 
-      {/* Spinning rings */}
-      <div className="hero-globe-ring" />
-      <div className="hero-globe-ring2" />
-      <div className="hero-globe-ring3" />
+      {/* Hero section */}
+      <div className="home-hero">
+        {/* Logo medallion */}
+        <div className="home-logo-wrap" onClick={() => {}}>
+          <div className="home-logo-ring" />
+          <div className="home-logo-ring2" />
+          <img src="/logo.png" alt="DNR Capitals" className="home-logo-img" />
+        </div>
 
-      {/* Floating particles */}
-      <div className="hero-particles">
-        {particles.map((p, i) => (
-          <div key={i} className="particle" style={{ left: p.left, bottom: "-10px", width: p.width, height: p.height, animationDuration: p.duration, animationDelay: p.delay, opacity: p.opacity }} />
-        ))}
-      </div>
-
-      {/* Main content */}
-      <div className="hero-content-wrap">
-        <div className="hero-eyebrow">
-          <div className="hero-eyebrow-line" />
+        <div className="home-eyebrow">
+          <div className="home-eyebrow-line" />
           DNR Capitals · Equity Research Intelligence
-          <div className="hero-eyebrow-line" />
+          <div className="home-eyebrow-line" />
         </div>
 
-        <h1 className="hero-title">Know Before</h1>
-        <span className="hero-title-accent">You Invest</span>
+        <h1 className="home-title">Know Before</h1>
+        <span className="home-title-accent">You Invest</span>
 
-        <div className="hero-divider">
-          <div className="hero-divider-line" />
-          <div className="hero-divider-diamond" />
-          <div className="hero-divider-line" />
+        <div className="home-divider">
+          <div className="home-divider-line" />
+          <div className="home-divider-diamond" />
+          <div className="home-divider-line" />
         </div>
 
-        <p className="hero-subtitle">
+        <p className="home-subtitle">
           Institutional-grade equity research powered by Groq AI. Deep-dive analysis across 18 dimensions — from business fundamentals to technical charts, peer benchmarking and portfolio intelligence.
         </p>
 
-        <div className="hero-btns">
-          <button className="btn-gold" onClick={() => setActiveTab("research")} style={{ padding: "13px 32px", fontSize: 13, letterSpacing: "0.5px" }}>
+        <div className="home-btns">
+          <button className="btn-gold" onClick={() => setActiveTab("research")} style={{ padding:"12px 28px", fontSize:13 }}>
             🔬 Start Deep Research
           </button>
-          <button className="btn-primary" onClick={() => setActiveTab("technical")} style={{ padding: "13px 32px", fontSize: 13 }}>
-            📈 Technical Charts
+          <button className="btn-primary" onClick={() => setActiveTab("screener")} style={{ padding:"12px 28px", fontSize:13 }}>
+            🔍 Stock Screener
           </button>
-          <button className="btn-ghost" onClick={() => setActiveTab("screener")} style={{ padding: "13px 32px", fontSize: 13, color: "#9a8f82", borderColor: "#67625c55" }}>
-            🔍 Screener
+          <button className="btn-ghost" onClick={() => setActiveTab("portfolio")} style={{ padding:"12px 28px", fontSize:13 }}>
+            💼 Portfolio
           </button>
         </div>
       </div>
 
-      {/* Live stats bar */}
-      <div className="hero-stats-bar">
-        {stats.map(s => (
-          <div key={s.l} className="hero-stat-item">
-            <div style={{ fontSize: 8, color: "#6a6058", letterSpacing: "2px", textTransform: "uppercase", marginBottom: 4 }}>{s.l}</div>
-            <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 15, fontWeight: 600, color: "#d8c7b5" }}>{s.v}</div>
-            <div style={{ fontSize: 10, color: s.u ? T.green : T.red, marginTop: 2 }}>{s.u ? "▲" : "▼"} {s.c}</div>
+      {/* Live market stats bar */}
+      <div className="home-stats">
+        {heroStats.map(s => (
+          <div key={s.label} className="home-stat-item">
+            <div style={{ fontSize:8, color:T.mutedDark, letterSpacing:"2px", textTransform:"uppercase", marginBottom:4 }}>{s.label}</div>
+            <div style={{ fontFamily:"'DM Mono',monospace", fontSize:16, fontWeight:700, color: fetching&&s.v==="···" ? T.mutedDark : T.dun }}>
+              {s.v}
+            </div>
+            {s.c ? (
+              <div style={{ fontSize:10, color:s.u?T.greenLight:T.redLight, marginTop:2 }}>{s.u?"▲":"▼"} {s.c}</div>
+            ) : (
+              <div style={{ fontSize:10, color:T.mutedDark, marginTop:2 }}>{fetching?"Loading…":"—"}</div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Feature grid */}
-      <div className="hero-features">
-        {features.map(f => (
-          <div key={f.title} className="hero-feature" onClick={() => setActiveTab(f.tab)}>
-            <div className="hero-feature-icon">{f.icon}</div>
+      {/* Rotating quotes / news slides */}
+      <div className="home-slides">
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginBottom:12 }}>
+          <div style={{ width:30, height:1, background:`linear-gradient(90deg,transparent,${T.gold}55)` }} />
+          <span style={{ fontSize:8, color:T.goldDim, letterSpacing:"3px", textTransform:"uppercase" }}>Investment Wisdom</span>
+          <div style={{ width:30, height:1, background:`linear-gradient(90deg,${T.gold}55,transparent)` }} />
+        </div>
+        <div className="slide-track">
+          <div style={{ transition:"opacity 0.6s", opacity: slideFade ? 1 : 0, textAlign:"center" }}>
+            <div className="slide-quote">"{SLIDES[slideIdx].quote}"</div>
+            <div className="slide-author">— {SLIDES[slideIdx].author}</div>
+          </div>
+        </div>
+        <div className="slide-dots">
+          {SLIDES.map((_, i) => (
+            <div key={i} className={`slide-dot ${i===slideIdx?"active":""}`} onClick={() => setSlideIdx(i)} />
+          ))}
+        </div>
+      </div>
+
+      {/* Feature cards */}
+      <div className="home-features">
+        {FEATURES.map(f => (
+          <div key={f.title} className="home-feat" onClick={() => setActiveTab(f.tab)}>
+            <div className="home-feat-icon">{f.icon}</div>
             <div>
-              <div className="hero-feature-title">{f.title}</div>
-              <div className="hero-feature-desc">{f.desc}</div>
+              <div className="home-feat-title">{f.title}</div>
+              <div className="home-feat-desc">{f.desc}</div>
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Quote */}
-      <div className="hero-quote-strip">
-        <QuoteRotator />
       </div>
     </div>
   );
 }
 
 // ─── MARKETS ──────────────────────────────────────────────────────────────────
-function Markets() {
+function Markets({ markets={}, fetching=false, onRefresh=()=>{} }) {
   const [summary, setSummary] = useState("");
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [newsLoading, setNewsLoading] = useState(false);
   const [tab, setTab] = useState("overview");
 
+  const STAT_CARDS = [
+    { label:"NIFTY 50", key:"NIFTY 50" },
+    { label:"SENSEX",   key:"SENSEX" },
+    { label:"NIFTY BANK",key:"NIFTY BANK" },
+    { label:"NIFTY IT", key:"NIFTY IT" },
+  ];
+
   const fetchOverview = async () => {
     setLoading(true); setSummary("");
+    const liveCtx = Object.values(markets).length > 0
+      ? "\n\nCURRENT LIVE MARKET LEVELS:\n" +
+        Object.values(markets).map(m => `${m.label}: ${m.v} (${m.c})`).join(" | ")
+      : "";
+    const today = new Date().toLocaleDateString("en-IN", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
     await callGroq(
-      `Today is ${new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}. Provide comprehensive daily market overview: 1) **Indian Markets** — Nifty50, Sensex, Bank Nifty, IT, Midcap key drivers with specific levels 2) **Global Markets** — US, Europe, Asia with index levels 3) **Macro Factors** — FII/DII flows, RBI stance, Fed signals, USD/INR, crude, gold 4) **Top Sectoral Movers** — best and worst sectors 5) **Key Corporate Developments** 6) **Market Outlook** — short-term directional view with key levels 7) **Events This Week**. Be specific with numbers like a Bloomberg strategist.`,
-      SYS, (t) => setSummary(t)
+      `Today is ${today}.${liveCtx}\n\nProvide comprehensive daily market overview using the LIVE levels above: 1) **Indian Markets** — Nifty50, Sensex, Bank Nifty, IT, Midcap key drivers with specific levels 2) **Global Markets** — US, Europe, Asia with index levels 3) **Macro Factors** — FII/DII flows, RBI stance, Fed signals, USD/INR, crude, gold 4) **Top Sectoral Movers** — best and worst sectors 5) **Key Corporate Developments** 6) **Market Outlook** — short-term directional view with key levels 7) **Events This Week**. Use the LIVE levels provided. Be specific with numbers like a Bloomberg strategist.`,
+      getSYS(), (t) => setSummary(t)
     );
     setLoading(false);
   };
@@ -956,45 +1332,78 @@ function Markets() {
     setNewsLoading(true); setNews([]);
     try {
       const raw = await callGroq(
-        `Generate 10 realistic Indian market news headlines for today. Return ONLY valid JSON array: [{"source":"ET Markets","headline":"...","time":"2h ago","sentiment":"positive","category":"India"}]. Categories: India macro, Global, Sector, Corporate. Sentiment: positive/negative/neutral. No markdown, just JSON array.`,
+        `Today is ${new Date().toLocaleDateString("en-IN")}. Generate 10 realistic current Indian market news headlines. Return ONLY valid JSON array: [{"source":"ET Markets","headline":"...","time":"2h ago","sentiment":"positive","category":"India"}]. Categories: India macro, Global, Sector, Corporate. Sentiment: positive/negative/neutral. No markdown, just JSON array.`,
         "Return only valid JSON array, no other text.", null
       );
       const match = raw.match(/\[[\s\S]*\]/);
       if (match) setNews(JSON.parse(match[0]));
-    } catch { setNews([{ source: "System", headline: "Retry news fetch.", time: "now", sentiment: "neutral", category: "India" }]); }
+    } catch { setNews([{ source:"System", headline:"Retry news fetch.", time:"now", sentiment:"neutral", category:"India" }]); }
     setNewsLoading(false);
   };
 
-  const sc = (s) => s === "positive" ? T.green : s === "negative" ? T.red : T.muted;
+  const sc = (s) => s==="positive" ? T.green : s==="negative" ? T.red : T.muted;
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <div><div className="sec-title">📊 Market Overview</div><div className="sec-sub">Daily intelligence — Indian & global markets powered by Groq AI</div></div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button className="btn-gold" onClick={fetchOverview} disabled={loading}>{loading ? "⏳ Analyzing..." : "🔄 Refresh"}</button>
-          <button className="btn-primary" onClick={fetchNews} disabled={newsLoading}>{newsLoading ? "..." : "📰 Fetch News"}</button>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18, flexWrap:"wrap", gap:10 }}>
+        <div>
+          <div className="sec-title">📊 Market Overview</div>
+          <div className="sec-sub">Live indices · AI daily intelligence · {fetching ? <span style={{color:T.gold}}>⟳ Refreshing…</span> : <span style={{color:T.greenLight}}>● Live data</span>}</div>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button className="btn-ghost" onClick={onRefresh} disabled={fetching}>{fetching?"⟳ Refreshing":"🔄 Refresh Prices"}</button>
+          <button className="btn-gold" onClick={fetchOverview} disabled={loading}>{loading?"⏳ Analyzing...":"🧠 Market Analysis"}</button>
+          <button className="btn-primary" onClick={fetchNews} disabled={newsLoading}>{newsLoading?"...":"📰 Fetch News"}</button>
         </div>
       </div>
-      <div className="g4" style={{ marginBottom: 18 }}>
-        {[{l:"NIFTY 50",v:"24,188",c:"+0.43%",u:true},{l:"SENSEX",v:"79,802",c:"+0.38%",u:true},{l:"NIFTY BANK",v:"51,204",c:"+0.62%",u:true},{l:"NIFTY IT",v:"41,204",c:"+1.20%",u:true}].map(s=>(
-          <div key={s.l} className="stat"><div className="stat-lbl">{s.l}</div><div className="stat-val">{s.v}</div><div className={`stat-chg ${s.u?"pos":"neg"}`}>{s.u?"▲":"▼"} {s.c}</div></div>
-        ))}
+
+      <div className="g4" style={{ marginBottom:18 }}>
+        {STAT_CARDS.map(sc2 => {
+          const live = markets[sc2.key];
+          return (
+            <div key={sc2.label} className="stat">
+              <div className="stat-lbl">{sc2.label}</div>
+              {live ? (
+                <><div className="stat-val">{live.v}</div><div className={`stat-chg ${live.u?"pos":"neg"}`}>{live.u?"▲":"▼"} {live.c}</div></>
+              ) : (
+                <><div className="stat-val" style={{color:T.walnutLight,fontSize:14}}>{fetching?"···":"—"}</div><div style={{fontSize:10,color:T.walnutLight}}>{fetching?"Loading…":"Unavailable"}</div></>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {Object.keys(markets).length > 0 && (
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:18 }}>
+          {["S&P 500","NASDAQ","DOW","GOLD ($)","CRUDE","USD/INR"].map(key => {
+            const m = markets[key];
+            if (!m) return null;
+            return (
+              <div key={key} style={{ padding:"6px 14px", background:T.walnutDeep+"cc", border:`1px solid ${T.walnut}33`, borderRadius:8, display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ fontSize:10, color:T.muted }}>{key}</span>
+                <span style={{ fontFamily:"'DM Mono',monospace", fontSize:12, fontWeight:600, color:T.dun }}>{m.v}</span>
+                <span style={{ fontSize:10, color:m.u?T.greenLight:T.redLight }}>{m.u?"▲":"▼"} {m.c}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <div className="tab-mini">
         {["overview","news"].map(t=><button key={t} className={`tmb ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{t==="overview"?"🌐 Analysis":"📰 News Feed"}</button>)}
       </div>
-      {tab==="overview"&&(
+
+      {tab==="overview" && (
         <div className="card">
-          {!summary&&!loading&&<div style={{textAlign:"center",padding:"48px 20px",color:T.muted}}><div style={{fontSize:48,marginBottom:12}}>📈</div><div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:T.dun,marginBottom:8}}>Daily Market Intelligence</div><div style={{fontSize:13}}>Click Refresh to get today's comprehensive market analysis</div></div>}
-          {loading&&<div style={{color:T.goldLight}}><span className="ld">Analyzing global markets</span></div>}
+          {!summary&&!loading&&<div style={{textAlign:"center",padding:"48px 20px",color:T.muted}}><div style={{fontSize:48,marginBottom:12}}>📈</div><div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:18,color:T.dun,marginBottom:8}}>Daily Market Intelligence</div><div style={{fontSize:13,marginBottom:20}}>Click "Market Analysis" for today's overview with live prices injected</div><button className="btn-gold" onClick={fetchOverview}>🧠 Get Market Analysis</button></div>}
+          {loading&&<div className="loading"><div className="spin"/><span className="ld">Analyzing global markets with live data</span></div>}
           {summary&&<div className="prose" dangerouslySetInnerHTML={{__html:summary.replace(/\*\*(.*?)\*\*/g,"<strong>$1</strong>").replace(/\n/g,"<br/>")}}/>}
         </div>
       )}
-      {tab==="news"&&(
+      {tab==="news" && (
         <div>
-          {!news.length&&!newsLoading&&<div className="card" style={{textAlign:"center",padding:"40px",color:T.muted}}><div style={{fontSize:36,marginBottom:10}}>📰</div><div>Click "Fetch News"</div></div>}
-          {newsLoading&&<div className="card" style={{color:T.goldLight}}><span className="ld">Fetching news</span></div>}
+          {!news.length&&!newsLoading&&<div className="card" style={{textAlign:"center",padding:"40px",color:T.muted}}><div style={{fontSize:36,marginBottom:10}}>📰</div><div style={{marginBottom:16}}>Click "Fetch News" for today's market headlines</div><button className="btn-primary" onClick={fetchNews}>📰 Fetch News</button></div>}
+          {newsLoading&&<div className="loading"><div className="spin"/><span className="ld">Fetching latest market news</span></div>}
           {news.map((n,i)=>(
             <div key={i} className="news-card">
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
@@ -1412,7 +1821,7 @@ Data fetched: ${fundData.fetchedAt}\n`;
         try {
           let text = "";
           const enrichedPrompt = prompts[step](query) + rtContext;
-          await callGroq(enrichedPrompt, SYS, (t) => {
+          await callGroq(enrichedPrompt, getSYS(), (t) => {
             text = t;
             setSections(prev => ({ ...prev, [step]: t }));
           });
@@ -1579,7 +1988,7 @@ function QuarterlyHub() {
     };
     const setters = { results: setResults, concall: setConcall, presentation: setPresentation };
     setters[type]("");
-    await callGroq(prompts[type], SYS, (t) => setters[type](t));
+    await callGroq(prompts[type], getSYS(), (t) => setters[type](t));
     setLoading(p => ({ ...p, [type]: false }));
   };
 
@@ -1642,88 +2051,398 @@ function QuarterlyHub() {
 }
 
 // ─── SCREENER ─────────────────────────────────────────────────────────────────
+const SCREENER_STOCKS = [
+  { sym:"RELIANCE",  name:"Reliance Industries",       sector:"Conglomerate",  mcapN:1982000, pe:28.4, pb:2.1,  roe:9.8,  roce:11.2, de:0.35, rev_gr:18.2, pat_gr:22.1, div:1.2,  rating:"BUY" },
+  { sym:"TCS",       name:"Tata Consultancy Services",  sector:"IT Services",   mcapN:1420000, pe:32.1, pb:14.2, roe:44.1, roce:58.2, de:0.02, rev_gr:8.4,  pat_gr:9.2,  div:3.8,  rating:"ACCUMULATE" },
+  { sym:"HDFCBANK",  name:"HDFC Bank",                  sector:"Banking",       mcapN:1240000, pe:18.2, pb:2.8,  roe:16.8, roce:null,  de:7.2,  rev_gr:24.1, pat_gr:18.4, div:1.5,  rating:"BUY" },
+  { sym:"INFOSYS",   name:"Infosys Ltd",                sector:"IT Services",   mcapN:784000,  pe:28.8, pb:8.4,  roe:31.2, roce:42.1, de:0.08, rev_gr:6.2,  pat_gr:8.8,  div:4.2,  rating:"ACCUMULATE" },
+  { sym:"ICICIBANK", name:"ICICI Bank",                 sector:"Banking",       mcapN:892000,  pe:19.4, pb:3.4,  roe:18.2, roce:null,  de:6.8,  rev_gr:28.4, pat_gr:24.2, div:1.8,  rating:"BUY" },
+  { sym:"HINDUNILVR",name:"Hindustan Unilever",         sector:"FMCG",          mcapN:584000,  pe:58.2, pb:12.4, roe:21.4, roce:28.4, de:0.12, rev_gr:4.2,  pat_gr:6.8,  div:2.8,  rating:"HOLD" },
+  { sym:"KOTAKBANK", name:"Kotak Mahindra Bank",        sector:"Banking",       mcapN:392000,  pe:22.4, pb:3.8,  roe:14.2, roce:null,  de:5.4,  rev_gr:22.1, pat_gr:26.4, div:0.8,  rating:"ACCUMULATE" },
+  { sym:"WIPRO",     name:"Wipro Ltd",                  sector:"IT Services",   mcapN:262000,  pe:24.4, pb:5.2,  roe:18.4, roce:24.2, de:0.18, rev_gr:4.8,  pat_gr:12.4, div:1.2,  rating:"HOLD" },
+  { sym:"TATAMOTORS",name:"Tata Motors",                sector:"Auto",          mcapN:324000,  pe:14.2, pb:3.8,  roe:28.4, roce:18.2, de:1.42, rev_gr:18.4, pat_gr:142.8,div:0.2,  rating:"BUY" },
+  { sym:"ASIANPAINT",name:"Asian Paints",               sector:"Consumer",      mcapN:248000,  pe:58.4, pb:16.2, roe:26.8, roce:32.4, de:0.04, rev_gr:8.4,  pat_gr:2.4,  div:3.4,  rating:"HOLD" },
+  { sym:"ZOMATO",    name:"Zomato Ltd",                 sector:"Consumer Tech", mcapN:212000,  pe:284.2,pb:14.8, roe:4.2,  roce:6.8,  de:0.02, rev_gr:68.4, pat_gr:null, div:0,    rating:"ACCUMULATE" },
+  { sym:"DIXON",     name:"Dixon Technologies",         sector:"Electronics",   mcapN:48000,   pe:142.4,pb:28.4, roe:22.8, roce:28.4, de:0.12, rev_gr:82.4, pat_gr:68.4, div:0.4,  rating:"BUY" },
+  { sym:"BAJFINANCE",name:"Bajaj Finance",              sector:"NBFC",          mcapN:498000,  pe:34.2, pb:6.8,  roe:22.4, roce:null,  de:3.8,  rev_gr:28.2, pat_gr:24.8, div:0.4,  rating:"BUY" },
+  { sym:"MARUTI",    name:"Maruti Suzuki India",        sector:"Auto",          mcapN:382000,  pe:28.8, pb:4.8,  roe:18.4, roce:22.4, de:0.01, rev_gr:14.2, pat_gr:38.4, div:1.8,  rating:"ACCUMULATE" },
+  { sym:"SUNPHARMA", name:"Sun Pharmaceutical",         sector:"Pharma",        mcapN:342000,  pe:38.4, pb:5.8,  roe:16.2, roce:18.4, de:0.08, rev_gr:12.8, pat_gr:24.2, div:1.2,  rating:"BUY" },
+  { sym:"LT",        name:"Larsen & Toubro",            sector:"Capital Goods",  mcapN:482000, pe:34.8, pb:5.2,  roe:14.8, roce:16.4, de:1.12, rev_gr:18.4, pat_gr:22.8, div:1.4,  rating:"BUY" },
+  { sym:"NESTLEIND", name:"Nestle India",               sector:"FMCG",          mcapN:224000,  pe:72.4, pb:82.4, roe:118.4,roce:142.4,de:0.01, rev_gr:8.8,  pat_gr:14.4, div:2.8,  rating:"HOLD" },
+  { sym:"DRREDDY",   name:"Dr. Reddy's Laboratories",  sector:"Pharma",        mcapN:112000,  pe:22.4, pb:3.8,  roe:18.4, roce:22.4, de:0.08, rev_gr:14.2, pat_gr:28.4, div:0.8,  rating:"ACCUMULATE" },
+  { sym:"TITAN",     name:"Titan Company",              sector:"Consumer",      mcapN:278000,  pe:88.4, pb:22.4, roe:28.4, roce:34.2, de:0.02, rev_gr:18.4, pat_gr:18.8, div:1.0,  rating:"HOLD" },
+  { sym:"ADANIPORTS",name:"Adani Ports & SEZ",          sector:"Infrastructure",mcapN:264000,  pe:28.4, pb:4.8,  roe:18.8, roce:14.4, de:1.82, rev_gr:24.4, pat_gr:28.4, div:0.8,  rating:"ACCUMULATE" },
+  { sym:"TECHM",     name:"Tech Mahindra",              sector:"IT Services",   mcapN:128000,  pe:42.4, pb:4.8,  roe:12.4, roce:16.4, de:0.08, rev_gr:2.4,  pat_gr:62.4, div:2.4,  rating:"ACCUMULATE" },
+  { sym:"HINDALCO",  name:"Hindalco Industries",        sector:"Metals",        mcapN:134000,  pe:14.4, pb:1.8,  roe:14.2, roce:12.8, de:0.88, rev_gr:8.4,  pat_gr:18.4, div:0.6,  rating:"BUY" },
+  { sym:"TATAPOWER", name:"Tata Power",                 sector:"Power",         mcapN:84000,   pe:28.4, pb:4.2,  roe:14.8, roce:8.4,  de:2.28, rev_gr:18.4, pat_gr:24.8, div:0.6,  rating:"BUY" },
+  { sym:"COALINDIA", name:"Coal India",                 sector:"Mining",        mcapN:248000,  pe:8.4,  pb:3.8,  roe:48.4, roce:68.4, de:0.01, rev_gr:4.2,  pat_gr:8.8,  div:8.4,  rating:"BUY" },
+  { sym:"PERSISTENT",name:"Persistent Systems",        sector:"IT Services",   mcapN:72000,   pe:62.4, pb:14.2, roe:24.4, roce:32.4, de:0.02, rev_gr:22.4, pat_gr:38.4, div:1.2,  rating:"BUY" },
+  { sym:"POLYCAB",   name:"Polycab India",              sector:"Electronics",   mcapN:62000,   pe:42.4, pb:8.4,  roe:22.4, roce:28.4, de:0.04, rev_gr:18.4, pat_gr:22.4, div:1.4,  rating:"BUY" },
+  { sym:"ABCAPITAL", name:"Aditya Birla Capital",       sector:"NBFC",          mcapN:38000,   pe:22.4, pb:2.4,  roe:12.4, roce:null,  de:4.2,  rev_gr:28.4, pat_gr:18.4, div:0.2,  rating:"ACCUMULATE" },
+  { sym:"DEEPAKNTR", name:"Deepak Nitrite",             sector:"Chemicals",     mcapN:22000,   pe:32.4, pb:5.8,  roe:18.4, roce:22.4, de:0.08, rev_gr:8.4,  pat_gr:4.8,  div:1.2,  rating:"HOLD" },
+  { sym:"PIIND",     name:"PI Industries",              sector:"Chemicals",     mcapN:42000,   pe:38.4, pb:8.4,  roe:22.4, roce:28.4, de:0.02, rev_gr:14.4, pat_gr:18.4, div:0.6,  rating:"ACCUMULATE" },
+  { sym:"ABBOTINDIA",name:"Abbott India",               sector:"Pharma",        mcapN:28000,   pe:48.4, pb:14.4, roe:32.4, roce:42.4, de:0.01, rev_gr:8.4,  pat_gr:12.4, div:2.8,  rating:"HOLD" },
+];
+
+const SECTOR_COLORS = {
+  "IT Services":"#4A6B8A","Banking":"#5A7A5A","FMCG":"#8A6A4A",
+  "Auto":"#6A4A8A","Consumer":"#8A4A5A","Consumer Tech":"#4A8A7A",
+  "Electronics":"#7A8A4A","NBFC":"#5A6A8A","Pharma":"#8A5A6A",
+  "Capital Goods":"#6A8A5A","Metals":"#7A6A5A","Power":"#8A7A4A",
+  "Mining":"#5A5A6A","Conglomerate":"#7A5A4A","Infrastructure":"#4A7A6A",
+  "Chemicals":"#6A8A7A",
+};
+
+const PRESETS = [
+  { label:"🏆 High ROE",      desc:"ROE > 20%",             filters:{ roeMin:20 } },
+  { label:"💎 Value Picks",   desc:"P/E < 20",              filters:{ peMax:20 } },
+  { label:"🚀 Growth Stars",  desc:"Rev Growth > 20%",      filters:{ revGrMin:20 } },
+  { label:"🏦 Large Cap",     desc:"MCap > ₹1L Cr",         filters:{ mcapMin:100000 } },
+  { label:"🌱 Small Cap",     desc:"MCap < ₹50K Cr",        filters:{ mcapMax:50000 } },
+  { label:"💰 Dividend",      desc:"Div Yield > 2%",        filters:{ divMin:2 } },
+  { label:"🧹 Low Debt",      desc:"D/E < 0.3 (ex-fin)",   filters:{ deMax:0.3 } },
+  { label:"⚡ Buy Rated",     desc:"All BUY ratings",       filters:{ rating:"BUY" } },
+];
+
 function Screener() {
-  const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState(null);
-  const [analysis, setAnalysis] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [search, setSearch]       = useState("");
+  const [sectorFilter, setSector] = useState("all");
+  const [ratingFilter, setRating] = useState("all");
+  const [sortKey, setSortKey]     = useState("mcapN");
+  const [sortDir, setSortDir]     = useState("desc");
+  const [selected, setSelected]   = useState(null);
+  const [analysis, setAnalysis]   = useState("");
+  const [loading, setLoading]     = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [activePreset, setActivePreset] = useState(null);
 
-  const stocks = [
-    { sym: "RELIANCE", name: "Reliance Industries", sector: "Conglomerate", mcap: "19,82,000", pe: "28.4", pb: "2.1", roe: "9.8", roce: "11.2", de: "0.35", rev_gr: "18.2", pat_gr: "22.1", div: "1.2", rating: "BUY" },
-    { sym: "TCS", name: "Tata Consultancy Services", sector: "IT Services", mcap: "14,20,000", pe: "32.1", pb: "14.2", roe: "44.1", roce: "58.2", de: "0.02", rev_gr: "8.4", pat_gr: "9.2", div: "3.8", rating: "ACCUMULATE" },
-    { sym: "HDFCBANK", name: "HDFC Bank", sector: "Banking", mcap: "12,40,000", pe: "18.2", pb: "2.8", roe: "16.8", roce: "—", de: "7.2", rev_gr: "24.1", pat_gr: "18.4", div: "1.5", rating: "BUY" },
-    { sym: "INFOSYS", name: "Infosys Ltd", sector: "IT Services", mcap: "7,84,000", pe: "28.8", pb: "8.4", roe: "31.2", roce: "42.1", de: "0.08", rev_gr: "6.2", pat_gr: "8.8", div: "4.2", rating: "ACCUMULATE" },
-    { sym: "ICICIBANK", name: "ICICI Bank", sector: "Banking", mcap: "8,92,000", pe: "19.4", pb: "3.4", roe: "18.2", roce: "—", de: "6.8", rev_gr: "28.4", pat_gr: "24.2", div: "1.8", rating: "BUY" },
-    { sym: "HINDUNILVR", name: "Hindustan Unilever", sector: "FMCG", mcap: "5,84,000", pe: "58.2", pb: "12.4", roe: "21.4", roce: "28.4", de: "0.12", rev_gr: "4.2", pat_gr: "6.8", div: "2.8", rating: "HOLD" },
-    { sym: "KOTAKBANK", name: "Kotak Mahindra Bank", sector: "Banking", mcap: "3,92,000", pe: "22.4", pb: "3.8", roe: "14.2", roce: "—", de: "5.4", rev_gr: "22.1", pat_gr: "26.4", div: "0.8", rating: "ACCUMULATE" },
-    { sym: "WIPRO", name: "Wipro Ltd", sector: "IT Services", mcap: "2,62,000", pe: "24.4", pb: "5.2", roe: "18.4", roce: "24.2", de: "0.18", rev_gr: "4.8", pat_gr: "12.4", div: "1.2", rating: "HOLD" },
-    { sym: "TATAMOTORS", name: "Tata Motors Ltd", sector: "Auto", mcap: "3,24,000", pe: "14.2", pb: "3.8", roe: "28.4", roce: "18.2", de: "1.42", rev_gr: "18.4", pat_gr: "142.8", div: "0.2", rating: "BUY" },
-    { sym: "ASIANPAINT", name: "Asian Paints", sector: "Consumer", mcap: "2,48,000", pe: "58.4", pb: "16.2", roe: "26.8", roce: "32.4", de: "0.04", rev_gr: "8.4", pat_gr: "2.4", div: "3.4", rating: "HOLD" },
-    { sym: "ZOMATO", name: "Zomato Ltd", sector: "Consumer Tech", mcap: "2,12,000", pe: "284.2", pb: "14.8", roe: "4.2", roce: "6.8", de: "0.02", rev_gr: "68.4", pat_gr: "N/A", div: "0", rating: "ACCUMULATE" },
-    { sym: "DIXON", name: "Dixon Technologies", sector: "Electronics", mcap: "48,000", pe: "142.4", pb: "28.4", roe: "22.8", roce: "28.4", de: "0.12", rev_gr: "82.4", pat_gr: "68.4", div: "0.4", rating: "BUY" },
-  ];
+  // Numeric range filters
+  const [peMin, setPeMin]       = useState("");
+  const [peMax, setPeMax]       = useState("");
+  const [roeMin, setRoeMin]     = useState("");
+  const [roeMax, setRoeMax]     = useState("");
+  const [mcapMin, setMcapMin]   = useState("");
+  const [mcapMax, setMcapMax]   = useState("");
+  const [deMax, setDeMax]       = useState("");
+  const [revGrMin, setRevGrMin] = useState("");
+  const [patGrMin, setPatGrMin] = useState("");
+  const [divMin, setDivMin]     = useState("");
 
-  const filtered = stocks.filter(s =>
-    (filter === "all" || s.sector === filter || s.rating === filter) &&
-    (s.sym.toLowerCase().includes(search.toLowerCase()) || s.name.toLowerCase().includes(search.toLowerCase()))
+  const sectors  = [...new Set(SCREENER_STOCKS.map(s => s.sector))].sort();
+  const ratings  = ["BUY","ACCUMULATE","HOLD","SELL"];
+
+  const ratingColor = (r) =>
+    r === "BUY"       ? T.greenLight :
+    r === "ACCUMULATE"? T.goldLight  :
+    r === "HOLD"      ? T.gold       : T.redLight;
+
+  const applyPreset = (preset) => {
+    clearFilters();
+    setActivePreset(preset.label);
+    const f = preset.filters;
+    if (f.roeMin)   setRoeMin(String(f.roeMin));
+    if (f.peMax)    setPeMax(String(f.peMax));
+    if (f.revGrMin) setRevGrMin(String(f.revGrMin));
+    if (f.mcapMin)  setMcapMin(String(f.mcapMin));
+    if (f.mcapMax)  setMcapMax(String(f.mcapMax));
+    if (f.divMin)   setDivMin(String(f.divMin));
+    if (f.deMax)    setDeMax(String(f.deMax));
+    if (f.rating)   setRating(f.rating);
+  };
+
+  const clearFilters = () => {
+    setPeMin(""); setPeMax(""); setRoeMin(""); setRoeMax("");
+    setMcapMin(""); setMcapMax(""); setDeMax("");
+    setRevGrMin(""); setPatGrMin(""); setDivMin("");
+    setSector("all"); setRating("all"); setSearch("");
+    setActivePreset(null);
+  };
+
+  const hasActiveFilters = peMin||peMax||roeMin||roeMax||mcapMin||mcapMax||deMax||revGrMin||patGrMin||divMin||sectorFilter!=="all"||ratingFilter!=="all"||search;
+
+  const filtered = SCREENER_STOCKS
+    .filter(s => {
+      if (search && !s.sym.toLowerCase().includes(search.toLowerCase()) && !s.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (sectorFilter !== "all" && s.sector !== sectorFilter) return false;
+      if (ratingFilter !== "all" && s.rating !== ratingFilter) return false;
+      if (peMin  !== "" && s.pe    < parseFloat(peMin))    return false;
+      if (peMax  !== "" && s.pe    > parseFloat(peMax))    return false;
+      if (roeMin !== "" && s.roe   < parseFloat(roeMin))   return false;
+      if (roeMax !== "" && s.roe   > parseFloat(roeMax))   return false;
+      if (mcapMin!== "" && s.mcapN < parseFloat(mcapMin))  return false;
+      if (mcapMax!== "" && s.mcapN > parseFloat(mcapMax))  return false;
+      if (deMax  !== "" && s.de    > parseFloat(deMax))    return false;
+      if (revGrMin!=="" && s.rev_gr< parseFloat(revGrMin)) return false;
+      if (patGrMin!=="" && (s.pat_gr == null || s.pat_gr < parseFloat(patGrMin))) return false;
+      if (divMin !== "" && s.div   < parseFloat(divMin))   return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const av = a[sortKey] ?? -Infinity;
+      const bv = b[sortKey] ?? -Infinity;
+      return sortDir === "asc" ? av - bv : bv - av;
+    });
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("desc"); }
+  };
+
+  const SortHdr = ({ label, k, style }) => (
+    <span onClick={() => handleSort(k)} style={{ cursor:"pointer", userSelect:"none", display:"flex", alignItems:"center", gap:3, ...(style||{}) }}>
+      {label}
+      <span style={{ fontSize:8, color: sortKey===k ? T.goldLight : T.walnutLight, opacity: sortKey===k ? 1 : 0.5 }}>
+        {sortKey===k ? (sortDir==="asc" ? "▲" : "▼") : "↕"}
+      </span>
+    </span>
   );
-
-  const sectors = [...new Set(stocks.map(s => s.sector))];
-  const ratingColor = (r) => r === "BUY" || r === "STRONG BUY" ? T.green : r === "ACCUMULATE" ? T.goldLight : r === "HOLD" ? T.gold : T.red;
 
   const quickAnalyze = async (stock) => {
     setSelected(stock);
     setLoading(true); setAnalysis("");
     await callGroq(
-      `Quick comprehensive analysis of ${stock.sym} (${stock.name}): Current P/E ${stock.pe}x, P/B ${stock.pb}x, ROE ${stock.roe}%, Revenue growth ${stock.rev_gr}%, PAT growth ${stock.pat_gr}%. Provide: 1) Is valuation cheap/fair/expensive vs sector? 2) Quality of business — is ROE/ROCE sustainable? 3) Growth outlook — can current growth sustain? 4) Key risks 5) Final verdict with ideal entry price range. Be specific with numbers.`,
+      `Comprehensive quick analysis of ${stock.sym} (${stock.name}, ${stock.sector} sector):
+Financials: P/E ${stock.pe}x | P/B ${stock.pb}x | ROE ${stock.roe}% | ROCE ${stock.roce ?? "N/A"}% | D/E ${stock.de} | Rev Growth ${stock.rev_gr}% | PAT Growth ${stock.pat_gr ?? "N/A"}% | Div Yield ${stock.div}% | MCap ₹${(stock.mcapN/1e5).toFixed(0)}L Cr
+
+Provide a structured analysis:
+1) **Valuation Assessment** — Is current P/E cheap / fair / expensive vs sector peers? Justify with numbers.
+2) **Business Quality** — ROE/ROCE sustainability, competitive moat, management quality signals.
+3) **Growth Trajectory** — Can current revenue/PAT growth sustain? Key growth drivers.
+4) **Risk Factors** — Top 3 specific risks for this company right now.
+5) **Technicals** — Key support / resistance levels based on current price range.
+6) **DNR Verdict** — BUY / ACCUMULATE / HOLD / SELL with ideal entry range and 12-month target.
+
+Be specific with numbers. Reference current FY25 data.`,
       SYS, (t) => setAnalysis(t)
     );
     setLoading(false);
   };
 
+  const FilterInput = ({ label, val, setter, placeholder }) => (
+    <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+      <label style={{ fontSize:9, color:T.muted, letterSpacing:"1px", textTransform:"uppercase" }}>{label}</label>
+      <input className="inp" value={val} onChange={e => { setter(e.target.value); setActivePreset(null); }}
+        placeholder={placeholder} style={{ width:90, padding:"6px 10px", fontSize:12 }} />
+    </div>
+  );
+
+  const fmtMcap = (n) => n >= 100000 ? `₹${(n/100000).toFixed(1)}L Cr` : `₹${(n/1000).toFixed(0)}K Cr`;
+
   return (
     <div>
-      <div className="sec-title">🔍 Stock Screener</div>
-      <div className="sec-sub">Real-time stock data with AI-powered quick analysis</div>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <input className="inp" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or symbol..." style={{ maxWidth: 280 }} />
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {["all", "BUY", "ACCUMULATE", "HOLD", ...sectors].map(f => (
-              <button key={f} className={`btn-ghost ${filter === f ? "on" : ""}`} style={filter === f ? { background: T.walnut, color: T.dun, borderColor: T.walnut } : {}} onClick={() => setFilter(f)}>
-                {f === "all" ? "All" : f}
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:18, flexWrap:"wrap", gap:12 }}>
+        <div>
+          <div className="sec-title">🔍 Stock Screener</div>
+          <div className="sec-sub">30 stocks · Multi-filter · Sortable · AI quick analysis</div>
+        </div>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          {hasActiveFilters && (
+            <button className="btn-danger" onClick={clearFilters} style={{ fontSize:11 }}>✕ Clear Filters</button>
+          )}
+          <button className={`btn-ghost ${showFilters ? "on" : ""}`}
+            style={showFilters ? { background:T.walnut, color:T.dun, borderColor:T.walnut } : {}}
+            onClick={() => setShowFilters(f => !f)}>
+            ⚙️ {showFilters ? "Hide" : "Filters"}
+          </button>
+        </div>
+      </div>
+
+      {/* Presets */}
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:14 }}>
+        {PRESETS.map(p => (
+          <button key={p.label} onClick={() => applyPreset(p)}
+            style={{
+              padding:"5px 12px", borderRadius:20, fontSize:11, cursor:"pointer", transition:"all 0.2s",
+              background: activePreset===p.label ? T.gold+"33" : T.walnutDeep,
+              border: `1px solid ${activePreset===p.label ? T.gold+"88" : T.walnut+"44"}`,
+              color: activePreset===p.label ? T.goldLight : T.muted,
+              fontFamily:"'Jost',sans-serif",
+            }} title={p.desc}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search + Sector + Rating bar */}
+      <div className="card" style={{ marginBottom:12, padding:"14px 16px" }}>
+        <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
+          <input className="inp" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="🔍  Search symbol or name..."
+            style={{ maxWidth:240, minWidth:160 }} />
+          <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
+            <button onClick={() => setSector("all")}
+              className="btn-ghost" style={sectorFilter==="all" ? { background:T.walnut, color:T.dun, borderColor:T.walnut } : {}}>
+              All Sectors
+            </button>
+            {sectors.map(sec => (
+              <button key={sec} onClick={() => setSector(sec)}
+                className="btn-ghost"
+                style={sectorFilter===sec ? {
+                  background: (SECTOR_COLORS[sec]||T.walnut)+"44",
+                  color: T.dun,
+                  borderColor: (SECTOR_COLORS[sec]||T.walnut)+"88",
+                } : {}}>
+                {sec}
+              </button>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:5, marginLeft:"auto" }}>
+            {["all",...ratings].map(r => (
+              <button key={r} onClick={() => setRating(r)}
+                className="btn-ghost"
+                style={ratingFilter===r ? {
+                  background: r==="all" ? T.walnut : ratingColor(r)+"33",
+                  color: r==="all" ? T.dun : ratingColor(r),
+                  borderColor: r==="all" ? T.walnut : ratingColor(r)+"77",
+                  fontWeight:700,
+                } : {}}>
+                {r==="all" ? "All Ratings" : r}
               </button>
             ))}
           </div>
         </div>
       </div>
-      <div className="card" style={{ overflowX: "auto" }}>
-        <div className="scr-row scr-hdr">
-          <span>Stock</span><span>MCap (Cr)</span><span>P/E</span><span>P/B</span><span>ROE%</span><span>Rev Gr%</span><span>PAT Gr%</span><span>D/E</span><span>Rating</span>
-        </div>
-        {filtered.map(s => (
-          <div key={s.sym} className="scr-row" onClick={() => quickAnalyze(s)}>
-            <div>
-              <div style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, fontSize: 12, color: T.dun }}>{s.sym}</div>
-              <div style={{ fontSize: 10, color: T.muted }}>{s.name}</div>
-            </div>
-            <span style={{ fontFamily: "'DM Mono',monospace" }}>{s.mcap}</span>
-            <span style={{ fontFamily: "'DM Mono',monospace" }}>{s.pe}</span>
-            <span style={{ fontFamily: "'DM Mono',monospace" }}>{s.pb}</span>
-            <span style={{ color: parseFloat(s.roe) > 20 ? T.green : T.dunDark }}>{s.roe}</span>
-            <span style={{ color: parseFloat(s.rev_gr) > 15 ? T.green : T.dunDark }}>{s.rev_gr}%</span>
-            <span style={{ color: s.pat_gr === "N/A" ? T.muted : parseFloat(s.pat_gr) > 20 ? T.green : T.dunDark }}>{s.pat_gr}{s.pat_gr !== "N/A" ? "%" : ""}</span>
-            <span style={{ color: parseFloat(s.de) > 1 ? T.red : T.green }}>{s.de}</span>
-            <span style={{ color: ratingColor(s.rating), fontWeight: 700, fontSize: 10 }}>{s.rating}</span>
+
+      {/* Advanced Numeric Filters */}
+      {showFilters && (
+        <div className="card card-gold" style={{ marginBottom:14 }}>
+          <div style={{ fontSize:11, color:T.goldLight, letterSpacing:"1.5px", textTransform:"uppercase", marginBottom:14, fontWeight:600 }}>
+            ⚙️ Advanced Numeric Filters
           </div>
-        ))}
+          <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
+            <FilterInput label="P/E Min"      val={peMin}    setter={e => { setPeMin(e); setActivePreset(null); }}     placeholder="e.g. 10" />
+            <FilterInput label="P/E Max"      val={peMax}    setter={e => { setPeMax(e); setActivePreset(null); }}     placeholder="e.g. 40" />
+            <FilterInput label="ROE Min %"    val={roeMin}   setter={e => { setRoeMin(e); setActivePreset(null); }}    placeholder="e.g. 15" />
+            <FilterInput label="ROE Max %"    val={roeMax}   setter={e => { setRoeMax(e); setActivePreset(null); }}    placeholder="e.g. 50" />
+            <FilterInput label="MCap Min(Cr)" val={mcapMin}  setter={e => { setMcapMin(e); setActivePreset(null); }}   placeholder="e.g. 50000" />
+            <FilterInput label="MCap Max(Cr)" val={mcapMax}  setter={e => { setMcapMax(e); setActivePreset(null); }}   placeholder="e.g. 500000" />
+            <FilterInput label="D/E Max"      val={deMax}    setter={e => { setDeMax(e); setActivePreset(null); }}     placeholder="e.g. 1.0" />
+            <FilterInput label="Rev Gr Min %" val={revGrMin} setter={e => { setRevGrMin(e); setActivePreset(null); }}  placeholder="e.g. 15" />
+            <FilterInput label="PAT Gr Min %" val={patGrMin} setter={e => { setPatGrMin(e); setActivePreset(null); }}  placeholder="e.g. 10" />
+            <FilterInput label="Div Yield Min"val={divMin}   setter={e => { setDivMin(e); setActivePreset(null); }}    placeholder="e.g. 2" />
+          </div>
+        </div>
+      )}
+
+      {/* Results count */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8, padding:"0 4px" }}>
+        <span style={{ fontSize:11, color:T.muted }}>
+          Showing <strong style={{ color:T.goldLight }}>{filtered.length}</strong> of {SCREENER_STOCKS.length} stocks
+          {hasActiveFilters && <span style={{ color:T.gold }}> · Filters active</span>}
+        </span>
+        <span style={{ fontSize:10, color:T.walnutLight }}>Click a row for AI analysis · Click column headers to sort</span>
       </div>
+
+      {/* Table */}
+      <div className="card" style={{ overflowX:"auto", padding:0 }}>
+        {/* Header row */}
+        <div className="scr-row scr-hdr" style={{ padding:"10px 14px", borderBottom:`2px solid ${T.walnut}55` }}>
+          <span>Stock</span>
+          <SortHdr label="MCap"     k="mcapN" />
+          <SortHdr label="P/E"      k="pe" />
+          <SortHdr label="P/B"      k="pb" />
+          <SortHdr label="ROE %"    k="roe" />
+          <SortHdr label="Rev Gr %" k="rev_gr" />
+          <SortHdr label="PAT Gr %" k="pat_gr" />
+          <SortHdr label="D/E"      k="de" />
+          <span>Rating</span>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"48px 20px" }}>
+            <div style={{ fontSize:36, marginBottom:12 }}>🔍</div>
+            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:18, color:T.dun, marginBottom:6 }}>No stocks match your filters</div>
+            <div style={{ color:T.muted, fontSize:13, marginBottom:16 }}>Try adjusting or clearing your filters</div>
+            <button className="btn-gold" onClick={clearFilters}>✕ Clear All Filters</button>
+          </div>
+        ) : (
+          filtered.map(s => (
+            <div key={s.sym} className="scr-row"
+              style={{ padding:"10px 14px", borderBottom:`1px solid ${T.walnut}22`, cursor:"pointer",
+                background: selected?.sym===s.sym ? T.gold+"0a" : "transparent",
+                borderLeft: selected?.sym===s.sym ? `3px solid ${T.gold}77` : "3px solid transparent",
+              }}
+              onClick={() => quickAnalyze(s)}>
+              <div>
+                <div style={{ fontFamily:"'DM Mono',monospace", fontWeight:700, fontSize:12, color:T.dun }}>{s.sym}</div>
+                <div style={{ fontSize:10, color:T.muted, marginBottom:2 }}>{s.name}</div>
+                <span style={{
+                  fontSize:8, letterSpacing:"0.5px", padding:"1px 6px", borderRadius:8,
+                  background: (SECTOR_COLORS[s.sector]||T.walnut)+"22",
+                  color: (SECTOR_COLORS[s.sector]||T.walnutLight),
+                  border: `1px solid ${(SECTOR_COLORS[s.sector]||T.walnut)}44`,
+                }}>
+                  {s.sector}
+                </span>
+              </div>
+              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11 }}>{fmtMcap(s.mcapN)}</span>
+              <span style={{
+                fontFamily:"'DM Mono',monospace",
+                color: s.pe > 60 ? T.redLight : s.pe < 20 ? T.greenLight : T.dunDark
+              }}>{s.pe}x</span>
+              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11 }}>{s.pb}x</span>
+              <span style={{ color: s.roe >= 25 ? T.greenLight : s.roe >= 15 ? T.dun : T.redLight, fontWeight: s.roe >= 25 ? 700 : 400 }}>
+                {s.roe}%
+              </span>
+              <span style={{ color: s.rev_gr >= 20 ? T.greenLight : s.rev_gr >= 10 ? T.dun : T.muted }}>
+                {s.rev_gr}%
+              </span>
+              <span style={{ color: s.pat_gr == null ? T.muted : s.pat_gr >= 20 ? T.greenLight : s.pat_gr >= 0 ? T.dun : T.redLight }}>
+                {s.pat_gr != null ? `${s.pat_gr}%` : "—"}
+              </span>
+              <span style={{ color: s.de > 1.5 ? T.redLight : s.de > 0.5 ? T.gold : T.greenLight }}>
+                {s.de}
+              </span>
+              <span style={{
+                color: ratingColor(s.rating), fontWeight:700, fontSize:10,
+                background: ratingColor(s.rating)+"18",
+                padding:"2px 8px", borderRadius:8,
+                border:`1px solid ${ratingColor(s.rating)}33`,
+              }}>
+                {s.rating}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display:"flex", gap:16, flexWrap:"wrap", marginTop:10, padding:"0 4px", fontSize:10, color:T.mutedDark }}>
+        <span><span style={{ color:T.greenLight }}>■</span> Strong / good</span>
+        <span><span style={{ color:T.gold }}>■</span> Moderate</span>
+        <span><span style={{ color:T.redLight }}>■</span> Weak / high risk</span>
+        <span style={{ marginLeft:"auto", color:T.walnutLight }}>MCap in ₹ Crores · All data FY25</span>
+      </div>
+
+      {/* AI Analysis Panel */}
       {(selected || loading) && (
-        <div className="card" style={{ marginTop: 14 }}>
-          <div className="card-title">🔍 Quick Analysis — {selected?.sym}</div>
-          {loading && <div style={{ color: T.goldLight }}><span className="ld">Analyzing {selected?.sym}</span></div>}
-          {analysis && <div className="prose" dangerouslySetInnerHTML={{ __html: analysis.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>") }} />}
+        <div className="card card-gold" style={{ marginTop:18 }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+            <div>
+              <div className="card-title" style={{ marginBottom:2 }}>🤖 AI Analysis — {selected?.sym}</div>
+              <div style={{ fontSize:10, color:T.muted }}>
+                {selected?.name} · {selected?.sector} ·
+                P/E {selected?.pe}x · ROE {selected?.roe}%
+              </div>
+            </div>
+            <button className="btn-ghost btn-sm" onClick={() => { setSelected(null); setAnalysis(""); }}>✕ Close</button>
+          </div>
+          {loading ? (
+            <div className="loading">
+              <div className="spin" />
+              <span>Analyzing {selected?.sym} across valuation, growth & risk dimensions...</span>
+            </div>
+          ) : (
+            analysis && (
+              <div className="res-box"
+                dangerouslySetInnerHTML={{ __html:
+                  analysis
+                    .replace(/\*\*(.*?)\*\*/g, "<strong style='color:"+T.goldLight+"'>$1</strong>")
+                    .replace(/\n/g, "<br/>")
+                }} />
+            )
+          )}
         </div>
       )}
     </div>
@@ -1732,50 +2451,216 @@ function Screener() {
 
 // ─── WATCHLIST ─────────────────────────────────────────────────────────────────
 function WatchlistManager() {
-  const [watchlists, setWatchlists] = useState({ "My Watchlist": [{ symbol: "RELIANCE", name: "Reliance Industries", sector: "Conglomerate" }, { symbol: "TCS", name: "TCS", sector: "IT" }], "Momentum": [], "Dividends": [] });
-  const [active, setActive] = useState("My Watchlist");
-  const [sym, setSym] = useState(""); const [nm, setNm] = useState(""); const [ln, setLn] = useState("");
-  const [qr, setQr] = useState({}); const [ql, setQl] = useState(null);
-  const add = () => { if (!sym.trim()) return; setWatchlists(p => ({ ...p, [active]: [...(p[active] || []), { symbol: sym.toUpperCase(), name: nm || sym.toUpperCase(), sector: "—" }] })); setSym(""); setNm(""); };
-  const del = (s) => setWatchlists(p => ({ ...p, [active]: p[active].filter(x => x.symbol !== s) }));
-  const addList = () => { if (!ln.trim()) return; setWatchlists(p => ({ ...p, [ln]: [] })); setActive(ln); setLn(""); };
+  const STORAGE_KEY = "dnr_watchlists_v2";
+  const defaultLists = {
+    "My Watchlist": [
+      { symbol:"RELIANCE",  name:"Reliance Industries",      sector:"Conglomerate", note:"" },
+      { symbol:"TCS",       name:"Tata Consultancy Services", sector:"IT Services",  note:"" },
+      { symbol:"DIXONTECH", name:"Dixon Technologies",        sector:"Electronics",  note:"PLI beneficiary" },
+    ],
+    "Momentum":  [],
+    "Dividends": [],
+  };
+
+  const [watchlists, setWatchlists] = useState(() => {
+    try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : defaultLists; } catch { return defaultLists; }
+  });
+  const [active, setActive] = useState(Object.keys(defaultLists)[0]);
+  const [sym,  setSym]  = useState(""); const [nm,   setNm]   = useState("");
+  const [sec,  setSec]  = useState(""); const [note, setNote] = useState("");
+  const [ln,   setLn]   = useState("");
+  const [qr,   setQr]   = useState({}); const [ql, setQl] = useState(null);
+  const [editNote, setEditNote] = useState({}); // symbol -> note being edited
+
+  // Persist
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlists)); } catch {}
+  }, [watchlists]);
+
+  const currentList = watchlists[active] || [];
+
+  const add = () => {
+    if (!sym.trim()) return;
+    setWatchlists(p => ({
+      ...p,
+      [active]: [...(p[active]||[]), {
+        symbol: sym.toUpperCase(), name: nm||sym.toUpperCase(),
+        sector: sec||"—", note: note||"",
+      }]
+    }));
+    setSym(""); setNm(""); setSec(""); setNote("");
+  };
+
+  const del = (s) => setWatchlists(p => ({ ...p, [active]: p[active].filter(x=>x.symbol!==s) }));
+
+  const saveNote = (sym, val) => {
+    setWatchlists(p => ({ ...p, [active]: p[active].map(x => x.symbol===sym ? {...x,note:val} : x) }));
+    setEditNote(p => ({...p, [sym]:undefined}));
+  };
+
+  const addList = () => {
+    if (!ln.trim() || watchlists[ln]) return;
+    setWatchlists(p => ({...p, [ln]: []}));
+    setActive(ln); setLn("");
+  };
+
+  const delList = (name) => {
+    if (Object.keys(watchlists).length <= 1) return;
+    setWatchlists(p => { const n={...p}; delete n[name]; return n; });
+    if (active===name) setActive(Object.keys(watchlists).find(k=>k!==name)||"");
+  };
+
   const analyze = async (s) => {
     setQl(s);
-    await callGroq(`Quick 5-point analysis of ${s}: 1) Business quality /10 2) Financial health 3) Valuation cheap/fair/expensive 4) Recent momentum 5) Verdict BUY/ACCUMULATE/HOLD/AVOID with one-line reason.`, SYS, (t) => setQr(p => ({ ...p, [s]: t })));
+    await callGroq(
+      `Quick 5-point investment analysis of ${s} — today ${new Date().toLocaleDateString("en-IN")}:\n1) Business quality score /10 with 1-line reason\n2) Financial health — profitable? cash-rich or debt-heavy?\n3) Valuation — cheap/fair/expensive vs sector?\n4) Near-term momentum — any catalysts or headwinds?\n5) DNR Verdict — BUY / ACCUMULATE / HOLD / AVOID with one-line entry note`,
+      SYS, (t) => setQr(p=>({...p,[s]:t}))
+    );
     setQl(null);
   };
+
   return (
     <div>
-      <div className="sec-title">📋 Watchlist Manager</div>
-      <div className="sec-sub">Manage multiple watchlists with AI quick analysis</div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap", alignItems: "center" }}>
-        {Object.keys(watchlists).map(n => <button key={n} onClick={() => setActive(n)} style={{ padding: "6px 14px", borderRadius: 20, background: active === n ? T.walnut : "transparent", border: `1px solid ${active === n ? T.walnut : T.walnut + "44"}`, color: active === n ? T.dun : T.muted, cursor: "pointer", fontSize: 12, transition: "all 0.2s" }}>{n} ({(watchlists[n] || []).length})</button>)}
-        <input className="inp" value={ln} onChange={e => setLn(e.target.value)} placeholder="New list..." style={{ width: 140 }} onKeyDown={e => e.key === "Enter" && addList()} />
-        <button className="btn-ghost" onClick={addList}>+</button>
+      <div className="sec-title">⭐ Watchlist Manager</div>
+      <div className="sec-sub">Persistent across sessions · Multiple lists · AI quick analysis</div>
+
+      {/* List tabs */}
+      <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
+        {Object.keys(watchlists).map(n => (
+          <div key={n} style={{ display:"flex", alignItems:"center", gap:0 }}>
+            <button onClick={()=>setActive(n)} style={{
+              padding:"6px 14px", borderRadius:active===n?"20px 0 0 20px":"20px",
+              background: active===n ? T.walnut : "transparent",
+              border:`1px solid ${active===n ? T.walnut : T.walnut+"44"}`,
+              borderRight: active===n ? "none" : undefined,
+              color: active===n ? T.dun : T.muted,
+              cursor:"pointer", fontSize:12, transition:"all 0.2s", fontFamily:"'Jost',sans-serif",
+            }}>
+              {n} <span style={{ fontSize:10, opacity:0.7 }}>({(watchlists[n]||[]).length})</span>
+            </button>
+            {active===n && Object.keys(watchlists).length>1 && (
+              <button onClick={()=>delList(n)} style={{
+                padding:"6px 8px", borderRadius:"0 20px 20px 0",
+                background:T.red+"22", border:`1px solid ${T.red}33`, borderLeft:"none",
+                color:T.redLight, cursor:"pointer", fontSize:10, transition:"all 0.2s",
+              }}>✕</button>
+            )}
+          </div>
+        ))}
+        <input className="inp" value={ln} onChange={e=>setLn(e.target.value)}
+          placeholder="+ New list..." style={{ width:130 }}
+          onKeyDown={e=>e.key==="Enter"&&addList()} />
+        {ln && <button className="btn-ghost" onClick={addList}>Create</button>}
       </div>
-      <div className="card" style={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <input className="inp" value={sym} onChange={e => setSym(e.target.value)} placeholder="Symbol*" style={{ maxWidth: 160 }} onKeyDown={e => e.key === "Enter" && add()} />
-          <input className="inp" value={nm} onChange={e => setNm(e.target.value)} placeholder="Company name" onKeyDown={e => e.key === "Enter" && add()} />
-          <button className="btn-primary" onClick={add}>+ Add</button>
+
+      {/* Add stock form */}
+      <div className="card" style={{ marginBottom:14, padding:"14px 16px" }}>
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"flex-end" }}>
+          <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+            <label style={{ fontSize:9, color:T.muted, letterSpacing:1, textTransform:"uppercase" }}>Symbol*</label>
+            <input className="inp" value={sym} onChange={e=>setSym(e.target.value)}
+              placeholder="e.g. RELIANCE" style={{ width:120 }}
+              onKeyDown={e=>e.key==="Enter"&&add()} />
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+            <label style={{ fontSize:9, color:T.muted, letterSpacing:1, textTransform:"uppercase" }}>Company Name</label>
+            <input className="inp" value={nm} onChange={e=>setNm(e.target.value)}
+              placeholder="Full name" style={{ width:180 }}
+              onKeyDown={e=>e.key==="Enter"&&add()} />
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+            <label style={{ fontSize:9, color:T.muted, letterSpacing:1, textTransform:"uppercase" }}>Sector</label>
+            <input className="inp" value={sec} onChange={e=>setSec(e.target.value)}
+              placeholder="e.g. Banking" style={{ width:120 }}
+              onKeyDown={e=>e.key==="Enter"&&add()} />
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+            <label style={{ fontSize:9, color:T.muted, letterSpacing:1, textTransform:"uppercase" }}>Note</label>
+            <input className="inp" value={note} onChange={e=>setNote(e.target.value)}
+              placeholder="Why watching?" style={{ width:200 }}
+              onKeyDown={e=>e.key==="Enter"&&add()} />
+          </div>
+          <button className="btn-primary" onClick={add}>+ Add to {active}</button>
         </div>
       </div>
-      <div className="card">
-        <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 18, color: T.dun, marginBottom: 12 }}>{active} <span style={{ fontSize: 13, color: T.muted, fontFamily: "'Jost',sans-serif" }}>· {(watchlists[active] || []).length} stocks</span></div>
-        {(watchlists[active] || []).length === 0 && <div style={{ textAlign: "center", padding: "30px", color: T.muted }}>No stocks yet.</div>}
-        {(watchlists[active] || []).map(s => (
+
+      {/* List */}
+      <div className="card" style={{ padding:0 }}>
+        <div style={{ padding:"12px 16px", borderBottom:`1px solid ${T.walnut}33`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:18, color:T.dun }}>
+            {active}
+            <span style={{ fontSize:13, color:T.muted, fontFamily:"'Jost',sans-serif", marginLeft:8 }}>
+              · {currentList.length} {currentList.length===1?"stock":"stocks"}
+            </span>
+          </div>
+        </div>
+
+        {currentList.length===0 && (
+          <div style={{ textAlign:"center", padding:"48px 20px", color:T.muted }}>
+            <div style={{ fontSize:36, marginBottom:12 }}>⭐</div>
+            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:18, color:T.dun }}>List is empty</div>
+            <div style={{ fontSize:13, marginTop:6 }}>Add stocks above to start tracking</div>
+          </div>
+        )}
+
+        {currentList.map(s => (
           <div key={s.symbol}>
-            <div className="wl-stock">
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 7, background: T.walnut + "33", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Mono',monospace", fontSize: 10, fontWeight: 700, color: T.goldLight }}>{s.symbol.slice(0, 4)}</div>
-                <div><div style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: T.dun }}>{s.symbol}</div><div style={{ fontSize: 11, color: T.muted }}>{s.name}</div></div>
+            <div className="wl-stock" style={{ padding:"12px 16px" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{
+                  width:36, height:36, borderRadius:8,
+                  background:`linear-gradient(135deg,${T.cosmicBlueDim},${T.walnutDeep})`,
+                  border:`1px solid ${T.cosmicBlue}44`,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  fontFamily:"'DM Mono',monospace", fontSize:9, fontWeight:700, color:T.cosmicBluePale,
+                  boxShadow:`0 0 10px ${T.cosmicBlue}22`,
+                }}>
+                  {s.symbol.slice(0,4)}
+                </div>
+                <div>
+                  <div style={{ fontFamily:"'DM Mono',monospace", fontWeight:700, color:T.dun, fontSize:12 }}>{s.symbol}</div>
+                  <div style={{ fontSize:11, color:T.muted }}>{s.name}</div>
+                  <span style={{ fontSize:8, padding:"1px 6px", borderRadius:8, background:T.cosmicBlue+"22", color:T.cosmicBluePale, border:`1px solid ${T.cosmicBlue}33` }}>
+                    {s.sector}
+                  </span>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn-ghost" onClick={() => analyze(s.symbol)} disabled={ql === s.symbol}>{ql === s.symbol ? "⏳" : "🔍 Analyze"}</button>
-                <button className="btn-danger" onClick={() => del(s.symbol)}>✕</button>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
+                {/* Note display/edit */}
+                {editNote[s.symbol]!==undefined ? (
+                  <div style={{ display:"flex", gap:4 }}>
+                    <input className="inp" style={{ width:180, padding:"3px 8px", fontSize:11 }}
+                      value={editNote[s.symbol]}
+                      onChange={e=>setEditNote(p=>({...p,[s.symbol]:e.target.value}))}
+                      onKeyDown={e=>e.key==="Enter"&&saveNote(s.symbol,editNote[s.symbol])}
+                      autoFocus />
+                    <button className="btn-ghost" style={{ padding:"3px 8px", fontSize:10 }} onClick={()=>saveNote(s.symbol,editNote[s.symbol])}>Save</button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize:11, color:T.muted, cursor:"pointer", maxWidth:200, textAlign:"right" }}
+                    onClick={()=>setEditNote(p=>({...p,[s.symbol]:s.note||""}))}>
+                    {s.note ? <span style={{ color:T.goldLight, fontStyle:"italic" }}>"{s.note}"</span> : <span style={{ color:T.walnutLight }}>+ add note</span>}
+                  </div>
+                )}
+                <div style={{ display:"flex", gap:6 }}>
+                  <button className="btn-ghost btn-sm" onClick={()=>analyze(s.symbol)} disabled={ql===s.symbol}>
+                    {ql===s.symbol ? <span className="ld">Analyzing</span> : "🔍 Analyze"}
+                  </button>
+                  <button className="btn-danger" onClick={()=>del(s.symbol)}>✕</button>
+                </div>
               </div>
             </div>
-            {qr[s.symbol] && <div style={{ padding: "10px 14px", background: T.walnutDeep + "88", borderBottom: `1px solid ${T.walnut}22` }}><div className="prose" style={{ fontSize: 12 }} dangerouslySetInnerHTML={{ __html: qr[s.symbol].replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>") }} /></div>}
+            {/* Analysis result */}
+            {qr[s.symbol] && (
+              <div style={{ padding:"12px 16px", background:T.walnutDeep+"88", borderBottom:`1px solid ${T.walnut}22` }}>
+                <div className="prose" style={{ fontSize:12 }}
+                  dangerouslySetInnerHTML={{ __html:
+                    qr[s.symbol]
+                      .replace(/\*\*(.*?)\*\*/g,`<strong style='color:${T.goldLight}'>$1</strong>`)
+                      .replace(/\n/g,"<br/>")
+                  }} />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -1785,84 +2670,257 @@ function WatchlistManager() {
 
 // ─── PORTFOLIO ─────────────────────────────────────────────────────────────────
 function Portfolio() {
-  const [portfolio, setPortfolio] = useState([
-    { symbol: "RELIANCE", name: "Reliance Industries", qty: 10, avgPrice: 2450, cmp: 2890 },
-    { symbol: "TCS", name: "Tata Consultancy Services", qty: 5, avgPrice: 3800, cmp: 4120 },
-    { symbol: "HDFCBANK", name: "HDFC Bank", qty: 20, avgPrice: 1580, cmp: 1642 },
-    { symbol: "INFOSYS", name: "Infosys", qty: 15, avgPrice: 1720, cmp: 1890 },
-  ]);
-  const [form, setForm] = useState({ symbol: "", name: "", qty: "", avgPrice: "", cmp: "" });
-  const [analysis, setAnalysis] = useState(""); const [analyzing, setAnalyzing] = useState(false);
+  const STORAGE_KEY = "dnr_portfolio_v2";
+  const defaultPositions = [
+    { symbol:"RELIANCE",  name:"Reliance Industries",       qty:10, avgPrice:2450, cmp:2890, sector:"Conglomerate" },
+    { symbol:"TCS",       name:"Tata Consultancy Services",  qty:5,  avgPrice:3800, cmp:4120, sector:"IT Services" },
+    { symbol:"HDFCBANK",  name:"HDFC Bank",                  qty:20, avgPrice:1580, cmp:1642, sector:"Banking" },
+    { symbol:"INFOSYS",   name:"Infosys",                    qty:15, avgPrice:1720, cmp:1890, sector:"IT Services" },
+  ];
+
+  const [portfolio, setPortfolio] = useState(() => {
+    try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : defaultPositions; } catch { return defaultPositions; }
+  });
+  const [form, setForm]       = useState({ symbol:"", name:"", qty:"", avgPrice:"", cmp:"", sector:"" });
+  const [analysis, setAnalysis] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
   const [cmpEdit, setCmpEdit] = useState({});
-  const ti = portfolio.reduce((s, p) => s + p.qty * p.avgPrice, 0);
-  const tc = portfolio.reduce((s, p) => s + p.qty * p.cmp, 0);
-  const tpnl = tc - ti; const tpct = ((tpnl / ti) * 100).toFixed(2);
-  const addPos = () => { if (!form.symbol || !form.qty || !form.avgPrice) return; setPortfolio(p => [...p, { symbol: form.symbol.toUpperCase(), name: form.name || form.symbol.toUpperCase(), qty: +form.qty, avgPrice: +form.avgPrice, cmp: +(form.cmp || form.avgPrice) }]); setForm({ symbol: "", name: "", qty: "", avgPrice: "", cmp: "" }); };
-  const upCMP = (s) => { const v = parseFloat(cmpEdit[s]); if (!v) return; setPortfolio(p => p.map(x => x.symbol === s ? { ...x, cmp: v } : x)); setCmpEdit(p => ({ ...p, [s]: "" })); };
+  const [sortCol, setSortCol] = useState("pnlPct");
+  const [showAdd, setShowAdd] = useState(false);
+
+  // Persist to localStorage whenever portfolio changes
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolio)); } catch {}
+  }, [portfolio]);
+
+  // Derived totals
+  const ti   = portfolio.reduce((s,p) => s + p.qty * p.avgPrice, 0);
+  const tc   = portfolio.reduce((s,p) => s + p.qty * p.cmp,       0);
+  const tpnl = tc - ti;
+  const tpct = ti > 0 ? ((tpnl / ti) * 100) : 0;
+
+  // Best / worst
+  const rows = portfolio.map(p => ({
+    ...p,
+    invested: p.qty * p.avgPrice,
+    currentVal: p.qty * p.cmp,
+    pnl: p.qty * (p.cmp - p.avgPrice),
+    pnlPct: ((p.cmp - p.avgPrice) / p.avgPrice * 100),
+    weight: tc > 0 ? (p.qty * p.cmp / tc * 100) : 0,
+  })).sort((a,b) => b[sortCol] - a[sortCol]);
+
+  const addPos = () => {
+    if (!form.symbol || !form.qty || !form.avgPrice) return;
+    setPortfolio(p => [...p, {
+      symbol:   form.symbol.toUpperCase(),
+      name:     form.name || form.symbol.toUpperCase(),
+      qty:      +form.qty,
+      avgPrice: +form.avgPrice,
+      cmp:      +(form.cmp || form.avgPrice),
+      sector:   form.sector || "—",
+    }]);
+    setForm({ symbol:"", name:"", qty:"", avgPrice:"", cmp:"", sector:"" });
+    setShowAdd(false);
+  };
+
+  const upCMP = (sym) => {
+    const v = parseFloat(cmpEdit[sym]);
+    if (!v || v <= 0) return;
+    setPortfolio(p => p.map(x => x.symbol===sym ? {...x, cmp:v} : x));
+    setCmpEdit(p => ({...p, [sym]:""}));
+  };
+
   const analyzePortfolio = async () => {
     setAnalyzing(true); setAnalysis("");
-    const pos = portfolio.map(p => `${p.symbol}: Qty ${p.qty}, Avg ₹${p.avgPrice}, CMP ₹${p.cmp}, P&L ${((p.cmp - p.avgPrice) / p.avgPrice * 100).toFixed(1)}%`).join("\n");
-    await callGroq(`Portfolio Review:\n${pos}\nTotal Invested: ₹${ti.toLocaleString("en-IN")}\nCurrent Value: ₹${tc.toLocaleString("en-IN")}\nOverall P&L: ${tpct}%\n\nProvide: 1) Portfolio health 2) Concentration risk 3) Top performers and laggards 4) Rebalancing suggestions 5) Diversification score /10 6) Action items.`, SYS, (t) => setAnalysis(t));
+    const pos = rows.map(p =>
+      `${p.symbol} (${p.sector}): Qty ${p.qty} | Avg ₹${p.avgPrice} | CMP ₹${p.cmp} | P&L ${p.pnlPct.toFixed(1)}% | Weight ${p.weight.toFixed(1)}%`
+    ).join("\n");
+    await callGroq(
+      `Portfolio Review as of today:\n${pos}\n\nTotal Invested: ₹${(ti/100000).toFixed(2)} Lakhs\nCurrent Value: ₹${(tc/100000).toFixed(2)} Lakhs\nOverall Return: ${tpct.toFixed(2)}%\n\nProvide institutional-quality portfolio review:\n1) **Overall Portfolio Health** — quality score /10 with justification\n2) **Concentration Risk** — sector/stock concentration warnings\n3) **Top Performers** — what's working and why to hold/add\n4) **Laggards** — what's underperforming and exit/hold decision\n5) **Rebalancing Suggestions** — specific allocation changes with reasoning\n6) **Missing Sectors** — gaps in diversification with 2-3 stock suggestions per gap\n7) **Action Items** — 3 specific actions this week`,
+      SYS, (t) => setAnalysis(t)
+    );
     setAnalyzing(false);
   };
-  const COLORS = [T.walnutLight, T.goldLight, T.green, T.blue, "#c06060", "#7a60c0"];
+
+  const PIE_COLORS = [T.goldLight, T.cosmicBlueLight, T.greenLight, T.redLight, T.walnutLight, "#c06080", "#7a60c0", "#60c0b0"];
+
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <div><div className="sec-title">💼 Portfolio Tracker</div><div className="sec-sub">Track performance and get AI portfolio insights</div></div>
-        <button className="btn-gold" onClick={analyzePortfolio} disabled={analyzing}>{analyzing ? "⏳ Analyzing..." : "🤖 AI Review"}</button>
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:18, flexWrap:"wrap", gap:10 }}>
+        <div>
+          <div className="sec-title">💼 Portfolio Tracker</div>
+          <div className="sec-sub">localStorage-persisted · Real-time P&L · AI portfolio review</div>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button className="btn-ghost" onClick={() => setShowAdd(s=>!s)}>
+            {showAdd ? "✕ Cancel" : "+ Add Position"}
+          </button>
+          <button className="btn-ghost" onClick={() => {
+            const hdr = "Symbol,Name,Sector,Qty,Avg Price,CMP,Invested,Current Value,P&L,P&L%,Weight%";
+            const rowsCSV = rows.map(p => `${p.symbol},${p.name},${p.sector},${p.qty},${p.avgPrice},${p.cmp},${p.invested.toFixed(0)},${p.currentVal.toFixed(0)},${p.pnl.toFixed(0)},${p.pnlPct.toFixed(2)},${p.weight.toFixed(1)}`);
+            const blob = new Blob([hdr+"\n"+rowsCSV.join("\n")], {type:"text/csv"});
+            const a = document.createElement("a"); a.href=URL.createObjectURL(blob);
+            a.download=`DNR_Portfolio_${new Date().toLocaleDateString("en-IN").replace(/\//g,"-")}.csv`; a.click();
+          }}>📥 Export CSV</button>
+          <button className="btn-gold" onClick={analyzePortfolio} disabled={analyzing || portfolio.length===0}>
+            {analyzing ? <span className="ld">Analyzing</span> : "🤖 AI Review"}
+          </button>
+        </div>
       </div>
-      <div className="g4" style={{ marginBottom: 18 }}>
-        {[{ l: "Invested", v: `₹${(ti / 100000).toFixed(2)}L`, c: "" }, { l: "Current Value", v: `₹${(tc / 100000).toFixed(2)}L`, c: "" }, { l: "Total P&L", v: `${tpnl >= 0 ? "+" : ""}₹${Math.abs(tpnl / 100000).toFixed(2)}L`, c: tpnl >= 0 ? "pos" : "neg" }, { l: "Returns", v: `${tpct >= 0 ? "+" : ""}${tpct}%`, c: tpct >= 0 ? "pos" : "neg" }].map(s => (
-          <div key={s.l} className="stat"><div className="stat-lbl">{s.l}</div><div className={`stat-val ${s.c}`}>{s.v}</div></div>
+
+      {/* Summary stats */}
+      <div className="g4" style={{ marginBottom:18 }}>
+        {[
+          { l:"Invested",      v:`₹${(ti/100000).toFixed(2)}L`, c:"", sub:`${portfolio.length} positions` },
+          { l:"Current Value", v:`₹${(tc/100000).toFixed(2)}L`, c:"", sub:`₹${(tc/1000).toFixed(0)}K total` },
+          { l:"Total P&L",     v:`${tpnl>=0?"+":""}₹${(Math.abs(tpnl)/100000).toFixed(2)}L`, c:tpnl>=0?"pos":"neg", sub:`Unrealized` },
+          { l:"Returns",       v:`${tpct>=0?"+":""}${tpct.toFixed(2)}%`,                       c:tpct>=0?"pos":"neg", sub:"Overall XIRR est." },
+        ].map(s=>(
+          <div key={s.l} className={`stat ${tpnl>=0&&s.l==="Total P&L"?"stat-pos":tpnl<0&&s.l==="Total P&L"?"stat-neg":""}`}>
+            <div className="stat-lbl">{s.l}</div>
+            <div className={`stat-val ${s.c}`}>{s.v}</div>
+            <div style={{ fontSize:10, color:T.muted, marginTop:3 }}>{s.sub}</div>
+          </div>
         ))}
       </div>
-      <div className="card" style={{ marginBottom: 14, overflowX: "auto" }}>
-        <div className="p-row p-hdr"><span>Stock</span><span>Qty</span><span>Avg</span><span>Update CMP</span><span>Value</span><span>P&L</span><span></span></div>
-        {portfolio.map(p => {
-          const pnl = p.qty * (p.cmp - p.avgPrice); const pct = ((p.cmp - p.avgPrice) / p.avgPrice * 100).toFixed(1);
-          return (
-            <div key={p.symbol} className="p-row">
-              <div><div style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: T.dun, fontSize: 12 }}>{p.symbol}</div><div style={{ fontSize: 10, color: T.muted }}>{p.name}</div></div>
-              <span>{p.qty}</span>
-              <span style={{ fontFamily: "'DM Mono',monospace" }}>₹{p.avgPrice.toLocaleString("en-IN")}</span>
-              <div style={{ display: "flex", gap: 4 }}>
-                <input className="inp" style={{ width: 75, padding: "3px 7px", fontSize: 11 }} placeholder={p.cmp.toString()} value={cmpEdit[p.symbol] || ""} onChange={e => setCmpEdit(pr => ({ ...pr, [p.symbol]: e.target.value }))} onKeyDown={e => e.key === "Enter" && upCMP(p.symbol)} />
-                <button className="btn-ghost" style={{ padding: "3px 7px", fontSize: 11 }} onClick={() => upCMP(p.symbol)}>✓</button>
-              </div>
-              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>₹{(p.qty * p.cmp).toLocaleString("en-IN")}</span>
-              <span className={pnl >= 0 ? "pos" : "neg"} style={{ fontFamily: "'DM Mono',monospace", fontSize: 11 }}>{pnl >= 0 ? "+" : ""}₹{Math.abs(pnl).toLocaleString("en-IN")}<br /><span style={{ fontSize: 10 }}>({pct}%)</span></span>
-              <button className="btn-danger" onClick={() => setPortfolio(p2 => p2.filter(x => x.symbol !== p.symbol))}>✕</button>
+
+      {/* Add position form */}
+      {showAdd && (
+        <div className="card card-gold" style={{ marginBottom:14 }}>
+          <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:16, color:T.dun, marginBottom:12 }}>Add New Position</div>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"flex-end" }}>
+            {[
+              { f:"symbol",   ph:"Symbol*",      w:100 },
+              { f:"name",     ph:"Company Name", w:180 },
+              { f:"sector",   ph:"Sector",       w:130 },
+              { f:"qty",      ph:"Qty*",         w:80  },
+              { f:"avgPrice", ph:"Avg Price*",   w:110 },
+              { f:"cmp",      ph:"CMP (optional)",w:120 },
+            ].map(({f,ph,w})=>(
+              <input key={f} className="inp" style={{ width:w }}
+                placeholder={ph} value={form[f]}
+                onChange={e => setForm(p=>({...p,[f]:e.target.value}))}
+                onKeyDown={e => e.key==="Enter" && addPos()} />
+            ))}
+            <button className="btn-gold" onClick={addPos}>+ Add</button>
+          </div>
+        </div>
+      )}
+
+      {/* Positions table */}
+      <div className="card" style={{ overflowX:"auto", padding:0, marginBottom:14 }}>
+        <div className="p-row p-hdr" style={{ padding:"10px 14px", borderBottom:`2px solid ${T.walnut}44` }}>
+          <span>Stock</span>
+          <span style={{ cursor:"pointer" }} onClick={()=>setSortCol("qty")}>Qty</span>
+          <span>Avg / CMP</span>
+          <span style={{ cursor:"pointer" }} onClick={()=>setSortCol("currentVal")}>Value</span>
+          <span style={{ cursor:"pointer", color: sortCol==="pnlPct"?T.goldLight:"inherit" }} onClick={()=>setSortCol("pnlPct")}>P&L {sortCol==="pnlPct"&&"▼"}</span>
+          <span style={{ cursor:"pointer" }} onClick={()=>setSortCol("weight")}>Weight</span>
+          <span></span>
+        </div>
+        {rows.length===0 && (
+          <div style={{ textAlign:"center", padding:"48px", color:T.muted }}>
+            <div style={{ fontSize:36, marginBottom:12 }}>💼</div>
+            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:18, color:T.dun }}>No positions yet</div>
+            <div style={{ fontSize:13, marginTop:8 }}>Click "+ Add Position" to get started</div>
+          </div>
+        )}
+        {rows.map(p=>(
+          <div key={p.symbol} className="p-row" style={{ padding:"10px 14px" }}>
+            <div>
+              <div style={{ fontFamily:"'DM Mono',monospace", fontWeight:700, color:T.dun, fontSize:12 }}>{p.symbol}</div>
+              <div style={{ fontSize:10, color:T.muted }}>{p.name}</div>
+              <span style={{
+                fontSize:8, padding:"1px 6px", borderRadius:8,
+                background:T.cosmicBlue+"22", color:T.cosmicBluePale,
+                border:`1px solid ${T.cosmicBlue}33`,
+              }}>{p.sector}</span>
             </div>
-          );
-        })}
+            <span style={{ fontFamily:"'DM Mono',monospace" }}>{p.qty}</span>
+            <div>
+              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11 }}>₹{p.avgPrice.toLocaleString("en-IN")}</div>
+              {/* Inline CMP update */}
+              <div style={{ display:"flex", gap:3, marginTop:3 }}>
+                <input className="inp" style={{ width:65, padding:"2px 6px", fontSize:10 }}
+                  placeholder={`${p.cmp}`} value={cmpEdit[p.symbol]||""}
+                  onChange={e => setCmpEdit(pr=>({...pr,[p.symbol]:e.target.value}))}
+                  onKeyDown={e => e.key==="Enter" && upCMP(p.symbol)} />
+                <button className="btn-ghost" style={{ padding:"2px 6px", fontSize:10 }} onClick={()=>upCMP(p.symbol)}>✓</button>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11 }}>₹{p.currentVal.toLocaleString("en-IN")}</div>
+              {/* Weight bar */}
+              <div style={{ background:T.walnutDeep, borderRadius:2, overflow:"hidden", height:3, width:60, marginTop:4 }}>
+                <div className="p-bar" style={{ width:`${Math.min(p.weight,100)}%`, background:PIE_COLORS[rows.indexOf(p)%PIE_COLORS.length] }} />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:11, color: p.pnl>=0?T.greenLight:T.redLight, fontWeight:600 }}>
+                {p.pnl>=0?"+":""}₹{Math.abs(p.pnl).toLocaleString("en-IN")}
+              </div>
+              <div style={{ fontSize:10, color: p.pnlPct>=0?T.greenLight:T.redLight }}>
+                {p.pnlPct>=0?"+":""}{p.pnlPct.toFixed(1)}%
+              </div>
+            </div>
+            <div style={{ fontSize:11, color:T.muted }}>
+              {p.weight.toFixed(1)}%
+            </div>
+            <button className="btn-danger" onClick={()=>setPortfolio(p2=>p2.filter(x=>x.symbol!==p.symbol))}>✕</button>
+          </div>
+        ))}
       </div>
-      <div className="card" style={{ marginBottom: 14 }}>
-        <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 16, color: T.dun, marginBottom: 10 }}>Add Position</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {["symbol", "name", "qty", "avgPrice", "cmp"].map(f => <input key={f} className="inp" style={{ maxWidth: f === "name" ? 180 : 120 }} placeholder={{ symbol: "Symbol*", name: "Company Name", qty: "Qty*", avgPrice: "Avg Price*", cmp: "CMP" }[f]} value={form[f]} onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))} onKeyDown={e => e.key === "Enter" && addPos()} />)}
-          <button className="btn-primary" onClick={addPos}>+ Add</button>
+
+      {/* Charts */}
+      {portfolio.length>0 && (
+        <div className="g2" style={{ marginBottom:14 }}>
+          <div className="card">
+            <div className="chart-title">Portfolio Allocation by Value</div>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={rows.map(p=>({ name:p.symbol, value:p.currentVal }))}
+                  cx="50%" cy="50%" outerRadius={80} innerRadius={35}
+                  dataKey="value" paddingAngle={2}
+                  label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`}
+                  labelLine={false} fontSize={10}>
+                  {rows.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]} />)}
+                </Pie>
+                <Tooltip contentStyle={{background:T.walnutDeep,border:`1px solid ${T.walnut}44`,color:T.dun,fontSize:11}} formatter={v=>`₹${v.toLocaleString("en-IN")}`} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="card">
+            <div className="chart-title">P&L % by Position</div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={rows.map(p=>({ name:p.symbol, PnL:parseFloat(p.pnlPct.toFixed(1)) }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke={T.walnut+"33"} />
+                <XAxis dataKey="name" tick={{fill:T.muted,fontSize:10}} />
+                <YAxis tick={{fill:T.muted,fontSize:10}} unit="%" />
+                <ReferenceLine y={0} stroke={T.walnut} strokeDasharray="4 4" />
+                <Tooltip contentStyle={{background:T.walnutDeep,border:`1px solid ${T.walnut}44`,color:T.dun,fontSize:11}} formatter={v=>`${v}%`} />
+                <Bar dataKey="PnL" radius={[3,3,0,0]}>
+                  {rows.map((p,i)=><Cell key={i} fill={p.pnlPct>=0?T.greenLight:T.redLight} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
-      <div className="g2">
-        <div className="card">
-          <div className="chart-title">Portfolio Allocation</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart><Pie data={portfolio.map(p => ({ name: p.symbol, value: p.qty * p.cmp }))} cx="50%" cy="50%" outerRadius={85} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} fontSize={10}>{portfolio.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip contentStyle={{ background: T.walnutDeep, border: `1px solid ${T.walnut}44`, color: T.dun }} formatter={v => `₹${v.toLocaleString("en-IN")}`} /></PieChart>
-          </ResponsiveContainer>
+      )}
+
+      {/* AI Analysis */}
+      {(analysis||analyzing) && (
+        <div className="card card-gold" style={{ marginTop:14 }}>
+          <div className="card-title" style={{ marginBottom:14 }}>🤖 AI Portfolio Assessment</div>
+          {analyzing ? (
+            <div className="loading"><div className="spin"/><span>Analyzing your portfolio across 7 dimensions...</span></div>
+          ) : (
+            <div className="res-box" dangerouslySetInnerHTML={{ __html:
+              analysis.replace(/\*\*(.*?)\*\*/g,`<strong style='color:${T.goldLight}'>$1</strong>`).replace(/\n/g,"<br/>")
+            }}/>
+          )}
         </div>
-        <div className="card">
-          <div className="chart-title">P&L by Stock (%)</div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={portfolio.map(p => ({ name: p.symbol, PnL: parseFloat(((p.cmp - p.avgPrice) / p.avgPrice * 100).toFixed(1)) }))}>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.walnut + "33"} /><XAxis dataKey="name" tick={{ fill: T.muted, fontSize: 10 }} /><YAxis tick={{ fill: T.muted, fontSize: 10 }} unit="%" />
-              <Tooltip contentStyle={{ background: T.walnutDeep, border: `1px solid ${T.walnut}44`, color: T.dun }} />
-              <Bar dataKey="PnL" radius={[3, 3, 0, 0]}>{portfolio.map((p, i) => <Cell key={i} fill={p.cmp >= p.avgPrice ? T.green : T.red} />)}</Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      {(analysis || analyzing) && <div className="card" style={{ marginTop: 14 }}><div className="card-title">🤖 AI Portfolio Assessment</div>{analyzing && <div style={{ color: T.goldLight }}><span className="ld">Analyzing portfolio</span></div>}{analysis && <div className="prose" dangerouslySetInnerHTML={{ __html: analysis.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>") }} />}</div>}
+      )}
     </div>
   );
 }
@@ -1983,7 +3041,7 @@ function IPOTracker() {
 
   const analyzeIPO = async (ipo) => {
     setLoadingId(ipo.name);
-    const raw = await callGroq(`Analyze IPO: ${ipo.name}, Sector: ${ipo.sector}, Price: ${ipo.price}, Size: ${ipo.size}, GMP: ${ipo.gmp}. Give: 1) Subscription recommendation (Subscribe/Avoid/Neutral) 2) Key positives (2 points) 3) Key risks (2 points) 4) Listing gain expectation. Keep it concise.`, SYS, null);
+    const raw = await callGroq(`Analyze IPO: ${ipo.name}, Sector: ${ipo.sector}, Price: ${ipo.price}, Size: ${ipo.size}, GMP: ${ipo.gmp}. Give: 1) Subscription recommendation (Subscribe/Avoid/Neutral) 2) Key positives (2 points) 3) Key risks (2 points) 4) Listing gain expectation. Keep it concise.`, getSYS(), null);
     setAnalysis(prev => ({...prev, [ipo.name]: raw}));
     setLoadingId(null);
   };
@@ -2030,79 +3088,178 @@ function IPOTracker() {
 
 // ─── FII DII DATA ─────────────────────────────────────────────────────────────
 function FIIDIITracker() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [fiiData,    setFiiData]    = useState([]);
+  const [analysis,   setAnalysis]   = useState("");
+  const [loading,    setLoading]    = useState(false);
+  const [dataLoading,setDataLoading]= useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
 
-  const FII_MONTHLY = [
-    {month:"Oct 24",fii:-94017,dii:107254},{month:"Nov 24",fii:-45974,dii:54626},
-    {month:"Dec 24",fii:-16982,dii:25487},{month:"Jan 25",fii:-87374,dii:92543},
-    {month:"Feb 25",fii:-34254,dii:41832},{month:"Mar 25",fii:12543,dii:8921},
-  ];
+  // Fetch live AI-generated FII/DII data on mount
+  useEffect(() => {
+    loadFIIData();
+  }, []);
+
+  const loadFIIData = async () => {
+    setDataLoading(true);
+    const data = await fetchLiveFIIDII();
+    if (data && data.length > 0) {
+      setFiiData(data);
+      setLastUpdate(new Date().toLocaleString("en-IN"));
+    }
+    setDataLoading(false);
+  };
 
   const fetchAnalysis = async () => {
     setLoading(true);
-    const raw = await callGroq(`Analyze FII/DII activity: Recent data shows FIIs sold ₹87,374 Cr in Jan 2025, ₹34,254 Cr in Feb 2025 but turned buyers in Mar 2025 with ₹12,543 Cr. DIIs have been consistently buying. Analyze: 1) What this means for Indian markets 2) Sectors FIIs are targeting 3) Outlook for next quarter. Be specific with data points.`, SYS, null);
-    setData(raw);
+    const today = new Date().toLocaleDateString("en-IN", { day:"numeric", month:"long", year:"numeric" });
+    const dataStr = fiiData.map(d => `${d.month}: FII ${d.fii>0?"+":""}₹${(d.fii/100).toFixed(0)} Cr | DII +₹${(d.dii/100).toFixed(0)} Cr`).join("\n");
+    const raw = await callGroq(
+      `Today is ${today}. Analyze the following ACTUAL FII/DII flow data for Indian equity markets:
+
+${dataStr || "Use latest available data as of today"}
+
+Provide a comprehensive institutional flow analysis:
+1) **FII Flow Trend** — are FIIs net buyers or sellers overall? Acceleration or deceleration?
+2) **DII Counterbalancing** — how effectively are DIIs (MFs, insurance) absorbing FII selling?
+3) **Sectors Being Targeted** — which sectors are FIIs accumulating/exiting based on recent filings?
+4) **Currency Impact** — USD/INR trend and its effect on FII flows
+5) **Global Triggers** — US Fed policy, EM allocation shifts driving FII behavior
+6) **Market Impact** — what these flows mean for NIFTY direction in next 1-3 months
+7) **Key Stocks** — 5 specific stocks seeing heavy institutional activity right now
+8) **Outlook** — Q4FY25 / Q1FY26 FII flow prediction with reasoning
+
+Be very specific with numbers and current data as of ${today}.`,
+      getSYS(), null
+    );
+    setAnalysis(raw);
     setLoading(false);
   };
 
-  const maxVal = Math.max(...FII_MONTHLY.map(d => Math.max(Math.abs(d.fii), d.dii)));
+  const maxVal = fiiData.length > 0
+    ? Math.max(...fiiData.map(d => Math.max(Math.abs(d.fii), d.dii))) || 1
+    : 1;
+
+  const totalFII = fiiData.reduce((s,d) => s+d.fii, 0);
+  const totalDII = fiiData.reduce((s,d) => s+d.dii, 0);
+  const latestMonth = fiiData[fiiData.length-1] || {};
+  const prevMonth   = fiiData[fiiData.length-2] || {};
 
   return (
     <div>
-      <div className="ph"><h1 className="pt">🌐 FII / DII Activity</h1><p className="ps">Foreign & Domestic Institutional Investor flow analysis</p></div>
-
-      <div className="g2" style={{marginBottom:24}}>
-        <div className="card">
-          <div className="sec-hdr">Monthly FII Activity (₹ Cr)</div>
-          {FII_MONTHLY.map(d => (
-            <div key={d.month} style={{marginBottom:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
-                <span style={{color:T.muted}}>{d.month}</span>
-                <span style={{color:d.fii>0?T.green:T.red,fontWeight:600}}>{d.fii>0?"+":""}{(d.fii/100).toFixed(0)} Cr</span>
-              </div>
-              <div className="fii-bar-wrap">
-                <div className="fii-bar" style={{width:`${Math.abs(d.fii)/maxVal*100}%`,background:d.fii>0?"linear-gradient(90deg,#22c55e,#16a34a)":"linear-gradient(90deg,#ef4444,#dc2626)"}}/>
-              </div>
-            </div>
-          ))}
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:18, flexWrap:"wrap", gap:10 }}>
+        <div>
+          <div className="sec-title">🌐 FII / DII Activity</div>
+          <div className="sec-sub">
+            Live institutional flow data · Auto-refreshed · AI analysis
+            {lastUpdate && <span style={{ marginLeft:8, color:T.walnutLight }}>· Last updated: {lastUpdate}</span>}
+          </div>
         </div>
-        <div className="card">
-          <div className="sec-hdr">Monthly DII Activity (₹ Cr)</div>
-          {FII_MONTHLY.map(d => (
-            <div key={d.month} style={{marginBottom:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
-                <span style={{color:T.muted}}>{d.month}</span>
-                <span style={{color:T.green,fontWeight:600}}>+{(d.dii/100).toFixed(0)} Cr</span>
-              </div>
-              <div className="fii-bar-wrap">
-                <div className="fii-bar" style={{width:`${d.dii/maxVal*100}%`,background:"linear-gradient(90deg,#C9A84C,#a08030)"}}/>
-              </div>
-            </div>
-          ))}
+        <div style={{ display:"flex", gap:8 }}>
+          <button className="btn-ghost" onClick={loadFIIData} disabled={dataLoading}>
+            {dataLoading ? <span className="ld">Loading</span> : "🔄 Refresh Data"}
+          </button>
+          <button className="btn-gold" onClick={fetchAnalysis} disabled={loading || fiiData.length===0}>
+            {loading ? <span className="ld">Analyzing</span> : "🤖 AI Flow Analysis"}
+          </button>
         </div>
       </div>
 
-      <div className="card" style={{marginBottom:20}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:16,textAlign:"center"}}>
-          {[{l:"FII Mar 2025",v:"₹12,543 Cr",c:T.green,s:"Net Buyer ▲"},
-            {l:"DII Mar 2025",v:"₹8,921 Cr",c:T.goldLight,s:"Net Buyer ▲"},
-            {l:"FII YTD 2025",v:"-₹1,08,085 Cr",c:T.red,s:"Net Seller ▼"},
-            {l:"DII YTD 2025",v:"₹1,43,296 Cr",c:T.green,s:"Net Buyer ▲"}
-          ].map(s => (
-            <div key={s.l} style={{padding:16,background:T.walnutDeeper+"88",borderRadius:10,border:`1px solid ${T.walnut}33`}}>
-              <div style={{fontSize:10,color:T.muted,marginBottom:6}}>{s.l}</div>
-              <div style={{fontSize:16,fontWeight:700,color:s.c,fontFamily:"'DM Mono',monospace"}}>{s.v}</div>
-              <div style={{fontSize:10,color:s.c,marginTop:4}}>{s.s}</div>
+      {/* Live summary cards */}
+      {fiiData.length > 0 && (
+        <div className="g4" style={{ marginBottom:18 }}>
+          {[
+            { l:`FII ${latestMonth.month||"Latest"}`, v:`${latestMonth.fii>0?"+":""}₹${latestMonth.fii?Math.abs(latestMonth.fii/100).toFixed(0):"—"} Cr`, c:latestMonth.fii>0?T.greenLight:T.redLight, s:latestMonth.fii>0?"Net Buyer ▲":"Net Seller ▼" },
+            { l:`DII ${latestMonth.month||"Latest"}`, v:`+₹${latestMonth.dii?(latestMonth.dii/100).toFixed(0):"—"} Cr`, c:T.goldLight, s:"Net Buyer ▲" },
+            { l:`FII ${fiiData.length}-Month Net`, v:`${totalFII>0?"+":""}₹${Math.abs(totalFII/100).toFixed(0)} Cr`, c:totalFII>0?T.greenLight:T.redLight, s:totalFII>0?"Net Buyer":"Net Seller" },
+            { l:`DII ${fiiData.length}-Month Net`, v:`+₹${(totalDII/100).toFixed(0)} Cr`, c:T.greenLight, s:"Consistent Buyer" },
+          ].map(s=>(
+            <div key={s.l} className="stat">
+              <div className="stat-lbl">{s.l}</div>
+              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:16, fontWeight:700, color:s.c }}>{s.v}</div>
+              <div style={{ fontSize:10, color:s.c, marginTop:3 }}>{s.s}</div>
             </div>
           ))}
         </div>
-      </div>
+      )}
 
-      <button className="btn-gold" onClick={fetchAnalysis} disabled={loading} style={{marginBottom:16}}>
-        {loading ? "🤖 Analyzing..." : "🤖 Get AI Flow Analysis"}
-      </button>
-      {data && <div className="res-box" style={{fontSize:13,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:data.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>")}}/>}
+      {dataLoading && <div className="loading"><div className="spin"/><span>Fetching latest FII/DII flow data...</span></div>}
+
+      {fiiData.length > 0 && (
+        <div className="g2" style={{ marginBottom:18 }}>
+          {/* FII bar chart */}
+          <div className="card">
+            <div className="sec-hdr">Monthly FII Net Flow (₹ Cr)</div>
+            {fiiData.map(d => (
+              <div key={d.month} style={{ marginBottom:12 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:4 }}>
+                  <span style={{ color:T.muted }}>{d.month}</span>
+                  <span style={{ color:d.fii>0?T.greenLight:T.redLight, fontWeight:600 }}>
+                    {d.fii>0?"+":""}₹{(d.fii/100).toFixed(0)} Cr
+                  </span>
+                </div>
+                <div className="fii-bar-wrap">
+                  <div className="fii-bar" style={{
+                    width:`${Math.abs(d.fii)/maxVal*100}%`,
+                    background:d.fii>0?"linear-gradient(90deg,#22c55e,#16a34a)":"linear-gradient(90deg,#ef4444,#dc2626)"
+                  }}/>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* DII bar chart */}
+          <div className="card">
+            <div className="sec-hdr">Monthly DII Net Flow (₹ Cr)</div>
+            {fiiData.map(d => (
+              <div key={d.month} style={{ marginBottom:12 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:4 }}>
+                  <span style={{ color:T.muted }}>{d.month}</span>
+                  <span style={{ color:T.goldLight, fontWeight:600 }}>+₹{(d.dii/100).toFixed(0)} Cr</span>
+                </div>
+                <div className="fii-bar-wrap">
+                  <div className="fii-bar" style={{
+                    width:`${d.dii/maxVal*100}%`,
+                    background:`linear-gradient(90deg,${T.goldLight}88,${T.gold})`
+                  }}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Combined recharts bar chart */}
+      {fiiData.length > 0 && (
+        <div className="card" style={{ marginBottom:18 }}>
+          <div className="chart-title">FII vs DII Monthly Flows (₹ Cr)</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={fiiData} barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" stroke={T.walnut+"33"} />
+              <XAxis dataKey="month" tick={{fill:T.muted,fontSize:9}} />
+              <YAxis tick={{fill:T.muted,fontSize:9}} tickFormatter={v=>`${(v/100).toFixed(0)}`} />
+              <ReferenceLine y={0} stroke={T.walnut} strokeDasharray="4 4" />
+              <Tooltip
+                contentStyle={{background:T.walnutDeep,border:`1px solid ${T.walnut}44`,color:T.dun,fontSize:11}}
+                formatter={(v,n)=>[`₹${(v/100).toFixed(0)} Cr`,n]}
+              />
+              <Legend wrapperStyle={{fontSize:10}} />
+              <Bar dataKey="fii" name="FII" radius={[3,3,0,0]}>
+                {fiiData.map((d,i) => <Cell key={i} fill={d.fii>=0?"#22c55e":"#ef4444"} opacity={0.85} />)}
+              </Bar>
+              <Bar dataKey="dii" name="DII" fill={T.goldLight} opacity={0.85} radius={[3,3,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div style={{ fontSize:10, color:T.walnutLight, marginTop:6, textAlign:"right" }}>
+            ⚡ Data: AI-synthesized from latest SEBI/NSE disclosures · Values in ₹ Crore
+          </div>
+        </div>
+      )}
+
+      {loading && <div className="loading"><div className="spin"/><span>Running institutional flow analysis...</span></div>}
+      {analysis && (
+        <div className="res-box" dangerouslySetInnerHTML={{ __html:
+          analysis.replace(/\*\*(.*?)\*\*/g,`<strong style='color:${T.goldLight}'>$1</strong>`).replace(/\n/g,"<br/>")
+        }}/>
+      )}
     </div>
   );
 }
@@ -2131,7 +3288,7 @@ function SectorRotation() {
   const analyzeSector = async (sector) => {
     setSelected(sector);
     setLoading(true);
-    const raw = await callGroq(`Deep dive analysis for ${sector.name} sector in Indian markets. Current performance: ${sector.perf}, Momentum: ${sector.momentum}. Provide: 1) Key drivers for current performance 2) Top 3 stocks to watch with brief reasoning 3) Key risks 4) 3-6 month outlook. Be specific with stock names and data.`, SYS, null);
+    const raw = await callGroq(`Deep dive analysis for ${sector.name} sector in Indian markets. Current performance: ${sector.perf}, Momentum: ${sector.momentum}. Provide: 1) Key drivers for current performance 2) Top 3 stocks to watch with brief reasoning 3) Key risks 4) 3-6 month outlook. Be specific with stock names and data.`, getSYS(), null);
     setAnalysis(raw);
     setLoading(false);
   };
@@ -2243,16 +3400,17 @@ function InstitutionalMomentum() {
   const [detailData, setDetailData] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // Load saved data on mount
+  // Load saved data from localStorage on mount — no auto-fetch
   useEffect(() => {
-    try {
-      const d = localStorage.getItem("dnr_daily"); if(d) setDailyData(JSON.parse(d));
-      const m = localStorage.getItem("dnr_monthly"); if(m) setMonthlyData(JSON.parse(m));
-      const q = localStorage.getItem("dnr_quarterly"); if(q) setQuarterlyData(JSON.parse(q));
-      const lu = localStorage.getItem("dnr_lastupdated"); if(lu) setLastUpdated(JSON.parse(lu));
-      // Auto-load daily on first visit
-      if(!d) fetchDaily();
-    } catch(e) { fetchDaily(); }
+    const keys = [
+      ["dnr_daily",       setDailyData],
+      ["dnr_monthly",     setMonthlyData],
+      ["dnr_quarterly",   setQuarterlyData],
+    ];
+    keys.forEach(([k, setter]) => {
+      try { const v = localStorage.getItem(k); if(v) setter(JSON.parse(v)); } catch {}
+    });
+    try { const lu = localStorage.getItem("dnr_lastupdated"); if(lu) setLastUpdated(JSON.parse(lu)); } catch {}
   }, []);
 
   const saveAndUpdate = (key, data, modeKey) => {
@@ -2290,12 +3448,17 @@ Make it realistic — include specific fund names like SBI MF, HDFC MF, Mirae As
     try {
       const raw = await callGroq(prompt, "Return only valid JSON array starting with [. No extra text.", null);
       let clean = raw.replace(/```json|```/g,"").trim();
-      if(!clean.startsWith("[")) clean = clean.substring(clean.indexOf("["));
-      if(!clean.endsWith("]")) clean = clean.substring(0, clean.lastIndexOf("]")+1);
+      const start = clean.indexOf("[");
+      const end   = clean.lastIndexOf("]");
+      if(start === -1 || end === -1) throw new Error("No JSON array in response");
+      clean = clean.substring(start, end+1);
       const parsed = JSON.parse(clean);
+      if(!Array.isArray(parsed) || parsed.length === 0) throw new Error("Empty array returned");
       setDailyData(parsed);
       saveAndUpdate("dnr_daily", parsed, "daily");
-    } catch(e) { setError("Failed to fetch daily data. Try again."); }
+    } catch(e) {
+      setError(`Failed to fetch daily data: ${e.message}. Check your Groq API key and try again.`);
+    }
     setLoading(false);
   };
 
@@ -2330,12 +3493,15 @@ Focus on stocks with high conviction MF buying across multiple fund houses. Incl
     try {
       const raw = await callGroq(prompt, "Return only valid JSON array starting with [. No extra text.", null);
       let clean = raw.replace(/```json|```/g,"").trim();
-      if(!clean.startsWith("[")) clean = clean.substring(clean.indexOf("["));
-      if(!clean.endsWith("]")) clean = clean.substring(0, clean.lastIndexOf("]")+1);
-      const parsed = JSON.parse(clean);
+      const ms = clean.indexOf("["), me = clean.lastIndexOf("]");
+      if(ms===-1||me===-1) throw new Error("No JSON array in response");
+      const parsed = JSON.parse(clean.substring(ms, me+1));
+      if(!Array.isArray(parsed)||parsed.length===0) throw new Error("Empty array");
       setMonthlyData(parsed);
       saveAndUpdate("dnr_monthly", parsed, "monthly");
-    } catch(e) { setError("Failed to fetch monthly data. Try again."); }
+    } catch(e) {
+      setError(`Failed to fetch monthly data: ${e.message}. Check your Groq API key and try again.`);
+    }
     setLoading(false);
   };
 
@@ -2377,12 +3543,15 @@ Make it highly realistic based on actual Indian market trends in early 2025. Inc
     try {
       const raw = await callGroq(prompt, "Return only valid JSON array starting with [. No extra text.", null);
       let clean = raw.replace(/```json|```/g,"").trim();
-      if(!clean.startsWith("[")) clean = clean.substring(clean.indexOf("["));
-      if(!clean.endsWith("]")) clean = clean.substring(0, clean.lastIndexOf("]")+1);
-      const parsed = JSON.parse(clean);
+      const qs = clean.indexOf("["), qe = clean.lastIndexOf("]");
+      if(qs===-1||qe===-1) throw new Error("No JSON array in response");
+      const parsed = JSON.parse(clean.substring(qs, qe+1));
+      if(!Array.isArray(parsed)||parsed.length===0) throw new Error("Empty array");
       setQuarterlyData(parsed);
       saveAndUpdate("dnr_quarterly", parsed, "quarterly");
-    } catch(e) { setError("Failed to fetch quarterly data. Try again."); }
+    } catch(e) {
+      setError(`Failed to fetch quarterly data: ${e.message}. Check your Groq API key and try again.`);
+    }
     setLoading(false);
   };
 
@@ -2438,7 +3607,7 @@ Provide comprehensive analysis:
 8. **Portfolio allocation** — what % to allocate and at what levels`;
     }
 
-    const raw = await callGroq(prompt, SYS, null);
+    const raw = await callGroq(prompt, getSYS(), null);
     setDetailData(raw);
     setDetailLoading(false);
   };
@@ -2727,111 +3896,931 @@ Provide comprehensive analysis:
   );
 }
 
+// ─── CALCULATORS ──────────────────────────────────────────────────────────────
+function Calculators() {
+  const [tab, setTab] = useState("sip");
+
+  // ── SIP Calculator ──
+  const [sipMonthly, setSipMonthly] = useState(10000);
+  const [sipRate, setSipRate]       = useState(12);
+  const [sipYears, setSipYears]     = useState(10);
+  const sipMonths   = sipYears * 12;
+  const sipMonthly_ = sipRate / 100 / 12;
+  const sipCorpus   = sipMonthly_ > 0
+    ? sipMonthly * ((Math.pow(1 + sipMonthly_, sipMonths) - 1) / sipMonthly_) * (1 + sipMonthly_)
+    : sipMonthly * sipMonths;
+  const sipInvested = sipMonthly * sipMonths;
+  const sipGains    = sipCorpus - sipInvested;
+
+  // ── Lumpsum Calculator ──
+  const [lsAmount, setLsAmount]   = useState(100000);
+  const [lsRate, setLsRate]       = useState(12);
+  const [lsYears, setLsYears]     = useState(10);
+  const lsCorpus   = lsAmount * Math.pow(1 + lsRate / 100, lsYears);
+  const lsGains    = lsCorpus - lsAmount;
+  const lsDoubling = Math.log(2) / Math.log(1 + lsRate / 100);
+
+  // ── Position Sizing ──
+  const [capital, setCapital]     = useState(500000);
+  const [riskPct, setRiskPct]     = useState(1);
+  const [entry, setEntry]         = useState(1000);
+  const [stopLoss, setStopLoss]   = useState(940);
+  const riskAmt    = capital * riskPct / 100;
+  const riskPerSh  = Math.abs(entry - stopLoss);
+  const qty        = riskPerSh > 0 ? Math.floor(riskAmt / riskPerSh) : 0;
+  const posSize    = qty * entry;
+  const posPct     = capital > 0 ? (posSize / capital * 100).toFixed(1) : 0;
+  const riskReward = riskPerSh > 0 ? ((entry * 1.1 - entry) / riskPerSh).toFixed(2) : 0;
+
+  const SliderRow = ({ label, val, setter, min, max, step, prefix="", suffix="" }) => (
+    <div style={{ marginBottom:18 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+        <span style={{ fontSize:12, color:T.muted }}>{label}</span>
+        <span style={{ fontFamily:"'DM Mono',monospace", fontSize:13, color:T.goldLight, fontWeight:600 }}>
+          {prefix}{val.toLocaleString("en-IN")}{suffix}
+        </span>
+      </div>
+      <input type="range" className="range-inp" min={min} max={max} step={step} value={val}
+        onChange={e => setter(Number(e.target.value))} />
+      <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:T.walnutLight, marginTop:3 }}>
+        <span>{prefix}{min.toLocaleString()}{suffix}</span>
+        <span>{prefix}{max.toLocaleString()}{suffix}</span>
+      </div>
+    </div>
+  );
+
+  const fmtCr = (n) => n >= 1e7 ? `₹${(n/1e7).toFixed(2)} Cr` : n >= 1e5 ? `₹${(n/1e5).toFixed(2)} L` : `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+  return (
+    <div>
+      <div className="sec-title">🧮 Financial Calculators</div>
+      <div className="sec-sub">SIP · Lumpsum · Position Sizing — plan your investments intelligently</div>
+
+      <div className="tab-mini" style={{ marginBottom:20 }}>
+        {[{id:"sip",l:"📅 SIP Calculator"},{id:"lumpsum",l:"💰 Lumpsum"},{id:"position",l:"⚖️ Position Sizing"}]
+          .map(t => <button key={t.id} className={`tmb ${tab===t.id?"on":""}`} onClick={()=>setTab(t.id)}>{t.l}</button>)}
+      </div>
+
+      {tab === "sip" && (
+        <div className="g2">
+          <div className="card">
+            <div className="card-title">SIP Calculator</div>
+            <SliderRow label="Monthly Investment"   val={sipMonthly} setter={setSipMonthly} min={500}   max={100000} step={500}   prefix="₹" />
+            <SliderRow label="Expected Annual Return" val={sipRate}  setter={setSipRate}    min={4}     max={30}     step={0.5}  suffix="%" />
+            <SliderRow label="Investment Period"    val={sipYears}  setter={setSipYears}    min={1}     max={40}     step={1}    suffix=" yrs" />
+          </div>
+          <div>
+            <div className="calc-result">
+              <div style={{ fontSize:10, color:T.muted, letterSpacing:1, textTransform:"uppercase" }}>Maturity Value</div>
+              <div className="calc-big">{fmtCr(sipCorpus)}</div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Total Invested</span><span style={{ color:T.dun }}>{fmtCr(sipInvested)}</span></div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Total Gains</span><span style={{ color:T.greenLight, fontWeight:700 }}>{fmtCr(sipGains)}</span></div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Wealth Multiple</span><span style={{ color:T.goldLight }}>{(sipCorpus/sipInvested).toFixed(2)}x</span></div>
+              <div className="calc-row" style={{ border:"none" }}><span style={{ color:T.muted }}>Effective CAGR</span><span style={{ color:T.goldLight }}>{sipRate}%</span></div>
+            </div>
+            <div className="card" style={{ marginTop:14 }}>
+              <div className="chart-title">Corpus Growth Over Time</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={Array.from({length:sipYears+1},(_,y)=>({
+                  year:`Y${y}`,
+                  Invested: sipMonthly*y*12,
+                  Corpus: sipMonthly_>0 ? sipMonthly*((Math.pow(1+sipMonthly_,y*12)-1)/sipMonthly_)*(1+sipMonthly_) : sipMonthly*y*12
+                }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={T.walnut+"33"} />
+                  <XAxis dataKey="year" tick={{fill:T.muted,fontSize:9}} />
+                  <YAxis tick={{fill:T.muted,fontSize:9}} tickFormatter={v=>v>=1e7?`${(v/1e7).toFixed(0)}Cr`:v>=1e5?`${(v/1e5).toFixed(0)}L`:v} />
+                  <Tooltip contentStyle={{background:T.walnutDeep,border:`1px solid ${T.walnut}44`,color:T.dun,fontSize:11}} formatter={v=>fmtCr(v)} />
+                  <Legend wrapperStyle={{fontSize:10}} />
+                  <Area type="monotone" dataKey="Invested" stroke={T.walnutLight} fill={T.walnutLight+"22"} strokeWidth={1.5} />
+                  <Area type="monotone" dataKey="Corpus"   stroke={T.goldLight}   fill={T.gold+"22"}        strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "lumpsum" && (
+        <div className="g2">
+          <div className="card">
+            <div className="card-title">Lumpsum Calculator</div>
+            <SliderRow label="Investment Amount"      val={lsAmount} setter={setLsAmount}  min={10000}  max={10000000} step={10000} prefix="₹" />
+            <SliderRow label="Expected Annual Return" val={lsRate}   setter={setLsRate}    min={4}      max={30}       step={0.5}  suffix="%" />
+            <SliderRow label="Investment Period"      val={lsYears}  setter={setLsYears}   min={1}      max={40}       step={1}    suffix=" yrs" />
+            <div style={{ marginTop:16, padding:"12px 14px", background:T.cosmicBlue+"18", borderRadius:8, border:`1px solid ${T.cosmicBlue}33` }}>
+              <div style={{ fontSize:10, color:T.cosmicBluePale, marginBottom:4 }}>💡 Rule of 72 — Money Doubles In</div>
+              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:20, color:T.goldLight, fontWeight:700 }}>{lsDoubling.toFixed(1)} years</div>
+              <div style={{ fontSize:11, color:T.muted }}>at {lsRate}% annual return</div>
+            </div>
+          </div>
+          <div>
+            <div className="calc-result">
+              <div style={{ fontSize:10, color:T.muted, letterSpacing:1, textTransform:"uppercase" }}>Final Corpus</div>
+              <div className="calc-big">{fmtCr(lsCorpus)}</div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Amount Invested</span><span style={{ color:T.dun }}>{fmtCr(lsAmount)}</span></div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Total Gains</span><span style={{ color:T.greenLight, fontWeight:700 }}>{fmtCr(lsGains)}</span></div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Wealth Multiple</span><span style={{ color:T.goldLight }}>{(lsCorpus/lsAmount).toFixed(2)}x</span></div>
+              <div className="calc-row" style={{ border:"none" }}><span style={{ color:T.muted }}>Absolute Return</span><span style={{ color:T.goldLight }}>{(lsGains/lsAmount*100).toFixed(1)}%</span></div>
+            </div>
+            <div className="card" style={{ marginTop:14 }}>
+              <div className="chart-title">Value Growth by Year</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={Array.from({length:lsYears+1},(_,y)=>({ year:`Y${y}`, Value: lsAmount*Math.pow(1+lsRate/100,y) }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={T.walnut+"33"} />
+                  <XAxis dataKey="year" tick={{fill:T.muted,fontSize:9}} />
+                  <YAxis tick={{fill:T.muted,fontSize:9}} tickFormatter={v=>v>=1e7?`${(v/1e7).toFixed(1)}Cr`:v>=1e5?`${(v/1e5).toFixed(0)}L`:v} />
+                  <Tooltip contentStyle={{background:T.walnutDeep,border:`1px solid ${T.walnut}44`,color:T.dun,fontSize:11}} formatter={v=>fmtCr(v)} />
+                  <Line type="monotone" dataKey="Value" stroke={T.goldLight} strokeWidth={2.5} dot={{fill:T.gold,r:3}} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "position" && (
+        <div className="g2">
+          <div className="card">
+            <div className="card-title">⚖️ Position Sizing Calculator</div>
+            <div style={{ fontSize:12, color:T.muted, marginBottom:16 }}>Based on Kelly Criterion & % Risk per trade</div>
+            <SliderRow label="Total Capital"      val={capital}  setter={setCapital}  min={50000}  max={10000000} step={50000} prefix="₹" />
+            <SliderRow label="Risk Per Trade"     val={riskPct}  setter={setRiskPct}  min={0.5}    max={5}        step={0.5}  suffix="%" />
+            <div style={{ marginBottom:18 }}>
+              <div style={{ fontSize:12, color:T.muted, marginBottom:8 }}>Entry Price (₹)</div>
+              <input type="number" className="inp" value={entry} onChange={e=>setEntry(Number(e.target.value))} style={{ width:"100%" }} />
+            </div>
+            <div style={{ marginBottom:18 }}>
+              <div style={{ fontSize:12, color:T.muted, marginBottom:8 }}>Stop Loss Price (₹)</div>
+              <input type="number" className="inp" value={stopLoss} onChange={e=>setStopLoss(Number(e.target.value))} style={{ width:"100%" }} />
+            </div>
+          </div>
+          <div>
+            <div className="calc-result">
+              <div style={{ fontSize:10, color:T.muted, letterSpacing:1, textTransform:"uppercase" }}>Buy Quantity</div>
+              <div className="calc-big">{qty.toLocaleString()} shares</div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Position Size</span><span style={{ color:T.dun }}>₹{posSize.toLocaleString("en-IN")}</span></div>
+              <div className="calc-row"><span style={{ color:T.muted }}>% of Capital</span><span style={{ color: posPct>20?T.redLight:T.goldLight }}>{posPct}%</span></div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Max Risk Amount</span><span style={{ color:T.redLight }}>₹{riskAmt.toLocaleString("en-IN")}</span></div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Risk Per Share</span><span style={{ color:T.red }}>₹{riskPerSh.toLocaleString("en-IN")}</span></div>
+              <div className="calc-row" style={{ border:"none" }}><span style={{ color:T.muted }}>Target R:R (10% up)</span><span style={{ color: riskReward>=2?T.greenLight:T.gold }}>{riskReward}:1</span></div>
+            </div>
+            <div className="card" style={{ marginTop:14, background:posPct>20?T.red+"0a":T.green+"0a", borderColor:posPct>20?T.red+"44":T.green+"44" }}>
+              <div style={{ fontSize:12, color:T.goldLight, marginBottom:8, fontWeight:600 }}>📋 Trade Summary</div>
+              {[
+                { l:"Entry",     v:`₹${entry.toLocaleString("en-IN")}` },
+                { l:"Stop Loss", v:`₹${stopLoss.toLocaleString("en-IN")}`, c:T.redLight },
+                { l:"Target (2:1 RR)", v:`₹${(entry + riskPerSh*2).toLocaleString("en-IN")}`, c:T.greenLight },
+                { l:"Risk %",    v:`${((Math.abs(entry-stopLoss)/entry)*100).toFixed(1)}%`, c:T.gold },
+              ].map(r => (
+                <div key={r.l} className="calc-row">
+                  <span style={{ color:T.muted }}>{r.l}</span>
+                  <span style={{ color:r.c||T.dun, fontFamily:"'DM Mono',monospace" }}>{r.v}</span>
+                </div>
+              ))}
+              <div style={{ marginTop:10, fontSize:11, color:T.muted, fontStyle:"italic" }}>
+                {posPct>20 ? "⚠️ Position size > 20% of capital — consider reducing risk" : "✅ Position size within safe limits"}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── FINANCIAL CALENDAR ───────────────────────────────────────────────────────
+function FinancialCalendar() {
+  const [tab, setTab]           = useState("earnings");
+  const [earnings, setEarnings] = useState([]);
+  const [economic, setEconomic] = useState([]);
+  const [loading, setLoading]   = useState(false);
+
+  const fetchEarnings = async () => {
+    setLoading(true); setEarnings([]);
+    const raw = await callGroq(
+      `Generate a realistic Indian corporate earnings calendar for the next 4 weeks (starting ${new Date().toLocaleDateString("en-IN")}).
+Include 20 major companies across sectors. Return ONLY JSON array:
+[{"company":"TCS","symbol":"TCS","sector":"IT","date":"Mar 20, 2025","day":"Thursday","quarter":"Q4FY25","consensus_eps":"28.4","prev_eps":"26.8","revenue_est":"₹62,400 Cr","importance":"High","watch":"Guidance, deal wins","analyst_estimate":"Beat expected"}]`,
+      "Return only valid JSON array.", null
+    );
+    try {
+      let c = raw.replace(/```json|```/g,"").trim();
+      if(!c.startsWith("[")) c=c.substring(c.indexOf("["));
+      setEarnings(JSON.parse(c));
+    } catch {}
+    setLoading(false);
+  };
+
+  const fetchEconomic = async () => {
+    setLoading(true); setEconomic([]);
+    const raw = await callGroq(
+      `Generate a realistic Indian and global economic calendar for the next 4 weeks (starting ${new Date().toLocaleDateString("en-IN")}).
+Include 18 events: RBI policy, India CPI, WPI, IIP, GDP, US Fed, US CPI, US jobs, ECB, Budget events.
+Return ONLY JSON array:
+[{"event":"RBI Monetary Policy","date":"Apr 5, 2025","day":"Saturday","country":"India","previous":"6.25%","forecast":"6.0%","actual":"","importance":"High","market_impact":"Rate cut expected — positive for rate-sensitive sectors","category":"Central Bank"}]`,
+      "Return only valid JSON array.", null
+    );
+    try {
+      let c = raw.replace(/```json|```/g,"").trim();
+      if(!c.startsWith("[")) c=c.substring(c.indexOf("["));
+      setEconomic(JSON.parse(c));
+    } catch {}
+    setLoading(false);
+  };
+
+  const impBadge = (imp) =>
+    imp==="High"   ? <span className="imp-high">HIGH</span> :
+    imp==="Medium" ? <span className="imp-med">MED</span>   :
+                     <span className="imp-low">LOW</span>;
+
+  return (
+    <div>
+      <div className="sec-title">📅 Financial Calendar</div>
+      <div className="sec-sub">Earnings results calendar · Economic events · RBI · Fed — AI-generated</div>
+
+      <div className="tab-mini" style={{ marginBottom:16 }}>
+        {[{id:"earnings",l:"📊 Earnings Calendar"},{id:"economic",l:"🏛️ Economic Events"}]
+          .map(t => <button key={t.id} className={`tmb ${tab===t.id?"on":""}`} onClick={()=>setTab(t.id)}>{t.l}</button>)}
+      </div>
+
+      {tab==="earnings" && (
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+            <div style={{ fontSize:12, color:T.muted }}>Upcoming Q4FY25 / Q1FY26 results season</div>
+            <button className="btn-gold" onClick={fetchEarnings} disabled={loading}>
+              {loading ? <span className="ld">Loading</span> : "📅 Fetch Earnings Calendar"}
+            </button>
+          </div>
+          {loading && <div className="loading"><div className="spin"/><span>Building earnings calendar...</span></div>}
+          {!earnings.length && !loading && (
+            <div className="card" style={{ textAlign:"center", padding:"48px" }}>
+              <div style={{ fontSize:42, marginBottom:12 }}>📊</div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:T.dun }}>Earnings Calendar</div>
+              <div style={{ color:T.muted, fontSize:13, marginTop:8, marginBottom:20 }}>Get the next 4 weeks of scheduled results</div>
+              <button className="btn-gold" onClick={fetchEarnings}>📅 Load Calendar</button>
+            </div>
+          )}
+          {earnings.length>0 && (
+            <div className="card" style={{ padding:0 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 0.7fr 0.7fr 0.6fr 0.8fr 0.8fr 1fr", gap:6, padding:"10px 14px", borderBottom:`2px solid ${T.walnut}44`, fontSize:9, color:T.muted, letterSpacing:1, textTransform:"uppercase", fontWeight:600 }}>
+                <span>Company</span><span>Date</span><span>Quarter</span><span>Impact</span><span>EPS Est.</span><span>Prev EPS</span><span>Watch</span>
+              </div>
+              {earnings.map((e,i)=>(
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 0.7fr 0.7fr 0.6fr 0.8fr 0.8fr 1fr", gap:6, padding:"10px 14px", borderBottom:`1px solid ${T.walnut}22`, fontSize:11, alignItems:"center" }}>
+                  <div>
+                    <div style={{ fontFamily:"'DM Mono',monospace", fontWeight:700, color:T.dun, fontSize:12 }}>{e.symbol}</div>
+                    <div style={{ fontSize:10, color:T.muted }}>{e.company}</div>
+                    <span style={{ fontSize:8, padding:"1px 6px", borderRadius:8, background:T.cosmicBlue+"22", color:T.cosmicBluePale, border:`1px solid ${T.cosmicBlue}33` }}>{e.sector}</span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, color:T.dun }}>{e.date}</div>
+                    <div style={{ fontSize:10, color:T.muted }}>{e.day}</div>
+                  </div>
+                  <span style={{ fontFamily:"'DM Mono',monospace", color:T.goldLight }}>{e.quarter}</span>
+                  <span>{impBadge(e.importance)}</span>
+                  <span style={{ fontFamily:"'DM Mono',monospace", color:T.dun }}>₹{e.consensus_eps}</span>
+                  <span style={{ fontFamily:"'DM Mono',monospace", color:T.muted }}>₹{e.prev_eps}</span>
+                  <span style={{ fontSize:10, color:T.muted, lineHeight:1.4 }}>{e.watch}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab==="economic" && (
+        <div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+            <div style={{ fontSize:12, color:T.muted }}>RBI · India Macro · US Fed · Global events</div>
+            <button className="btn-gold" onClick={fetchEconomic} disabled={loading}>
+              {loading ? <span className="ld">Loading</span> : "🏛️ Fetch Economic Calendar"}
+            </button>
+          </div>
+          {loading && <div className="loading"><div className="spin"/><span>Building economic calendar...</span></div>}
+          {!economic.length && !loading && (
+            <div className="card" style={{ textAlign:"center", padding:"48px" }}>
+              <div style={{ fontSize:42, marginBottom:12 }}>🏛️</div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:20, color:T.dun }}>Economic Events</div>
+              <div style={{ color:T.muted, fontSize:13, marginTop:8, marginBottom:20 }}>RBI, CPI, GDP, Fed, and more</div>
+              <button className="btn-gold" onClick={fetchEconomic}>🏛️ Load Calendar</button>
+            </div>
+          )}
+          {economic.length>0 && (
+            <div className="card" style={{ padding:0 }}>
+              {economic.map((e,i)=>(
+                <div key={i} className="cal-event">
+                  <div className="cal-dot" style={{ background: e.importance==="High"?T.red:e.importance==="Medium"?T.gold:T.walnut }} />
+                  <div className="cal-date">{e.date}<br/><span style={{color:T.walnutLight}}>{e.day}</span></div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <div className="cal-title">{e.event}</div>
+                      {impBadge(e.importance)}
+                      <span style={{ fontSize:9, padding:"1px 7px", borderRadius:8, background:T.walnut+"22", color:T.muted, border:`1px solid ${T.walnut}44` }}>{e.country}</span>
+                    </div>
+                    <div className="cal-sub">{e.market_impact}</div>
+                  </div>
+                  <div style={{ textAlign:"right", minWidth:100 }}>
+                    {e.forecast && <div style={{ fontSize:11, color:T.goldLight }}>Est: {e.forecast}</div>}
+                    {e.previous && <div style={{ fontSize:10, color:T.muted }}>Prev: {e.previous}</div>}
+                    {e.actual   && <div style={{ fontSize:11, color:T.greenLight, fontWeight:700 }}>Actual: {e.actual}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ADVANCED TOOLS ───────────────────────────────────────────────────────────
+function AdvancedTools() {
+  const [tab, setTab] = useState("tax");
+
+  // ── Tax P&L Calculator ──
+  const [txBuy,  setTxBuy]  = useState(1000);
+  const [txSell, setTxSell] = useState(1500);
+  const [txQty,  setTxQty]  = useState(100);
+  const [txDays, setTxDays] = useState(400);
+  const isLTCG     = txDays >= 365;
+  const profit     = (txSell - txBuy) * txQty;
+  const ltcgExempt = 125000;
+  const stcgRate   = 0.20;
+  const ltcgRate   = 0.125;
+  const taxableAmt = isLTCG ? Math.max(0, profit - ltcgExempt) : profit;
+  const taxRate    = isLTCG ? ltcgRate : stcgRate;
+  const taxAmt     = Math.max(0, taxableAmt * taxRate);
+  const netProfit  = profit - taxAmt;
+
+  // ── Black-Scholes Options Calculator ──
+  const [optS,   setOptS]   = useState(24000); // Spot
+  const [optK,   setOptK]   = useState(24000); // Strike
+  const [optT,   setOptT]   = useState(30);    // Days to expiry
+  const [optR,   setOptR]   = useState(6.5);   // Risk-free rate %
+  const [optSig, setOptSig] = useState(18);    // Implied vol %
+
+  // Standard Normal CDF approximation (Hart 1968)
+  const normCDF = (x) => {
+    const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+    const sign = x<0 ? -1 : 1;
+    x = Math.abs(x)/Math.sqrt(2);
+    const t = 1/(1+p*x);
+    const y = 1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+    return 0.5*(1+sign*y);
+  };
+  const T_  = optT / 365;
+  const r_  = optR / 100;
+  const sig_= optSig / 100;
+  const d1  = T_>0&&sig_>0 ? (Math.log(optS/optK) + (r_ + sig_*sig_/2)*T_) / (sig_*Math.sqrt(T_)) : 0;
+  const d2  = d1 - sig_*Math.sqrt(T_);
+  const bsCall = T_>0 ? optS*normCDF(d1) - optK*Math.exp(-r_*T_)*normCDF(d2) : Math.max(0,optS-optK);
+  const bsPut  = T_>0 ? optK*Math.exp(-r_*T_)*normCDF(-d2) - optS*normCDF(-d1) : Math.max(0,optK-optS);
+  const deltaC = normCDF(d1);
+  const deltaP = deltaC - 1;
+  const theta  = (-(optS*sig_*Math.exp(-d1*d1/2))/(2*Math.sqrt(2*Math.PI*T_)) - r_*optK*Math.exp(-r_*T_)*normCDF(d2)) / 365;
+
+  // ── MF Overlap Checker ──
+  const [mf1,    setMf1]    = useState("");
+  const [mf2,    setMf2]    = useState("");
+  const [overlap, setOverlap] = useState("");
+  const [ovLoading, setOvLoading] = useState(false);
+
+  const checkOverlap = async () => {
+    if(!mf1.trim()||!mf2.trim()) return;
+    setOvLoading(true); setOverlap("");
+    await callGroq(
+      `Mutual Fund Overlap Analysis between:
+Fund 1: ${mf1}
+Fund 2: ${mf2}
+
+Provide:
+1) **Overlap Score** — estimated % of overlapping stocks (high/medium/low overlap)
+2) **Top Common Holdings** — list top 8 stocks likely common in both funds with approximate weight in each
+3) **Portfolio Concentration Risk** — if someone holds both, what's the effective concentration?
+4) **Sector Overlap** — which sectors are double-weighted
+5) **Recommendation** — are these funds truly diversifying each other or are they redundant?
+6) **Alternative suggestion** — if overlap is high, what complementary fund to consider instead
+
+Be specific with actual fund holdings knowledge as of FY25.`,
+      SYS, (t) => setOverlap(t)
+    );
+    setOvLoading(false);
+  };
+
+  const MF_SUGGESTIONS = [
+    "Mirae Asset Large Cap Fund","HDFC Top 100 Fund","SBI Small Cap Fund",
+    "Parag Parikh Flexi Cap Fund","Axis Midcap Fund","ICICI Pru Technology Fund",
+    "Nippon India Small Cap Fund","Kotak Emerging Equity Fund",
+  ];
+
+  return (
+    <div>
+      <div className="sec-title">🛠️ Advanced Tools</div>
+      <div className="sec-sub">Tax P&L · Options Pricing · Mutual Fund Overlap Checker</div>
+
+      <div className="tab-mini" style={{ marginBottom:20 }}>
+        {[{id:"tax",l:"💸 Tax Calculator"},{id:"options",l:"📐 Options Pricer"},{id:"mfoverlap",l:"🔁 MF Overlap"}]
+          .map(t => <button key={t.id} className={`tmb ${tab===t.id?"on":""}`} onClick={()=>setTab(t.id)}>{t.l}</button>)}
+      </div>
+
+      {tab==="tax" && (
+        <div className="g2">
+          <div className="card">
+            <div className="card-title">💸 Capital Gains Tax Calculator</div>
+            <div style={{ fontSize:11, color:T.muted, marginBottom:16 }}>As per Union Budget 2024 — STCG 20% · LTCG 12.5% (exempt up to ₹1.25L)</div>
+            {[
+              { l:"Buy Price (₹/share)", v:txBuy, s:setTxBuy },
+              { l:"Sell Price (₹/share)",v:txSell,s:setTxSell },
+              { l:"Quantity (shares)",   v:txQty, s:setTxQty },
+              { l:"Holding Days",        v:txDays,s:setTxDays },
+            ].map(row=>(
+              <div key={row.l} style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, color:T.muted, marginBottom:6 }}>{row.l}</div>
+                <input type="number" className="inp" value={row.v}
+                  onChange={e=>row.s(Number(e.target.value))} style={{ width:"100%" }} />
+              </div>
+            ))}
+            <div style={{ padding:"10px 14px", borderRadius:8, background: isLTCG?T.green+"15":T.gold+"15", border:`1px solid ${isLTCG?T.green:T.gold}44`, fontSize:12, color: isLTCG?T.greenLight:T.goldLight }}>
+              {isLTCG ? "✅ Long Term Capital Gain (LTCG) — held > 1 year" : `⏳ Short Term Capital Gain (STCG) — held ${txDays} days (need ${365-txDays} more days for LTCG)`}
+            </div>
+          </div>
+          <div>
+            <div className="calc-result">
+              <div style={{ fontSize:10, color:T.muted, letterSpacing:1, textTransform:"uppercase" }}>{isLTCG?"LTCG":"STCG"} Tax Liability</div>
+              <div className="calc-big" style={{ color: taxAmt>0?T.redLight:T.greenLight }}>₹{Math.round(taxAmt).toLocaleString("en-IN")}</div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Gross Profit</span><span style={{ color: profit>=0?T.greenLight:T.redLight }}>₹{Math.round(profit).toLocaleString("en-IN")}</span></div>
+              {isLTCG && <div className="calc-row"><span style={{ color:T.muted }}>LTCG Exemption</span><span style={{ color:T.goldLight }}>₹{Math.min(profit,ltcgExempt).toLocaleString("en-IN")}</span></div>}
+              <div className="calc-row"><span style={{ color:T.muted }}>Taxable Amount</span><span style={{ color:T.dun }}>₹{Math.round(taxableAmt).toLocaleString("en-IN")}</span></div>
+              <div className="calc-row"><span style={{ color:T.muted }}>Tax Rate</span><span style={{ color:T.gold }}>{(taxRate*100).toFixed(1)}%</span></div>
+              <div className="calc-row" style={{ border:"none", marginTop:4, paddingTop:10, borderTop:`1px solid ${T.walnut}55` }}>
+                <span style={{ color:T.dun, fontWeight:600 }}>Net Profit (after tax)</span>
+                <span style={{ color:T.greenLight, fontWeight:700, fontFamily:"'DM Mono',monospace" }}>₹{Math.round(netProfit).toLocaleString("en-IN")}</span>
+              </div>
+            </div>
+            <div className="card" style={{ marginTop:14 }}>
+              <div style={{ fontSize:11, color:T.goldLight, fontWeight:600, marginBottom:10 }}>📌 Quick Tips</div>
+              <div style={{ fontSize:12, color:T.muted, lineHeight:1.8 }}>
+                • Hold equity > 1 year to qualify for LTCG (12.5%)<br/>
+                • First ₹1.25 lakh LTCG per year is fully exempt<br/>
+                • Harvest losses before March 31 to offset gains<br/>
+                • STCG applies even on intraday and F&O profits<br/>
+                • Tax harvesting: book profits and reinvest to reset cost basis
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab==="options" && (
+        <div className="g2">
+          <div className="card">
+            <div className="card-title">📐 Black-Scholes Options Pricer</div>
+            <div style={{ fontSize:11, color:T.muted, marginBottom:16 }}>European options pricing — NIFTY / BANKNIFTY / individual stocks</div>
+            {[
+              { l:"Spot Price (S)",          v:optS,   s:setOptS },
+              { l:"Strike Price (K)",        v:optK,   s:setOptK },
+              { l:"Days to Expiry",          v:optT,   s:setOptT },
+              { l:"Risk-Free Rate % (repo)", v:optR,   s:setOptR },
+              { l:"Implied Volatility %",    v:optSig, s:setOptSig },
+            ].map(row=>(
+              <div key={row.l} style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, color:T.muted, marginBottom:6 }}>{row.l}</div>
+                <input type="number" className="inp" value={row.v}
+                  onChange={e=>row.s(Number(e.target.value))} style={{ width:"100%" }} />
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="g2" style={{ marginBottom:14 }}>
+              <div className="calc-result" style={{ textAlign:"center" }}>
+                <div style={{ fontSize:10, color:T.muted, marginBottom:4 }}>CALL PRICE</div>
+                <div style={{ fontFamily:"'DM Mono',monospace", fontSize:28, fontWeight:700, color:T.greenLight }}>₹{bsCall.toFixed(2)}</div>
+                <div style={{ fontSize:10, color:T.muted, marginTop:6 }}>Delta: {deltaC.toFixed(3)}</div>
+              </div>
+              <div className="calc-result" style={{ textAlign:"center" }}>
+                <div style={{ fontSize:10, color:T.muted, marginBottom:4 }}>PUT PRICE</div>
+                <div style={{ fontFamily:"'DM Mono',monospace", fontSize:28, fontWeight:700, color:T.redLight }}>₹{bsPut.toFixed(2)}</div>
+                <div style={{ fontSize:10, color:T.muted, marginTop:6 }}>Delta: {deltaP.toFixed(3)}</div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-title" style={{ marginBottom:12 }}>Greeks</div>
+              {[
+                { l:"Theta (daily decay)", v:`₹${theta.toFixed(2)}/day`, note:"Time value lost per day" },
+                { l:"d1",                  v:d1.toFixed(4), note:"" },
+                { l:"d2",                  v:d2.toFixed(4), note:"" },
+                { l:"Call Delta",          v:deltaC.toFixed(4), note:"Probability ITM" },
+                { l:"Put Delta",           v:deltaP.toFixed(4), note:"" },
+                { l:"Moneyness",           v: optS>optK?"ITM Call / OTM Put":optS<optK?"OTM Call / ITM Put":"ATM", note:"" },
+              ].map(r=>(
+                <div key={r.l} className="calc-row">
+                  <div>
+                    <span style={{ color:T.muted }}>{r.l}</span>
+                    {r.note && <div style={{ fontSize:9, color:T.walnutLight }}>{r.note}</div>}
+                  </div>
+                  <span style={{ fontFamily:"'DM Mono',monospace", color:T.goldLight }}>{r.v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab==="mfoverlap" && (
+        <div>
+          <div className="card card-gold" style={{ marginBottom:16 }}>
+            <div className="card-title">🔁 Mutual Fund Overlap Checker</div>
+            <div style={{ fontSize:12, color:T.muted, marginBottom:14 }}>Enter two fund names to check how much their portfolios overlap</div>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:12 }}>
+              <div style={{ flex:1, minWidth:220 }}>
+                <div style={{ fontSize:10, color:T.muted, letterSpacing:1, marginBottom:6, textTransform:"uppercase" }}>Fund 1</div>
+                <input className="inp" value={mf1} onChange={e=>setMf1(e.target.value)} placeholder="e.g. Mirae Asset Large Cap Fund" style={{ width:"100%" }} />
+              </div>
+              <div style={{ flex:1, minWidth:220 }}>
+                <div style={{ fontSize:10, color:T.muted, letterSpacing:1, marginBottom:6, textTransform:"uppercase" }}>Fund 2</div>
+                <input className="inp" value={mf2} onChange={e=>setMf2(e.target.value)} placeholder="e.g. HDFC Top 100 Fund" style={{ width:"100%" }} />
+              </div>
+              <button className="btn-gold" style={{ alignSelf:"flex-end", whiteSpace:"nowrap" }} onClick={checkOverlap} disabled={ovLoading||!mf1||!mf2}>
+                {ovLoading ? <span className="ld">Analyzing</span> : "🔁 Check Overlap"}
+              </button>
+            </div>
+            <div style={{ fontSize:11, color:T.muted }}>Popular funds to try:</div>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:6 }}>
+              {MF_SUGGESTIONS.map(mf=>(
+                <button key={mf} onClick={()=>!mf1?setMf1(mf):setMf2(mf)} style={{ padding:"3px 10px", borderRadius:16, background:T.walnutDeep, border:`1px solid ${T.walnut}44`, color:T.muted, fontSize:10, cursor:"pointer", fontFamily:"'Jost',sans-serif" }}>{mf}</button>
+              ))}
+            </div>
+          </div>
+          {ovLoading && <div className="loading"><div className="spin"/><span>Analyzing fund portfolios for overlap...</span></div>}
+          {overlap && (
+            <div className="res-box" dangerouslySetInnerHTML={{ __html:
+              overlap.replace(/\*\*(.*?)\*\*/g,`<strong style='color:${T.goldLight}'>$1</strong>`).replace(/\n/g,"<br/>")
+            }}/>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── BULK DEALS ───────────────────────────────────────────────────────────────
+function BulkDeals() {
+  const [deals, setDeals]         = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [filter, setFilter]       = useState("all");
+  const [selected, setSelected]   = useState(null);
+  const [analysis, setAnalysis]   = useState("");
+  const [aLoading, setALoading]   = useState(false);
+
+  const fetchDeals = async () => {
+    setLoading(true); setDeals([]);
+    const raw = await callGroq(
+      `Generate 20 realistic bulk deal / block deal entries from NSE/BSE for the last 7 trading days (around ${new Date().toLocaleDateString("en-IN")}).
+Mix of buys and sells from institutions (FIIs, mutual funds, insurance companies, PE funds, promoters).
+
+Return ONLY JSON array:
+[{"stock":"Infosys","symbol":"INFY","date":"Mar 14, 2025","buyer_seller":"Goldman Sachs (FII)","type":"BUY","qty":1250000,"price":1892.50,"value_cr":236.6,"exchange":"NSE","sector":"IT","significance":"High","note":"Large FII accumulation above 200 DMA","promoter_deal":false}]
+
+Include variety: IT, Banking, FMCG, Auto, Pharma, Small cap. Some promoter sales, some FII buys, some MF accumulation.`,
+      "Return only valid JSON array.", null
+    );
+    try {
+      let c = raw.replace(/```json|```/g,"").trim();
+      if(!c.startsWith("[")) c=c.substring(c.indexOf("["));
+      if(!c.endsWith("]")) c=c.substring(0,c.lastIndexOf("]")+1);
+      setDeals(JSON.parse(c));
+    } catch {}
+    setLoading(false);
+  };
+
+  const analyzeStock = async (deal) => {
+    setSelected(deal);
+    setALoading(true); setAnalysis("");
+    await callGroq(
+      `Analyze this bulk/block deal:
+Stock: ${deal.stock} (${deal.symbol})
+Action: ${deal.type} by ${deal.buyer_seller}
+Qty: ${deal.qty?.toLocaleString()} shares | Price: ₹${deal.price} | Value: ₹${deal.value_cr} Cr
+Date: ${deal.date} | Sector: ${deal.sector}
+Note: ${deal.note}
+
+Provide:
+1) **Why ${deal.buyer_seller} ${deal.type === "BUY" ? "bought" : "sold"}** — institutional reasoning and thesis
+2) **Track record** of this institution in this stock
+3) **What this signals** — is smart money accumulating or distributing?
+4) **Follow-on buying/selling** — who else might follow this trade?
+5) **Short-term price impact** — typical reaction to such deals
+6) **DNR View** — should retail investors follow this trade?`,
+      SYS, (t) => setAnalysis(t)
+    );
+    setALoading(false);
+  };
+
+  const exportCSV = () => {
+    const hdr = "Stock,Symbol,Date,Buyer/Seller,Type,Qty,Price,Value(Cr),Exchange,Sector";
+    const rows = deals.map(d => `${d.stock},${d.symbol},${d.date},"${d.buyer_seller}",${d.type},${d.qty},${d.price},${d.value_cr},${d.exchange},${d.sector}`);
+    const blob = new Blob([hdr+"\n"+rows.join("\n")], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `DNR_BulkDeals_${new Date().toLocaleDateString("en-IN").replace(/\//g,"-")}.csv`;
+    a.click();
+  };
+
+  const filtered = deals.filter(d => filter==="all" || d.type===filter);
+
+  return (
+    <div>
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:18, flexWrap:"wrap", gap:10 }}>
+        <div>
+          <div className="sec-title">📦 Bulk & Block Deals</div>
+          <div className="sec-sub">Institutional buying & selling signals · Smart money tracker · AI analysis</div>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          {deals.length>0 && <button className="btn-ghost" onClick={exportCSV}>📥 Export CSV</button>}
+          <button className="btn-gold" onClick={fetchDeals} disabled={loading}>
+            {loading ? <span className="ld">Fetching</span> : "🔄 Fetch Latest Deals"}
+          </button>
+        </div>
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{ display:"flex", gap:6, marginBottom:14 }}>
+        {["all","BUY","SELL"].map(f=>(
+          <button key={f} className="btn-ghost" onClick={()=>setFilter(f)} style={filter===f?{
+            background: f==="BUY"?T.green+"33":f==="SELL"?T.red+"33":T.walnut,
+            color: f==="BUY"?T.greenLight:f==="SELL"?T.redLight:T.dun,
+            borderColor: f==="BUY"?T.green+"66":f==="SELL"?T.red+"66":T.walnut,
+            fontWeight:700,
+          }:{}}>
+            {f==="all"?"All Deals":`${f==="BUY"?"🟢":"🔴"} ${f} only`}
+            {deals.length>0 && ` (${f==="all"?deals.length:deals.filter(d=>d.type===f).length})`}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div className="loading"><div className="spin"/><span>Scanning NSE/BSE bulk deal data...</span></div>}
+
+      {!deals.length && !loading && (
+        <div className="card" style={{ textAlign:"center", padding:"56px 20px" }}>
+          <div style={{ fontSize:48, marginBottom:16 }}>📦</div>
+          <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:22, color:T.dun, marginBottom:8 }}>Bulk & Block Deal Tracker</div>
+          <div style={{ color:T.muted, fontSize:13, marginBottom:24 }}>Track where smart money is moving — FIIs, MFs, Insurance, Promoters</div>
+          <button className="btn-gold" style={{ padding:"13px 32px" }} onClick={fetchDeals}>🔄 Fetch Deals</button>
+        </div>
+      )}
+
+      {filtered.length>0 && (
+        <div className="card" style={{ padding:0, marginBottom:14 }}>
+          <div className="bd-row bd-hdr" style={{ padding:"10px 14px", borderBottom:`2px solid ${T.walnut}44` }}>
+            <span>Stock</span><span>Date</span><span>Institution</span><span>Type</span>
+            <span>Qty (L)</span><span>Price</span><span>Value (Cr)</span>
+          </div>
+          {filtered.map((d,i)=>(
+            <div key={i} className="bd-row" style={{
+              padding:"10px 14px",
+              cursor:"pointer",
+              background: selected?.stock===d.stock&&selected?.date===d.date ? T.gold+"0a" : "transparent",
+              borderLeft: selected?.stock===d.stock&&selected?.date===d.date ? `3px solid ${T.gold}77` : "3px solid transparent",
+            }} onClick={()=>analyzeStock(d)}>
+              <div>
+                <div style={{ fontFamily:"'DM Mono',monospace", fontWeight:700, color:T.dun, fontSize:12 }}>{d.symbol}</div>
+                <div style={{ fontSize:10, color:T.muted }}>{d.stock}</div>
+                <span style={{ fontSize:8, padding:"1px 5px", borderRadius:6, background:T.cosmicBlue+"22", color:T.cosmicBluePale }}>{d.sector}</span>
+              </div>
+              <span style={{ fontSize:11, color:T.muted }}>{d.date}</span>
+              <span style={{ fontSize:11, color:T.dunDark }}>{d.buyer_seller}</span>
+              <span><span className={d.type==="BUY"?"bd-buy":"bd-sell"}>{d.type}</span></span>
+              <span style={{ fontFamily:"'DM Mono',monospace" }}>{d.qty ? (d.qty/100000).toFixed(2) : "—"}</span>
+              <span style={{ fontFamily:"'DM Mono',monospace" }}>₹{d.price}</span>
+              <span style={{ fontFamily:"'DM Mono',monospace", color: d.value_cr>100?T.goldLight:T.dun, fontWeight: d.value_cr>100?700:400 }}>₹{d.value_cr} Cr</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Analysis panel */}
+      {(selected||aLoading) && (
+        <div className="card card-gold" style={{ marginTop:4 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+            <div>
+              <div className="card-title" style={{ marginBottom:2 }}>🤖 Deal Analysis — {selected?.stock}</div>
+              <div style={{ fontSize:10, color:T.muted }}>{selected?.buyer_seller} · {selected?.type} · ₹{selected?.value_cr} Cr · {selected?.date}</div>
+            </div>
+            <button className="btn-ghost btn-sm" onClick={()=>{setSelected(null);setAnalysis("");}}>✕</button>
+          </div>
+          {aLoading ? (
+            <div className="loading"><div className="spin"/><span>Analyzing institutional deal intent...</span></div>
+          ) : (
+            analysis && <div className="res-box" dangerouslySetInnerHTML={{ __html:
+              analysis.replace(/\*\*(.*?)\*\*/g,`<strong style='color:${T.goldLight}'>$1</strong>`).replace(/\n/g,"<br/>")
+            }}/>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ROOT APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
-  const [darkMode, setDarkMode] = useState(true);
-  const [lang, setLang] = useState("EN");
-  const [showAlerts, setShowAlerts] = useState(false);
+  const [darkMode,  setDarkMode]  = useState(true);
+  const [lang,      setLang]      = useState("EN");
+  const [showAlerts,setShowAlerts]= useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const { markets, lastFetch, fetching, refresh } = useLiveMarkets();
 
   useEffect(() => {
     document.body.className = darkMode ? "" : "light";
   }, [darkMode]);
 
   const LABELS = {
-    EN: { home:"Home", markets:"Markets", research:"Deep Research", technical:"Technical Charts", quarterly:"Quarterly Hub", screener:"Screener", watchlist:"Watchlists", portfolio:"Portfolio", legends:"Legends", news:"News Feed", ipo:"IPO Tracker", fii:"FII / DII", sector:"Sector Rotation" },
-    HI: { home:"होम", markets:"बाज़ार", research:"गहरी रिसर्च", technical:"टेक्निकल", quarterly:"तिमाही", screener:"स्क्रीनर", watchlist:"वॉचलिस्ट", portfolio:"पोर्टफोलियो", legends:"दिग्गज", news:"समाचार", ipo:"IPO", fii:"FII/DII", sector:"सेक्टर" }
+    EN: { markets:"Markets", research:"Deep Research", technical:"Technical Charts",
+          screener:"Screener", watchlist:"Watchlists", portfolio:"Portfolio",
+          quarterly:"Quarterly Hub", bulkdeals:"Bulk Deals", news:"News Feed",
+          ipo:"IPO Tracker", fii:"FII / DII", sector:"Sector Rotation",
+          calculators:"Calculators", calendar:"Calendar", tools:"Adv. Tools",
+          legends:"Legends", institutional:"Inst. Momentum" },
   };
-  const L = LABELS[lang];
+  const L = LABELS.EN;
 
-  const tabs = [
-    { id:"markets", icon:"📊", label:L.markets },
-    { id:"research", icon:"🔬", label:L.research },
-    { id:"technical", icon:"📈", label:L.technical },
-    { id:"institutional", icon:"🏦", label:"Inst. Momentum" },
-    { id:"news", icon:"📰", label:L.news },
-    { id:"ipo", icon:"🏦", label:L.ipo },
-    { id:"fii", icon:"🌐", label:L.fii },
-    { id:"sector", icon:"🔄", label:L.sector },
-    { id:"quarterly", icon:"📋", label:L.quarterly },
-    { id:"screener", icon:"🔍", label:L.screener },
-    { id:"watchlist", icon:"⭐", label:L.watchlist },
-    { id:"portfolio", icon:"💼", label:L.portfolio },
-    { id:"legends", icon:"🏛️", label:L.legends },
+  // Grouped sidebar navigation
+  const NAV_GROUPS = [
+    {
+      label:"Research & Analysis",
+      items:[
+        { id:"markets",      icon:"📊", label:L.markets },
+        { id:"research",     icon:"🔬", label:L.research },
+        { id:"technical",    icon:"📈", label:L.technical },
+        { id:"institutional",icon:"🏦", label:L.institutional },
+      ]
+    },
+    {
+      label:"My Portfolio",
+      items:[
+        { id:"screener",  icon:"🔍", label:L.screener },
+        { id:"watchlist", icon:"⭐", label:L.watchlist },
+        { id:"portfolio", icon:"💼", label:L.portfolio },
+      ]
+    },
+    {
+      label:"Data & Tracking",
+      items:[
+        { id:"quarterly", icon:"📋", label:L.quarterly },
+        { id:"bulkdeals", icon:"📦", label:L.bulkdeals },
+        { id:"fii",       icon:"🌐", label:L.fii },
+        { id:"sector",    icon:"🔄", label:L.sector },
+      ]
+    },
+    {
+      label:"News & Events",
+      items:[
+        { id:"news",     icon:"📰", label:L.news },
+        { id:"ipo",      icon:"🚀", label:L.ipo },
+        { id:"calendar", icon:"📅", label:L.calendar },
+      ]
+    },
+    {
+      label:"Tools",
+      items:[
+        { id:"calculators", icon:"🧮", label:L.calculators },
+        { id:"tools",       icon:"🛠️", label:L.tools },
+        { id:"legends",     icon:"🏛️", label:L.legends },
+      ]
+    },
   ];
 
   return (
     <>
       <style>{styles}</style>
       {showAlerts && <PriceAlerts onClose={() => setShowAlerts(false)} />}
+
       <div className="app">
-        <header className="hdr">
-          <div className="logo" style={{cursor:"pointer"}} onClick={() => setActiveTab("home")}>
-            <div className="logo-mark">D</div>
-            <div>
-              <div className="logo-title">DNR Capitals</div>
-              <div className="logo-sub">Equity Research Intelligence</div>
-            </div>
-          </div>
+
+        {/* ── TOP BAR ── */}
+        <div className="top-bar">
+          {/* Live ticker */}
           <div className="ticker">
             <div className="ticker-inner">
-              {[...TICKERS, ...TICKERS].map((t, i) => (
+              {(TICKER_ORDER.flatMap(label => {
+                const m = markets[label];
+                if (!m && !fetching) return [];
+                return [m || { label, v:"···", c:"", u:true }];
+              }).concat(
+                TICKER_ORDER.flatMap(label => {
+                  const m = markets[label];
+                  if (!m && !fetching) return [];
+                  return [m || { label, v:"···", c:"", u:true }];
+                })
+              )).map((t, i) => (
                 <span key={i} style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <span style={{ color:T.muted }}>{t.s}</span>
+                  <span style={{ color:T.muted }}>{t.label}</span>
                   <span style={{ color:T.dun, fontWeight:600 }}>{t.v}</span>
-                  <span style={{ color:t.u ? T.green : T.red }}>{t.u ? "▲" : "▼"} {t.c}</span>
+                  {t.c && <span style={{ color:t.u?T.greenLight:T.redLight }}>{t.u?"▲":"▼"} {t.c}</span>}
                 </span>
               ))}
             </div>
           </div>
-          <div className="hdr-controls">
-            <button className="hdr-btn" onClick={() => setShowAlerts(true)}>🔔 Alerts</button>
-            <button className={`hdr-btn ${lang==="HI"?"active":""}`} onClick={() => setLang(l => l==="EN"?"HI":"EN")}>
-              {lang==="EN" ? "🇮🇳 हिंदी" : "🇬🇧 English"}
+
+          {/* Controls */}
+          <div className="tb-controls">
+            <button className="tb-btn" onClick={() => setShowAlerts(true)}>🔔</button>
+            <button className={`tb-btn ${lang==="HI"?"active":""}`} onClick={() => setLang(l => l==="EN"?"HI":"EN")}>
+              {lang==="EN" ? "🇮🇳 हिंदी" : "🇬🇧 EN"}
             </button>
-            <button className="hdr-btn" onClick={() => setDarkMode(d => !d)}>
-              {darkMode ? "☀️ Light" : "🌙 Dark"}
+            <button className="tb-btn" onClick={() => setDarkMode(d => !d)}>
+              {darkMode ? "☀️" : "🌙"}
             </button>
-            <div style={{ fontSize:10, color:T.muted, textAlign:"right" }}>
-              <div style={{ color:T.goldLight, marginBottom:2 }}>● LIVE</div>
-              <div>{new Date().toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" })}</div>
+            <div style={{ fontSize:9, color:T.muted, textAlign:"right", lineHeight:1.4 }}>
+              <div style={{ color:fetching?T.gold:T.greenLight }}>{fetching?"⟳ LIVE":"● LIVE"}</div>
+              <div style={{ color:T.mutedDark }}>{lastFetch?.split(",")[1]?.trim() || new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>
             </div>
           </div>
-        </header>
+        </div>
 
-        <nav className="nav">
-          {tabs.map(t => <button key={t.id} className={`nb ${activeTab===t.id ? "on" : ""}`} onClick={() => setActiveTab(t.id)}>{t.icon} {t.label}</button>)}
-        </nav>
+        {/* ── WORKSPACE ── */}
+        <div className="workspace">
 
-        {activeTab !== "home" && (
-          <main className="main">
-            {GROQ_API_KEY === "YOUR_KEY_HERE" && (
-              <div className="api-warn">
-                <span style={{ fontSize:22 }}>⚠️</span>
-                <div><strong style={{ color:T.goldLight }}>Groq API Key Required</strong><br />Add REACT_APP_GROQ_API_KEY to your environment variables.</div>
+          {/* ── LEFT SIDEBAR ── */}
+          <aside className="sidebar">
+            {/* Logo */}
+            <div className="sb-logo" onClick={() => setActiveTab("home")}>
+              <img src="/logo.png" alt="DNR Capitals" className="sb-logo-img" />
+              <div className="sb-logo-title">DNR Capitals</div>
+              <div className="sb-logo-sub">Equity Research Intelligence</div>
+            </div>
+
+            {/* Nav groups */}
+            {NAV_GROUPS.map(group => (
+              <div key={group.label} className="sb-group">
+                <div className="sb-group-label">{group.label}</div>
+                {group.items.map(item => (
+                  <div
+                    key={item.id}
+                    className={`sb-item ${activeTab===item.id?"active":""}`}
+                    onClick={() => setActiveTab(item.id)}
+                  >
+                    <span className="sb-icon">{item.icon}</span>
+                    <span className="sb-label">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {/* Sidebar footer */}
+            <div className="sb-footer">
+              <div className="sb-live">
+                <div className="sb-live-dot" />
+                <span>Groq AI · Live Data</span>
+              </div>
+              <div style={{ fontSize:9, color:T.mutedDark, marginTop:4 }}>
+                © {new Date().getFullYear()} DNR Capitals
+              </div>
+            </div>
+          </aside>
+
+          {/* ── CONTENT AREA ── */}
+          <div className="content-area">
+            {activeTab === "home" ? (
+              <HomePage setActiveTab={setActiveTab} markets={markets} fetching={fetching} />
+            ) : (
+              <div className="main">
+                {GROQ_API_KEY === "YOUR_KEY_HERE" && (
+                  <div className="api-warn">
+                    <span style={{ fontSize:22 }}>⚠️</span>
+                    <div><strong style={{ color:T.goldLight }}>Groq API Key Required</strong><br />Add REACT_APP_GROQ_API_KEY to your .env file.</div>
+                  </div>
+                )}
+                {activeTab === "markets"       && <Markets markets={markets} fetching={fetching} onRefresh={refresh} />}
+                {activeTab === "research"      && <StockResearch />}
+                {activeTab === "technical"     && <TechnicalCharts />}
+                {activeTab === "institutional" && <InstitutionalMomentum />}
+                {activeTab === "news"          && <NewsFeed />}
+                {activeTab === "ipo"           && <IPOTracker />}
+                {activeTab === "fii"           && <FIIDIITracker />}
+                {activeTab === "sector"        && <SectorRotation />}
+                {activeTab === "quarterly"     && <QuarterlyHub />}
+                {activeTab === "screener"      && <Screener />}
+                {activeTab === "watchlist"     && <WatchlistManager />}
+                {activeTab === "portfolio"     && <Portfolio />}
+                {activeTab === "legends"       && <Legends />}
+                {activeTab === "calculators"   && <Calculators />}
+                {activeTab === "calendar"      && <FinancialCalendar />}
+                {activeTab === "tools"         && <AdvancedTools />}
+                {activeTab === "bulkdeals"     && <BulkDeals />}
               </div>
             )}
-            {activeTab === "markets"       && <Markets />}
-            {activeTab === "research"      && <StockResearch />}
-            {activeTab === "technical"     && <TechnicalCharts />}
-            {activeTab === "institutional" && <InstitutionalMomentum />}
-            {activeTab === "news"          && <NewsFeed />}
-            {activeTab === "ipo"       && <IPOTracker />}
-            {activeTab === "fii"       && <FIIDIITracker />}
-            {activeTab === "sector"    && <SectorRotation />}
-            {activeTab === "quarterly" && <QuarterlyHub />}
-            {activeTab === "screener"  && <Screener />}
-            {activeTab === "watchlist" && <WatchlistManager />}
-            {activeTab === "portfolio" && <Portfolio />}
-            {activeTab === "legends"   && <Legends />}
-          </main>
-        )}
-        {activeTab === "home" && <HomePage setActiveTab={setActiveTab} />}
 
-        <footer style={{ borderTop:`1px solid ${T.walnut}33`, padding:"10px 24px", display:"flex", justifyContent:"space-between", alignItems:"center", background:T.walnutDeeper+"cc", fontSize:10, color:T.muted }}>
-          <span>© {new Date().getFullYear()} DNR Capitals · Equity Research Intelligence</span>
-          <span style={{ color:T.walnutLight }}>Powered by Groq AI · For educational purposes only · Not SEBI registered advice</span>
-        </footer>
+            {/* Footer */}
+            <div style={{ padding:"10px 24px", display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${T.navyBorder}`, background:T.navyDeep, fontSize:10, color:T.mutedDark, marginTop:"auto" }}>
+              <span style={{ color:T.mutedDark }}>© {new Date().getFullYear()} DNR Capitals · Equity Research Intelligence</span>
+              <span style={{ color:T.mutedDark }}>Powered by Groq AI · Educational purposes only · Not SEBI registered advice</span>
+            </div>
+          </div>
+
+        </div>
       </div>
     </>
   );

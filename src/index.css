@@ -5,9 +5,22 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Prevent layout shift from scrollbar appearing */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Selection highlight */
+::selection {
+  background: #C9A84C33;
+  color: #EAE0D5;
 }
