@@ -11,7 +11,7 @@ const GROQ_API_KEY = process.env.REACT_APP_GROQ_API_KEY || "";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── THEME — CARBON BLACK + NEON GREEN (Bloomberg/Reuters) ──────────────────
+// ─── THEME — CARBON BLACK + ELECTRIC BLUE + GOLD (Institutional) ──────────────────
 const T = {
   // Carbon black backgrounds
   navyDeepest: "#000000",
@@ -19,15 +19,15 @@ const T = {
   navy:        "#0A0A0A",
   navyMid:     "#0F0F0F",
   navyLight:   "#141414",
-  navyBorder:  "#1A2A1A",
-  navyHover:   "#0D1A0D",
-  navyActive:  "#0F2A0F",
+  navyBorder:  "#0A1428",
+  navyHover:   "#060D18",
+  navyActive:  "#060F2A",
   // Neon green matrix
-  matrixGreen:      "#00FF41",
-  matrixGreenDim:   "#00C832",
-  matrixGreenPale:  "#00FF4133",
-  matrixGreenGlow:  "#00FF4188",
-  matrixGreenDeep:  "#003A0F",
+  matrixGreen:      "#00C8FF",
+  matrixGreenDim:   "#0099CC",
+  matrixGreenPale:  "#00C8FF33",
+  matrixGreenGlow:  "#00C8FF88",
+  matrixGreenDeep:  "#002A3A",
   // Gold accents (kept for premium feel)
   gold:        "#C9A84C",
   goldLight:   "#E0BC6A",
@@ -35,14 +35,14 @@ const T = {
   goldDim:     "#9A7A38",
   goldGlow:    "#E0BC6A55",
   // Text
-  dun:         "#E8F5E8",
-  dunLight:    "#F0FFF0",
-  dunDark:     "#A8C8A8",
-  muted:       "#4A6A4A",
-  mutedDark:   "#2A4A2A",
+  dun:         "#E8F0FF",
+  dunLight:    "#F0F8FF",
+  dunDark:     "#A8C8E8",
+  muted:       "#2A4A6A",
+  mutedDark:   "#0A1E3A",
   // Semantic
-  green:       "#00FF41",
-  greenLight:  "#39FF14",
+  green:       "#00C8FF",
+  greenLight:  "#40D8FF",
   red:         "#FF3333",
   redLight:    "#FF6666",
   blue:        "#00BFFF",
@@ -53,15 +53,15 @@ const T = {
   cosmicBlueDim:   "#0D3A7A",
   cosmicBluePale:  "#5AAEFF",
   // Legacy aliases
-  walnut:       "#1A2A1A",
-  walnutLight:  "#243A24",
-  walnutDark:   "#0F1A0F",
+  walnut:       "#0A1428",
+  walnutLight:  "#0A1A38",
+  walnutDark:   "#060E1A",
   walnutDeep:   "#0A0A0A",
   walnutDeeper: "#050505",
-  cream:        "#E8F5E8",
+  cream:        "#E8F0FF",
   ink:          "#000000",
   // Light mode
-  surface:    "#F0FFF0",
+  surface:    "#F0F8FF",
   surfaceAlt: "#E0F0E0",
   border:     "#A0C0A0",
 };
@@ -535,14 +535,14 @@ const styles = `
     width:72px;height:72px;border-radius:50%;
     object-fit:cover;
     border:2px solid ${T.gold}66;
-    box-shadow:0 0 24px #00FF4144, 0 0 48px #E0BC6A33;
+    box-shadow:0 0 24px #00C8FF44, 0 0 48px #E0BC6A33;
     margin-bottom:10px;
     transition:box-shadow 0.3s;
   }
-  .sb-logo:hover .sb-logo-img{box-shadow:0 0 32px #00FF4177, 0 0 60px #E0BC6A55}
+  .sb-logo:hover .sb-logo-img{box-shadow:0 0 32px #00C8FF77, 0 0 60px #E0BC6A55}
   .sb-logo-title{
     font-family:'Cormorant Garamond',serif;
-    font-size:17px;font-weight:700;color:#00FF41;
+    font-size:17px;font-weight:700;color:#00C8FF;
     letter-spacing:0.5px;line-height:1;
   }
   .sb-logo-sub{
@@ -567,19 +567,19 @@ const styles = `
   }
   .sb-item:hover{
     color:#E8F5E8;background:#0A1A0A;
-    border-color:#0A2A0A;
+    border-color:#061A2A;
   }
   .sb-item.active{
-    color:#00FF41;
-    background:linear-gradient(135deg,#0A2A0A,#051505);
-    border-color:#00FF4133;
-    box-shadow:0 0 12px #00FF4122;
+    color:#00C8FF;
+    background:linear-gradient(135deg,#061A2A,#060A18);
+    border-color:#00C8FF33;
+    box-shadow:0 0 12px #00C8FF22;
   }
   .sb-item.active::before{
     content:'';position:absolute;left:8px;
     width:3px;height:20px;border-radius:2px;
-    background:linear-gradient(180deg,#39FF14,#00FF41);
-    box-shadow:0 0 8px #00FF41;
+    background:linear-gradient(180deg,#39FF14,#00C8FF);
+    box-shadow:0 0 8px #00C8FF;
   }
   .sb-item{position:relative;}
   .sb-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
@@ -594,7 +594,7 @@ const styles = `
     display:flex;align-items:center;gap:6px;
     font-size:9px;color:${T.muted};
   }
-  .sb-live-dot{width:6px;height:6px;border-radius:50%;background:#00FF41;animation:livePulse 2s infinite}
+  .sb-live-dot{width:6px;height:6px;border-radius:50%;background:#00C8FF;animation:livePulse 2s infinite}
   @keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 0 0 ${T.green}44}50%{opacity:0.7;box-shadow:0 0 0 4px transparent}}
 
   /* CONTENT AREA */
@@ -624,7 +624,7 @@ const styles = `
     font-size:10px;cursor:pointer;transition:all 0.18s;
     font-family:'Jost',sans-serif;letter-spacing:0.3px;
   }
-  .tb-btn:hover{background:#0A1A0A;border-color:#00FF4144;color:#00FF41}
+  .tb-btn:hover{background:#0A1A0A;border-color:#00C8FF44;color:#00C8FF}
   .tb-btn:active{transform:scale(0.97)}
   .tb-btn.active{background:${T.gold}22;border-color:${T.gold}66;color:${T.goldLight}}
 
@@ -1070,493 +1070,650 @@ function QuoteRotator() {
   }, []);
   return (
     <div style={{ transition: "opacity 0.5s", opacity: fade ? 1 : 0, textAlign: "center" }}>
+      <div className="hero-quote-text">"{QUOTES[idx].text}"</div>
+      <div className="hero-quote-author">— {QUOTES[idx].author}</div>
+    </div>
+  );
+}
+
 function HomePage({ setActiveTab, markets, fetching }) {
   const canvasRef   = useRef(null);
-  const [entered, setEntered]     = useState(false);
-  const [slideIdx, setSlideIdx]   = useState(0);
+  const animRef     = useRef(null);
+  const stateRef    = useRef(null);
+  const [entered,   setEntered]   = useState(false);
+  const [slideIdx,  setSlideIdx]  = useState(0);
   const [slideFade, setSlideFade] = useState(true);
-  const [counters, setCounters]   = useState({ stocks:0, research:0, accuracy:0, users:0 });
+  const [counters,  setCounters]  = useState({ stocks:0, research:0, accuracy:0, users:0 });
 
-  // ── Galaxy constellation canvas ──
+  // ─────────────────────────────────────────────────────────────
+  //  3D CINEMATIC SPACE ENGINE
+  //  Uses real 3D projection: objects have X,Y,Z coordinates.
+  //  As Z decreases → object rushes toward viewer, grows in size.
+  //  Gives the authentic NASA warp/flythrough feel.
+  // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let raf;
 
-    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    // Resize handler
+    const resize = () => {
+      canvas.width  = canvas.offsetWidth  || window.innerWidth;
+      canvas.height = canvas.offsetHeight || window.innerHeight;
+      if (stateRef.current) stateRef.current.needsReinit = true;
+    };
     resize();
     window.addEventListener('resize', resize);
 
-    const W = () => canvas.width, H = () => canvas.height;
+    // ── UTILITY ──────────────────────────────────────────────
+    const rand  = (min, max) => min + Math.random()*(max-min);
+    const lerp  = (a, b, t) => a + (b-a)*t;
 
-    // Stars
-    const stars = Array.from({length:200}, () => ({
-      x: Math.random(), y: Math.random(),
-      r: Math.random()*1.5+0.2,
-      pulse: Math.random()*Math.PI*2,
-      speed: 0.005+Math.random()*0.02,
-      color: Math.random()>0.7 ? '#00FF41' : Math.random()>0.5 ? '#E0BC6A' : '#FFFFFF',
-      alpha: 0.3+Math.random()*0.7,
-    }));
-
-    // Constellation nodes (market-themed)
-    const nodes = Array.from({length:28}, (_, i) => ({
-      x: 0.1+Math.random()*0.8,
-      y: 0.1+Math.random()*0.8,
-      vx: (Math.random()-0.5)*0.0003,
-      vy: (Math.random()-0.5)*0.0003,
-      r: 2+Math.random()*3,
-      pulse: Math.random()*Math.PI*2,
-      label: ['NIFTY','TCS','HDFC','RIL','INFY','BAJF','SBI','WIPRO','LT','TATAM',
-               'ADANI','ITC','HUL','AXIS','KOTAK','SUNP','DRRD','ONGC','COAL','NTPC',
-               'POWER','TITAN','ASIAN','NEST','DABUR','MARTI','HCLT','ICICI'][i%28],
-    }));
-
-    let t = 0;
-
-    const draw = () => {
-      const w = W(), h = H();
-      ctx.fillStyle = 'rgba(0,0,0,0.15)';
-      ctx.fillRect(0,0,w,h);
-
-      t += 0.008;
-
-      // Draw stars
-      stars.forEach(s => {
-        s.pulse += s.speed;
-        const alpha = s.alpha * (0.6 + 0.4*Math.sin(s.pulse));
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = s.color;
-        ctx.beginPath();
-        ctx.arc(s.x*w, s.y*h, s.r, 0, Math.PI*2);
-        ctx.fill();
-        ctx.restore();
-      });
-
-      // Move nodes
-      nodes.forEach(n => {
-        n.x += n.vx; n.y += n.vy;
-        if(n.x<0.05||n.x>0.95) n.vx*=-1;
-        if(n.y<0.05||n.y>0.95) n.vy*=-1;
-        n.pulse += 0.02;
-      });
-
-      // Draw constellation lines
-      for(let i=0;i<nodes.length;i++) {
-        for(let j=i+1;j<nodes.length;j++) {
-          const a = nodes[i], b = nodes[j];
-          const dx = (a.x-b.x)*w, dy = (a.y-b.y)*h;
-          const dist = Math.sqrt(dx*dx+dy*dy);
-          if(dist < w*0.18) {
-            const alpha = (1-dist/(w*0.18))*0.25;
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            ctx.strokeStyle = '#00FF41';
-            ctx.lineWidth = 0.5;
-            ctx.beginPath();
-            ctx.moveTo(a.x*w, a.y*h);
-            ctx.lineTo(b.x*w, b.y*h);
-            ctx.stroke();
-            ctx.restore();
-          }
-        }
-      }
-
-      // Draw nodes
-      nodes.forEach(n => {
-        const x=n.x*w, y=n.y*h;
-        const pulse = 0.6+0.4*Math.sin(n.pulse);
-        // Glow
-        ctx.save();
-        ctx.globalAlpha = 0.3*pulse;
-        const grd = ctx.createRadialGradient(x,y,0,x,y,n.r*6);
-        grd.addColorStop(0,'#00FF41');
-        grd.addColorStop(1,'transparent');
-        ctx.fillStyle = grd;
-        ctx.beginPath();
-        ctx.arc(x,y,n.r*6,0,Math.PI*2);
-        ctx.fill();
-        ctx.restore();
-        // Core
-        ctx.save();
-        ctx.globalAlpha = 0.8*pulse;
-        ctx.fillStyle = '#00FF41';
-        ctx.beginPath();
-        ctx.arc(x,y,n.r,0,Math.PI*2);
-        ctx.fill();
-        ctx.restore();
-        // Label
-        ctx.save();
-        ctx.globalAlpha = 0.35*pulse;
-        ctx.fillStyle = '#00FF41';
-        ctx.font = `7px 'DM Mono',monospace`;
-        ctx.fillText(n.label, x+n.r+3, y+3);
-        ctx.restore();
-      });
-
-      // Falling matrix rain columns (subtle)
-      for(let col=0; col<Math.floor(w/18); col++) {
-        const x = col*18;
-        const drop = ((t*60 + col*37) % (h+200)) - 100;
-        ctx.save();
-        ctx.globalAlpha = 0.06;
-        ctx.fillStyle = '#00FF41';
-        ctx.font = '10px monospace';
-        ctx.fillText(String.fromCharCode(0x30A0+Math.floor(Math.random()*96)), x, drop);
-        ctx.restore();
-      }
-
-      raf = requestAnimationFrame(draw);
+    // 3D → 2D projection
+    const project = (x3, y3, z3, fov, cx, cy) => {
+      if (z3 <= 0) return null;
+      const scale = fov / z3;
+      return { x: cx + x3*scale, y: cy + y3*scale, scale };
     };
 
-    draw();
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize); };
+    // Hex to rgba
+    const rgba = (hex, a) => {
+      const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+      return `rgba(${r},${g},${b},${a})`;
+    };
+
+    // NASA star temperature colors
+    const STAR_COLS = [
+      '#B0C4FF','#C8D8FF','#DCE8FF', // O/B blue-white (hottest)
+      '#FFFFFF','#FFF8F0',            // A white
+      '#FFEEBB','#FFD980',            // F/G yellow-white, yellow (Sun-like)
+      '#FFB347','#FF8C42',            // K orange
+      '#FF6347','#FF4500',            // M red-orange (Betelgeuse)
+    ];
+
+    // ── INIT SCENE ────────────────────────────────────────────
+    const initScene = () => {
+      const W = canvas.width, H = canvas.height;
+      const FOV = Math.min(W, H) * 0.8;
+      const CX  = W/2, CY = H/2;
+      const DEPTH = 2000;
+
+      // ── STAR FIELD  (3D warp-style) ──
+      // Each star: x,y in 3D space, z = depth (DEPTH=far, 0=at viewer)
+      // On each frame z decreases → star rushes toward you, gets bigger
+      const NUM_STARS = 600;
+      const stars = Array.from({length: NUM_STARS}, () => ({
+        x:   rand(-W*2, W*2),
+        y:   rand(-H*2, H*2),
+        z:   rand(1, DEPTH),
+        pz:  0,           // previous z for trail
+        col: STAR_COLS[Math.floor(Math.pow(Math.random(),2)*STAR_COLS.length)],
+        size: rand(0.4, 2.2),
+      }));
+      // Store prev position for velocity trails
+      stars.forEach(s => { s.pz = s.z; });
+
+      // ── BLACK HOLE (3D positioned, breathes in/out) ──
+      const blackHole = {
+        x3: -W*0.3, y3: H*0.1, z3: 600,
+        vz: -0.15,               // drifting toward viewer
+        targetZ: 400,
+        baseRadius: 70,
+        diskAngle: 0,
+        pulse: 0,
+      };
+
+      // ── NEBULAE CLOUDS (3D positioned, parallax) ──
+      const nebulae = [
+        { x3:-W*0.6, y3:-H*0.4, z3:900, vz:-0.04, baseR:180, color1:'#880E4F', color2:'#CE93D8', alpha:0.12, rot:0, rotSpeed:0.0002 },
+        { x3: W*0.5, y3: H*0.3, z3:1200,vz:-0.03, baseR:220, color1:'#0D47A1', color2:'#E53935', alpha:0.10, rot:1, rotSpeed:-0.0001 },
+        { x3: W*0.1, y3:-H*0.5, z3:800, vz:-0.05, baseR:160, color1:'#1B5E20', color2:'#CDDC39', alpha:0.10, rot:2, rotSpeed:0.0003 },
+        { x3:-W*0.2, y3: H*0.6, z3:1400,vz:-0.02, baseR:250, color1:'#BF360C', color2:'#FFD740', alpha:0.09, rot:0.5, rotSpeed:0.0001 },
+        { x3: W*0.7, y3:-H*0.2, z3:1000,vz:-0.035,baseR:190, color1:'#006064', color2:'#80DEEA', alpha:0.11, rot:1.5, rotSpeed:-0.0002 },
+      ];
+
+      // ── PLANETS (3D orbit + z-depth zoom) ──
+      const planets = [
+        {
+          name:'Jupiter-class',
+          x3: W*0.5, y3:-H*0.2, z3:500, vz:-0.06,
+          orbitT:0, orbitSpeed:0.004, orbitRx:80, orbitRy:30,
+          baseR:32, color:'#CC7B3A', band:'#D4945A', atmosphere:'#FF9A5A44',
+          rings:false,
+        },
+        {
+          name:'Ice Giant',
+          x3:-W*0.4, y3: H*0.35, z3:700, vz:-0.04,
+          orbitT:2, orbitSpeed:0.003, orbitRx:60, orbitRy:22,
+          baseR:22, color:'#4DD0E1', band:'#80DEEA', atmosphere:'#4DD0E133',
+          rings:true,
+        },
+        {
+          name:'Lava World',
+          x3: W*0.2, y3: H*0.5, z3:900, vz:-0.03,
+          orbitT:4, orbitSpeed:0.006, orbitRx:40, orbitRy:15,
+          baseR:16, color:'#B71C1C', band:'#E53935', atmosphere:'#FF572244',
+          rings:false,
+        },
+      ];
+
+      // ── SHOOTING STARS ──
+      const shooters = [];
+      const spawnShooter = () => {
+        if (shooters.length >= 4) return;
+        shooters.push({
+          x: rand(0, W), y: rand(0, H*0.5),
+          vx: rand(5, 10), vy: rand(1.5, 4),
+          len: rand(80, 160), alpha: 1,
+          col: Math.random()>0.5 ? '#FFFFFF' : '#FFE8A0',
+        });
+      };
+
+      return { W, H, FOV, CX, CY, DEPTH, stars, blackHole, nebulae, planets, shooters, spawnShooter, t:0, needsReinit:false };
+    };
+
+    stateRef.current = initScene();
+
+    // ── DRAW LOOP ──────────────────────────────────────────────
+    const draw = () => {
+      const s = stateRef.current;
+      if (!s) return;
+      if (s.needsReinit) { stateRef.current = initScene(); return; }
+
+      const { W, H, FOV, CX, CY, DEPTH } = s;
+      s.t++;
+      const speed = 1.8; // warp speed — how fast stars rush at you
+
+      // Background — deep space, not pure black
+      ctx.fillStyle = '#010208';
+      ctx.fillRect(0, 0, W, H);
+
+      // Milky Way ambient glow
+      const mwGrad = ctx.createLinearGradient(0, H*0.25, W, H*0.75);
+      mwGrad.addColorStop(0,   'rgba(0,0,0,0)');
+      mwGrad.addColorStop(0.3, 'rgba(25,15,50,0.12)');
+      mwGrad.addColorStop(0.5, 'rgba(40,25,70,0.18)');
+      mwGrad.addColorStop(0.7, 'rgba(25,15,50,0.12)');
+      mwGrad.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = mwGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // ── 1. NEBULAE (back layer, large, parallax) ──
+      s.nebulae.forEach(n => {
+        n.z3 -= n.vz;
+        n.rot += n.rotSpeed;
+        if (n.z3 < 200) n.z3 = DEPTH;
+        const p = project(n.x3, n.y3, n.z3, FOV, CX, CY);
+        if (!p) return;
+        const r = n.baseR * p.scale;
+        if (r < 1) return;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(n.rot);
+
+        // Multi-layer radial gradient nebula
+        const alpha = Math.min(n.alpha, n.alpha * (1 - n.z3/DEPTH * 0.5) * 3);
+        const g1 = ctx.createRadialGradient(0,0,0, 0,0, r);
+        g1.addColorStop(0,   rgba(n.color1, alpha*1.5));
+        g1.addColorStop(0.4, rgba(n.color1, alpha*0.8));
+        g1.addColorStop(0.7, rgba(n.color2, alpha*0.4));
+        g1.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = g1;
+        ctx.scale(1, 0.6);
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI*2);
+        ctx.fill();
+
+        // Second wisp
+        ctx.scale(1, 1.4);
+        ctx.rotate(1.2);
+        const g2 = ctx.createRadialGradient(r*0.2, r*0.1, 0, r*0.2, r*0.1, r*0.7);
+        g2.addColorStop(0,   rgba(n.color2, alpha*0.8));
+        g2.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.fillStyle = g2;
+        ctx.beginPath();
+        ctx.arc(r*0.2, r*0.1, r*0.7, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
+      });
+
+      // ── 2. WARP STAR FIELD (core 3D effect) ──
+      s.stars.forEach(st => {
+        st.pz = st.z;
+        st.z -= speed;
+        if (st.z <= 1) {
+          // Reset to far distance with new random position
+          st.x  = rand(-W*2, W*2);
+          st.y  = rand(-H*2, H*2);
+          st.z  = DEPTH;
+          st.pz = DEPTH;
+        }
+
+        // Current projected position
+        const cur  = project(st.x, st.y, st.z,  FOV, CX, CY);
+        const prev = project(st.x, st.y, st.pz, FOV, CX, CY);
+        if (!cur || !prev) return;
+
+        const radius = Math.max(0.3, st.size * cur.scale * 1.2);
+        const alpha  = Math.min(1, (1 - st.z/DEPTH) * 1.4);
+
+        // Draw velocity trail (streak as star rushes toward viewer)
+        const trailLen = Math.sqrt(Math.pow(cur.x-prev.x,2)+Math.pow(cur.y-prev.y,2));
+        if (trailLen > 0.5) {
+          const tGrad = ctx.createLinearGradient(prev.x, prev.y, cur.x, cur.y);
+          tGrad.addColorStop(0, 'rgba(0,0,0,0)');
+          tGrad.addColorStop(1, rgba(st.col, alpha*0.7));
+          ctx.save();
+          ctx.strokeStyle = tGrad;
+          ctx.lineWidth   = radius * 0.8;
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(cur.x,  cur.y);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Star core — glows and grows as it approaches
+        if (radius > 0.3) {
+          // Glow for bright close stars
+          if (radius > 2) {
+            const glowGrad = ctx.createRadialGradient(cur.x,cur.y,0, cur.x,cur.y, radius*4);
+            glowGrad.addColorStop(0, rgba(st.col, alpha*0.4));
+            glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.save();
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(cur.x, cur.y, radius*4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+
+            // Diffraction cross
+            ctx.save();
+            ctx.globalAlpha = alpha*0.25;
+            ctx.strokeStyle = st.col;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath(); ctx.moveTo(cur.x-radius*5,cur.y); ctx.lineTo(cur.x+radius*5,cur.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cur.x,cur.y-radius*5); ctx.lineTo(cur.x,cur.y+radius*5); ctx.stroke();
+            ctx.restore();
+          }
+
+          ctx.save();
+          ctx.globalAlpha = Math.min(alpha, 1);
+          ctx.fillStyle   = st.col;
+          ctx.beginPath();
+          ctx.arc(cur.x, cur.y, radius, 0, Math.PI*2);
+          ctx.fill();
+          ctx.restore();
+        }
+      });
+
+      // ── 3. PLANETS (3D orbit + zoom in/out) ──
+      s.planets.forEach(pl => {
+        pl.orbitT += pl.orbitSpeed;
+        pl.x3 += Math.cos(pl.orbitT) * 0.3;
+        pl.y3 += Math.sin(pl.orbitT) * 0.15;
+        pl.z3 -= pl.vz;
+        if (pl.z3 < 100) pl.z3 = 1100;
+        if (pl.z3 > 1200) pl.z3 = 150;
+
+        const p = project(pl.x3, pl.y3, pl.z3, FOV, CX, CY);
+        if (!p) return;
+        const r = pl.baseR * p.scale;
+        if (r < 0.5) return;
+
+        // Atmosphere glow
+        const atmosGrad = ctx.createRadialGradient(p.x, p.y, r*0.7, p.x, p.y, r*2.5);
+        atmosGrad.addColorStop(0,   rgba(pl.atmosphere.slice(0,7), parseFloat('0x'+pl.atmosphere.slice(7,9))/255 * 0.8 || 0.15));
+        atmosGrad.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.save(); ctx.fillStyle = atmosGrad;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r*2.5, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+
+        // Planet sphere with 3D shading
+        const sphereGrad = ctx.createRadialGradient(p.x-r*0.35, p.y-r*0.35, 0, p.x, p.y, r);
+        sphereGrad.addColorStop(0,   lightenColor(pl.band, 0.45));
+        sphereGrad.addColorStop(0.35, pl.band);
+        sphereGrad.addColorStop(0.7,  pl.color);
+        sphereGrad.addColorStop(1,    darkenColor(pl.color, 0.6));
+        ctx.save(); ctx.fillStyle = sphereGrad;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+
+        // Cloud bands
+        for (let b=0; b<3; b++) {
+          const by = p.y - r*0.5 + b*r*0.4;
+          ctx.save();
+          ctx.globalAlpha = 0.15;
+          ctx.strokeStyle = lightenColor(pl.band, 0.3);
+          ctx.lineWidth   = r*0.18;
+          ctx.beginPath();
+          ctx.ellipse(p.x, by, r*0.9, r*0.08, 0, 0, Math.PI*2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Ring system
+        if (pl.rings) {
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          const rGrad = ctx.createLinearGradient(-r*2.5,0, r*2.5,0);
+          rGrad.addColorStop(0,   'rgba(180,220,255,0)');
+          rGrad.addColorStop(0.3, 'rgba(180,220,255,0.4)');
+          rGrad.addColorStop(0.5, 'rgba(200,235,255,0.55)');
+          rGrad.addColorStop(0.7, 'rgba(180,220,255,0.4)');
+          rGrad.addColorStop(1,   'rgba(180,220,255,0)');
+          ctx.strokeStyle = rGrad;
+          ctx.lineWidth = r*0.28;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, r*2.3, r*0.55, 0.25, 0, Math.PI*2);
+          ctx.stroke();
+          ctx.lineWidth = r*0.14;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, r*2.8, r*0.68, 0.25, 0, Math.PI*2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Terminator (shadow line)
+        const shadowGrad = ctx.createRadialGradient(p.x+r*0.4, p.y+r*0.3, 0, p.x, p.y, r);
+        shadowGrad.addColorStop(0,   'rgba(0,0,0,0)');
+        shadowGrad.addColorStop(0.5, 'rgba(0,0,0,0.1)');
+        shadowGrad.addColorStop(1,   'rgba(0,0,8,0.7)');
+        ctx.save(); ctx.fillStyle = shadowGrad;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+      });
+
+      // ── 4. BLACK HOLE (dramatic 3D zoom) ──
+      (() => {
+        const bh = s.blackHole;
+        bh.pulse += 0.012;
+        bh.diskAngle += 0.006;
+
+        // Breathe Z in and out — creates zoom effect
+        bh.z3 += bh.vz;
+        if (bh.z3 < 280) bh.vz =  0.12;
+        if (bh.z3 > 750) bh.vz = -0.12;
+
+        const p = project(bh.x3, bh.y3, bh.z3, FOV, CX, CY);
+        if (!p) return;
+        const rs = bh.baseRadius * p.scale;
+        if (rs < 2) return;
+
+        const cx2 = p.x, cy2 = p.y;
+
+        // Outer gravitational lensing halo
+        const lensGrad = ctx.createRadialGradient(cx2,cy2, rs, cx2,cy2, rs*6);
+        lensGrad.addColorStop(0,   'rgba(0,0,0,0.98)');
+        lensGrad.addColorStop(0.2, 'rgba(5,3,0,0.7)');
+        lensGrad.addColorStop(0.4, 'rgba(15,8,2,0.3)');
+        lensGrad.addColorStop(0.7, 'rgba(8,4,0,0.12)');
+        lensGrad.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.save(); ctx.fillStyle = lensGrad;
+        ctx.beginPath(); ctx.arc(cx2,cy2, rs*6, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+
+        // Accretion disk (EHT-accurate perspective ellipse)
+        ctx.save();
+        ctx.translate(cx2, cy2);
+        ctx.rotate(bh.diskAngle);
+
+        const diskLayers = [
+          { rx:rs*3.8, ry:rs*0.85, col:'rgba(255,110,0,0.06)',  lw:rs*1.0 },
+          { rx:rs*3.0, ry:rs*0.68, col:'rgba(255,140,0,0.12)',  lw:rs*0.7 },
+          { rx:rs*2.3, ry:rs*0.52, col:'rgba(255,175,30,0.22)', lw:rs*0.55 },
+          { rx:rs*1.8, ry:rs*0.38, col:'rgba(255,210,80,0.38)', lw:rs*0.42 },
+          { rx:rs*1.42,ry:rs*0.28, col:'rgba(255,235,140,0.55)',lw:rs*0.32 },
+          { rx:rs*1.18,ry:rs*0.20, col:'rgba(200,225,255,0.72)',lw:rs*0.22 }, // inner: hot blue-white
+        ];
+        diskLayers.forEach(dl => {
+          ctx.save();
+          ctx.strokeStyle = dl.col;
+          ctx.lineWidth   = dl.lw;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, dl.rx, dl.ry, 0, 0, Math.PI*2);
+          ctx.stroke();
+          ctx.restore();
+        });
+
+        // Photon ring Doppler brightening — bright arc on approaching side
+        for (let seg = 0; seg < 80; seg++) {
+          const a1 = (seg/80)*Math.PI*2;
+          const a2 = ((seg+1)/80)*Math.PI*2;
+          const bright = 0.3 + 0.7*Math.pow(Math.max(0, Math.sin(a1+Math.PI*0.6)), 1.5);
+          const r2 = 255, g2 = Math.floor(160+80*bright), b2 = Math.floor(60*bright);
+          ctx.save();
+          ctx.strokeStyle = `rgba(${r2},${g2},${b2},${0.6*bright})`;
+          ctx.lineWidth   = rs * 0.14;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, rs*1.25, rs*0.26, 0, a1, a2);
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.restore();
+
+        // Event horizon — absolute black
+        ctx.save();
+        ctx.fillStyle = '#000000';
+        ctx.beginPath(); ctx.arc(cx2, cy2, rs, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+
+        // Relativistic jets (pulsing brightness)
+        const jetBright = 0.5 + 0.5*Math.sin(bh.pulse);
+        const jetLen    = rs * 6;
+        [[0,-jetLen],[0,jetLen]].forEach(([dx,dy]) => {
+          const jGrad = ctx.createLinearGradient(cx2,cy2, cx2+dx,cy2+dy);
+          jGrad.addColorStop(0,   `rgba(180,220,255,${0.75*jetBright})`);
+          jGrad.addColorStop(0.3, `rgba(100,170,255,${0.4*jetBright})`);
+          jGrad.addColorStop(1,   'rgba(60,120,200,0)');
+          ctx.save();
+          ctx.strokeStyle = jGrad;
+          ctx.lineWidth   = rs * 0.22;
+          ctx.lineCap     = 'round';
+          ctx.beginPath(); ctx.moveTo(cx2,cy2); ctx.lineTo(cx2+dx,cy2+dy); ctx.stroke();
+          ctx.restore();
+        });
+      })();
+
+      // ── 5. SHOOTING STARS ──
+      if (Math.random() < 0.006) s.spawnShooter();
+      for (let i = s.shooters.length-1; i >= 0; i--) {
+        const sh = s.shooters[i];
+        const tGrad = ctx.createLinearGradient(sh.x,sh.y, sh.x-sh.vx*sh.len/6, sh.y-sh.vy*sh.len/6);
+        tGrad.addColorStop(0, rgba(sh.col, sh.alpha));
+        tGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.save();
+        ctx.strokeStyle = tGrad;
+        ctx.lineWidth   = 1.5;
+        ctx.beginPath(); ctx.moveTo(sh.x,sh.y); ctx.lineTo(sh.x-sh.vx*sh.len/6,sh.y-sh.vy*sh.len/6); ctx.stroke();
+        ctx.restore();
+        sh.x += sh.vx; sh.y += sh.vy; sh.alpha -= 0.016;
+        if (sh.alpha <= 0) s.shooters.splice(i, 1);
+      }
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    // ── COLOR HELPERS ──
+    function lightenColor(hex, amt) {
+      const r=Math.min(255,parseInt(hex.slice(1,3),16)+Math.floor(255*amt));
+      const g=Math.min(255,parseInt(hex.slice(3,5),16)+Math.floor(255*amt));
+      const b=Math.min(255,parseInt(hex.slice(5,7),16)+Math.floor(255*amt));
+      return `rgb(${r},${g},${b})`;
+    }
+    function darkenColor(hex, amt) {
+      const r=Math.max(0,parseInt(hex.slice(1,3),16)-Math.floor(255*amt));
+      const g=Math.max(0,parseInt(hex.slice(3,5),16)-Math.floor(255*amt));
+      const b=Math.max(0,parseInt(hex.slice(5,7),16)-Math.floor(255*amt));
+      return `rgb(${r},${g},${b})`;
+    }
+
+    animRef.current = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      window.removeEventListener('resize', resize);
+      stateRef.current = null;
+    };
   }, []);
 
   // ── Animated counters ──
   useEffect(() => {
     const targets = { stocks:30, research:18, accuracy:94, users:1200 };
-    const duration = 2500;
     const start = Date.now();
     const tick = () => {
-      const elapsed = Date.now()-start;
-      const prog = Math.min(elapsed/duration, 1);
-      const ease = 1-Math.pow(1-prog, 3);
-      setCounters({
-        stocks:   Math.floor(ease*targets.stocks),
-        research: Math.floor(ease*targets.research),
-        accuracy: Math.floor(ease*targets.accuracy),
-        users:    Math.floor(ease*targets.users),
-      });
-      if(prog<1) requestAnimationFrame(tick);
+      const prog = Math.min((Date.now()-start)/2800, 1);
+      const ease = 1-Math.pow(1-prog,3);
+      setCounters({ stocks:Math.floor(ease*targets.stocks), research:Math.floor(ease*targets.research), accuracy:Math.floor(ease*targets.accuracy), users:Math.floor(ease*targets.users) });
+      if (prog < 1) requestAnimationFrame(tick);
     };
-    const timer = setTimeout(tick, 800);
-    return () => clearTimeout(timer);
+    setTimeout(tick, 1200);
   }, []);
 
-  // ── Auto-advance slides ──
+  // ── Slides ──
   const SLIDES = [
-    { type:"quote", text:"The stock market is a device for transferring money from the impatient to the patient.", author:"Warren Buffett", tag:"Investment Philosophy" },
-    { type:"insight", text:"NIFTY 50 has delivered 14.8% CAGR over the last 20 years — outperforming every major asset class in India.", author:"DNR Research", tag:"Market Insight" },
-    { type:"quote", text:"In the short run the market is a voting machine. In the long run it is a weighing machine.", author:"Benjamin Graham", tag:"Timeless Wisdom" },
-    { type:"insight", text:"FIIs have invested over ₹2.5 lakh crore in Indian equities in the last 3 years despite global headwinds.", author:"DNR Data", tag:"Institutional Flow" },
-    { type:"quote", text:"Risk comes from not knowing what you are doing.", author:"Warren Buffett", tag:"Risk Management" },
-    { type:"insight", text:"Indian mutual fund AUM crossed ₹54 lakh crore — retail participation in equities at an all-time high.", author:"AMFI Data", tag:"Market Milestone" },
-    { type:"quote", text:"Know what you own, and know why you own it.", author:"Peter Lynch", tag:"Investment Principle" },
-    { type:"insight", text:"Q3FY25 earnings season showed 18% average revenue growth across NIFTY 50 companies — broad-based recovery.", author:"DNR Analysis", tag:"Earnings Update" },
+    { text:"The stock market is a device for transferring money from the impatient to the patient.", author:"Warren Buffett", tag:"Investment Philosophy" },
+    { text:"NIFTY 50 has delivered 14.8% CAGR over 20 years — outperforming every major asset class in India.", author:"DNR Research", tag:"Market Insight" },
+    { text:"In the short run the market is a voting machine. In the long run it is a weighing machine.", author:"Benjamin Graham", tag:"Timeless Wisdom" },
+    { text:"FIIs have invested over ₹2.5 lakh crore in Indian equities in 3 years despite global headwinds.", author:"DNR Data", tag:"Institutional Flow" },
+    { text:"Risk comes from not knowing what you are doing.", author:"Warren Buffett", tag:"Risk Management" },
+    { text:"Indian MF AUM crossed ₹54 lakh crore — retail participation at an all-time high.", author:"AMFI Data", tag:"Market Milestone" },
+    { text:"Know what you own, and know why you own it.", author:"Peter Lynch", tag:"Investment Principle" },
+    { text:"Q3FY25 earnings showed 18% average revenue growth across NIFTY 50 — broad recovery.", author:"DNR Analysis", tag:"Earnings Update" },
   ];
-
   useEffect(() => {
-    const t = setInterval(() => {
+    const ti = setInterval(() => {
       setSlideFade(false);
-      setTimeout(() => { setSlideIdx(i => (i+1)%SLIDES.length); setSlideFade(true); }, 500);
+      setTimeout(() => { setSlideIdx(i=>(i+1)%SLIDES.length); setSlideFade(true); }, 500);
     }, 5000);
-    return () => clearInterval(t);
+    return () => clearInterval(ti);
   }, []);
 
-  // ── Live price tiles ──
   const PRICE_TILES = [
-    { key:"NIFTY 50",  icon:"📊", color:"#00FF41" },
-    { key:"SENSEX",    icon:"📈", color:"#E0BC6A" },
-    { key:"NIFTY BANK",icon:"🏦", color:"#00BFFF" },
-    { key:"GOLD (₹)",  icon:"🥇", color:"#FFD700" },
-    { key:"CRUDE",     icon:"🛢️", color:"#FF6B35" },
-    { key:"USD/INR",   icon:"💱", color:"#A855F7" },
+    { key:"NIFTY 50",   icon:"📊", color:"#E0BC6A" },
+    { key:"SENSEX",     icon:"📈", color:"#60A5FA" },
+    { key:"NIFTY BANK", icon:"🏦", color:"#A78BFA" },
+    { key:"GOLD (₹)",   icon:"🥇", color:"#FCD34D" },
+    { key:"CRUDE",      icon:"🛢️", color:"#FB923C" },
+    { key:"USD/INR",    icon:"💱", color:"#34D399" },
   ];
 
   if (!entered) {
-    // ── CINEMATIC ENTRY SCREEN ──
     return (
-      <div style={{
-        position:"relative", width:"100%", height:"calc(100vh - 48px)",
-        background:"#000", overflow:"hidden",
-        display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-      }}>
+      <div style={{ position:"relative", width:"100%", height:"calc(100vh - 48px)", overflow:"hidden", background:"#010208" }}>
         <canvas ref={canvasRef} style={{ position:"absolute", inset:0, width:"100%", height:"100%" }} />
-        <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 80% 80% at 50% 50%, transparent 20%, #00000099 100%)", pointerEvents:"none" }} />
-
-        {/* Logo */}
-        <div style={{ position:"relative", zIndex:10, textAlign:"center", animation:"entryFadeUp 1.2s ease forwards" }}>
-          <div style={{ position:"relative", display:"inline-block", marginBottom:32 }}>
-            {/* Outer rings */}
-            {[100,120,140].map((size,i) => (
-              <div key={i} style={{
-                position:"absolute",
-                top:`${-((size-80)/2)}px`, left:`${-((size-80)/2)}px`,
-                width:size, height:size, borderRadius:"50%",
-                border:`1px solid ${i===0?"#00FF41":i===1?"#E0BC6A33":"#00FF4118"}`,
-                animation:`spin${i===1?"Rev":""}${60+i*20}s ${60+i*20}s linear infinite`,
-              }}/>
+        <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 65% 65% at 50% 50%, rgba(1,2,8,0.3) 0%, rgba(1,2,8,0.92) 100%)", pointerEvents:"none" }} />
+        <div style={{ position:"relative", zIndex:10, height:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", textAlign:"center", padding:"0 40px" }}>
+          <div style={{ position:"relative", marginBottom:40, animation:"csmFade 1.4s ease forwards" }}>
+            {[160,184,210].map((sz,i) => (
+              <div key={i} style={{ position:"absolute", top:`${-((sz-120)/2)}px`, left:`${-((sz-120)/2)}px`, width:sz, height:sz, borderRadius:"50%", border:`1px solid ${['#E0BC6A55','#60A5FA33','#A78BFA22'][i]}`, animation:`csmSpin${['60','90','120'][i]} ${['60','90','120'][i]}s linear infinite ${i===1?'reverse':''}` }}/>
             ))}
-            <img src="/logo.png" alt="DNR Capitals" style={{
-              width:140, height:140, borderRadius:"50%", objectFit:"cover",
-              border:"2px solid #00FF4166",
-              boxShadow:"0 0 60px #00FF4144, 0 0 120px #00FF4122, 0 0 30px #E0BC6A33",
-              position:"relative", zIndex:2,
-            }}/>
+            <img src="/logo.png" alt="DNR Capitals" style={{ width:120, height:120, borderRadius:"50%", objectFit:"cover", border:"2px solid #E0BC6A77", boxShadow:"0 0 70px #E0BC6A66,0 0 140px #60A5FA33,0 0 35px #A78BFA22", position:"relative", zIndex:2 }}/>
           </div>
-
-          <div style={{ fontSize:9, color:"#00FF41", letterSpacing:"8px", textTransform:"uppercase", marginBottom:16, opacity:0.8 }}>
-            DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE
-          </div>
-
-          <h1 style={{
-            fontFamily:"'Cormorant Garamond',serif",
-            fontSize:"clamp(48px,8vw,96px)", fontWeight:700,
-            color:"#F0FFF0", lineHeight:0.9,
-            textShadow:"0 0 80px #00FF4122",
-            marginBottom:8,
-          }}>Know Before</h1>
-          <h1 style={{
-            fontFamily:"'Cormorant Garamond',serif",
-            fontSize:"clamp(48px,8vw,96px)", fontWeight:700,
-            fontStyle:"italic", color:"#E0BC6A",
-            textShadow:"0 0 60px #E0BC6A44",
-            marginBottom:40, display:"block",
-          }}>You Invest</h1>
-
-          <button onClick={() => setEntered(true)} style={{
-            padding:"16px 48px",
-            background:"transparent",
-            border:"1px solid #00FF41",
-            borderRadius:4,
-            color:"#00FF41",
-            fontFamily:"'Jost',sans-serif",
-            fontSize:13, fontWeight:600,
-            letterSpacing:"4px", textTransform:"uppercase",
-            cursor:"pointer",
-            position:"relative",
-            overflow:"hidden",
-            transition:"all 0.3s",
-            boxShadow:"0 0 20px #00FF4133, inset 0 0 20px #00FF4108",
-          }}
-          onMouseEnter={e => {
-            e.target.style.background="#00FF4115";
-            e.target.style.boxShadow="0 0 40px #00FF4166, inset 0 0 30px #00FF4115";
-            e.target.style.letterSpacing="6px";
-          }}
-          onMouseLeave={e => {
-            e.target.style.background="transparent";
-            e.target.style.boxShadow="0 0 20px #00FF4133, inset 0 0 20px #00FF4108";
-            e.target.style.letterSpacing="4px";
-          }}>
-            ▶ &nbsp; ENTER PLATFORM
+          <div style={{ fontSize:9, color:"#E0BC6A", letterSpacing:"8px", textTransform:"uppercase", marginBottom:22, opacity:0.85, animation:"csmFade 1.7s ease forwards" }}>DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE</div>
+          <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(56px,9vw,112px)", fontWeight:700, color:"#F0F8FF", lineHeight:0.88, textShadow:"0 0 120px #60A5FA18", marginBottom:10, animation:"csmFade 1.9s ease forwards" }}>Know Before</h1>
+          <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(56px,9vw,112px)", fontWeight:700, fontStyle:"italic", color:"#E0BC6A", textShadow:"0 0 90px #E0BC6A55", marginBottom:52, display:"block", animation:"csmFade 2.1s ease forwards" }}>You Invest</h1>
+          <button onClick={() => setEntered(true)} style={{ padding:"16px 60px", background:"transparent", border:"1px solid #E0BC6A88", borderRadius:2, color:"#E0BC6A", fontFamily:"'Jost',sans-serif", fontSize:11, fontWeight:600, letterSpacing:"6px", textTransform:"uppercase", cursor:"pointer", transition:"all 0.4s", boxShadow:"0 0 28px #E0BC6A22,inset 0 0 28px #E0BC6A08", animation:"csmFade 2.3s ease forwards" }}
+            onMouseEnter={e=>{e.target.style.background="#E0BC6A15";e.target.style.boxShadow="0 0 60px #E0BC6A55,inset 0 0 40px #E0BC6A18";e.target.style.letterSpacing="9px"}}
+            onMouseLeave={e=>{e.target.style.background="transparent";e.target.style.boxShadow="0 0 28px #E0BC6A22,inset 0 0 28px #E0BC6A08";e.target.style.letterSpacing="6px"}}>
+            ◈ &nbsp; ENTER PLATFORM
           </button>
-
-          <div style={{ marginTop:24, fontSize:10, color:"#2A4A2A", letterSpacing:"2px" }}>
-            POWERED BY GROQ AI · REAL-TIME DATA · 18 RESEARCH DIMENSIONS
-          </div>
+          <div style={{ marginTop:30, fontSize:9, color:"#0A1428", letterSpacing:"2px", animation:"csmFade 2.5s ease forwards" }}>POWERED BY GROQ AI · REAL-TIME DATA · 18 RESEARCH DIMENSIONS</div>
         </div>
-
         <style>{`
-          @keyframes entryFadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
-          @keyframes spin60s { to{transform:rotate(360deg)} }
-          @keyframes spinRev80s { to{transform:rotate(-360deg)} }
+          @keyframes csmFade{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+          @keyframes csmSpin60{to{transform:rotate(360deg)}}
+          @keyframes csmSpin90{to{transform:rotate(-360deg)}}
+          @keyframes csmSpin120{to{transform:rotate(360deg)}}
         `}</style>
       </div>
     );
   }
 
-  // ── MAIN HOMEPAGE (after entry) ──
   return (
-    <div style={{ position:"relative", width:"100%", minHeight:"calc(100vh - 48px)", background:"#000", overflow:"hidden" }}>
-      <canvas ref={canvasRef} style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0.7 }} />
-      <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 100% 60% at 50% 0%, transparent 0%, #000000cc 70%)", pointerEvents:"none" }} />
-
+    <div style={{ position:"relative", width:"100%", minHeight:"calc(100vh - 48px)", background:"#010208", overflow:"hidden" }}>
+      <canvas ref={canvasRef} style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0.9 }} />
+      <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 100% 45% at 50% 0%, transparent, #01020888 80%)", pointerEvents:"none" }} />
       <div style={{ position:"relative", zIndex:10 }}>
-
-        {/* ── HERO ── */}
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"48px 40px 32px", textAlign:"center" }}>
-          {/* Logo */}
-          <div style={{ position:"relative", marginBottom:24 }}>
-            <div style={{ position:"absolute", inset:-14, borderRadius:"50%", border:"1px solid #00FF4133", animation:"spin60s 60s linear infinite" }}/>
-            <div style={{ position:"absolute", inset:-22, borderRadius:"50%", border:"1px solid #E0BC6A1A", animation:"spinRev80s 80s linear infinite" }}/>
-            <img src="/logo.png" alt="DNR Capitals" style={{
-              width:100, height:100, borderRadius:"50%", objectFit:"cover",
-              border:"2px solid #00FF4155",
-              boxShadow:"0 0 40px #00FF4144, 0 0 80px #00FF4122",
-              position:"relative", zIndex:2,
-            }}/>
+        {/* Hero */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"40px 40px 24px", textAlign:"center" }}>
+          <div style={{ position:"relative", marginBottom:18 }}>
+            {[1,2].map(i=>(
+              <div key={i} style={{ position:"absolute", inset:`${-i*10}px`, borderRadius:"50%", border:`1px solid ${i===1?"#E0BC6A44":"#60A5FA22"}`, animation:`csmSpin${i===1?60:90} ${i===1?60:90}s linear infinite${i===2?" reverse":""}` }}/>
+            ))}
+            <img src="/logo.png" alt="DNR Capitals" style={{ width:88, height:88, borderRadius:"50%", objectFit:"cover", border:"2px solid #E0BC6A55", boxShadow:"0 0 40px #E0BC6A44,0 0 80px #60A5FA22", position:"relative", zIndex:2 }}/>
           </div>
-
-          <div style={{ fontSize:9, color:"#00FF41", letterSpacing:"6px", textTransform:"uppercase", marginBottom:14, opacity:0.8 }}>
-            DNR Capitals · Equity Research Intelligence
-          </div>
-
-          <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(40px,6vw,80px)", fontWeight:700, color:"#F0FFF0", lineHeight:0.92, textShadow:"0 0 60px #00FF4115", marginBottom:4 }}>
-            Know Before
-          </h1>
-          <span style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(40px,6vw,80px)", fontWeight:700, fontStyle:"italic", color:"#E0BC6A", textShadow:"0 0 40px #E0BC6A44", marginBottom:20, display:"block" }}>
-            You Invest
-          </span>
-
-          {/* CTA buttons */}
-          <div style={{ display:"flex", gap:12, flexWrap:"wrap", justifyContent:"center", marginBottom:40 }}>
-            {[
-              { label:"🔬 Deep Research", tab:"research", primary:true },
-              { label:"🔍 Screener",      tab:"screener", primary:false },
-              { label:"💼 Portfolio",     tab:"portfolio", primary:false },
-            ].map(b => (
-              <button key={b.tab} onClick={() => setActiveTab(b.tab)} style={{
-                padding:"11px 26px",
-                background: b.primary ? "linear-gradient(135deg,#00FF4122,#00FF4108)" : "transparent",
-                border:`1px solid ${b.primary?"#00FF41":"#1A2A1A"}`,
-                borderRadius:4, color: b.primary?"#00FF41":"#4A6A4A",
-                fontFamily:"'Jost',sans-serif", fontSize:12, fontWeight:600,
-                letterSpacing:"1px", cursor:"pointer", transition:"all 0.2s",
-                boxShadow: b.primary ? "0 0 20px #00FF4122" : "none",
-              }}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor="#00FF41";e.currentTarget.style.color="#00FF41";e.currentTarget.style.boxShadow="0 0 20px #00FF4133"}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor=b.primary?"#00FF41":"#1A2A1A";e.currentTarget.style.color=b.primary?"#00FF41":"#4A6A4A";e.currentTarget.style.boxShadow=b.primary?"0 0 20px #00FF4122":"none"}}>
-                {b.label}
-              </button>
+          <div style={{ fontSize:8, color:"#E0BC6A77", letterSpacing:"5px", textTransform:"uppercase", marginBottom:18 }}>DNR Capitals · Equity Research Intelligence</div>
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap", justifyContent:"center" }}>
+            {[{label:"🔬 Deep Research",tab:"research",c:"#E0BC6A"},{label:"🔍 Screener",tab:"screener",c:"#60A5FA"},{label:"💼 Portfolio",tab:"portfolio",c:"#A78BFA"},{label:"📊 Markets",tab:"markets",c:"#34D399"}].map(b=>(
+              <button key={b.tab} onClick={()=>setActiveTab(b.tab)} style={{ padding:"9px 22px", background:"transparent", border:`1px solid ${b.c}44`, borderRadius:3, color:b.c, fontFamily:"'Jost',sans-serif", fontSize:11, fontWeight:600, letterSpacing:"1px", cursor:"pointer", transition:"all 0.2s" }}
+                onMouseEnter={e=>{e.currentTarget.style.background=b.c+'18';e.currentTarget.style.borderColor=b.c+'99';e.currentTarget.style.boxShadow=`0 0 20px ${b.c}33`}}
+                onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor=b.c+'44';e.currentTarget.style.boxShadow="none"}}>{b.label}</button>
             ))}
           </div>
         </div>
-
-        {/* ── ANIMATED COUNTERS ── */}
-        <div style={{
-          display:"flex", justifyContent:"center", gap:0,
-          borderTop:"1px solid #00FF4122", borderBottom:"1px solid #00FF4122",
-          background:"#00000088", padding:"20px 0", marginBottom:0,
-        }}>
-          {[
-            { label:"Stocks Covered",    val:counters.stocks,   suffix:"+",  color:"#00FF41" },
-            { label:"Research Dimensions",val:counters.research, suffix:"",   color:"#E0BC6A" },
-            { label:"AI Accuracy Score",  val:counters.accuracy, suffix:"%",  color:"#00BFFF" },
-            { label:"Data Points / Stock",val:counters.users,    suffix:"+",  color:"#A855F7" },
-          ].map((c,i) => (
-            <div key={i} style={{
-              flex:1, textAlign:"center", padding:"0 20px",
-              borderRight: i<3 ? "1px solid #00FF4115" : "none",
-            }}>
-              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(28px,4vw,44px)", fontWeight:700, color:c.color, lineHeight:1, textShadow:`0 0 20px ${c.color}66` }}>
-                {c.val}{c.suffix}
-              </div>
-              <div style={{ fontSize:9, color:"#2A4A2A", letterSpacing:"2px", textTransform:"uppercase", marginTop:6 }}>
-                {c.label}
-              </div>
+        {/* Counters */}
+        <div style={{ display:"flex", justifyContent:"center", borderTop:"1px solid #E0BC6A18", borderBottom:"1px solid #E0BC6A18", background:"#00000077", padding:"16px 0" }}>
+          {[{label:"Stocks Covered",val:counters.stocks,suffix:"+",color:"#E0BC6A"},{label:"Research Dimensions",val:counters.research,suffix:"",color:"#60A5FA"},{label:"AI Accuracy Score",val:counters.accuracy,suffix:"%",color:"#A78BFA"},{label:"Data Points/Stock",val:counters.users,suffix:"+",color:"#34D399"}].map((c,i)=>(
+            <div key={i} style={{ flex:1, textAlign:"center", padding:"0 16px", borderRight:i<3?"1px solid #E0BC6A12":"none" }}>
+              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(24px,3.5vw,42px)", fontWeight:700, color:c.color, textShadow:`0 0 20px ${c.color}55` }}>{c.val}{c.suffix}</div>
+              <div style={{ fontSize:8, color:"#1A2A4A", letterSpacing:"2px", textTransform:"uppercase", marginTop:5 }}>{c.label}</div>
             </div>
           ))}
         </div>
-
-        {/* ── LIVE PRICE TILES ── */}
-        <div style={{ padding:"20px 24px", borderBottom:"1px solid #00FF4115" }}>
-          <div style={{ fontSize:8, color:"#2A4A2A", letterSpacing:"3px", textTransform:"uppercase", marginBottom:12, textAlign:"center" }}>
-            ● LIVE MARKET DATA
-          </div>
+        {/* Price tiles */}
+        <div style={{ padding:"16px 20px", borderBottom:"1px solid #E0BC6A12" }}>
+          <div style={{ fontSize:8, color:"#1A2A4A", letterSpacing:"3px", textTransform:"uppercase", marginBottom:10, textAlign:"center" }}>● LIVE MARKET DATA</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:8 }}>
-            {PRICE_TILES.map(tile => {
-              const live = markets[tile.key];
+            {PRICE_TILES.map(tile=>{
+              const live=markets[tile.key];
               return (
-                <div key={tile.key} style={{
-                  background:"#050505",
-                  border:`1px solid ${tile.color}22`,
-                  borderRadius:6, padding:"12px 10px", textAlign:"center",
-                  transition:"all 0.3s",
-                  boxShadow:`0 0 12px ${tile.color}0f`,
-                  cursor:"pointer",
-                }}
-                onMouseEnter={e=>{e.currentTarget.style.border=`1px solid ${tile.color}66`;e.currentTarget.style.boxShadow=`0 0 24px ${tile.color}33`}}
-                onMouseLeave={e=>{e.currentTarget.style.border=`1px solid ${tile.color}22`;e.currentTarget.style.boxShadow=`0 0 12px ${tile.color}0f`}}>
-                  <div style={{ fontSize:14, marginBottom:4 }}>{tile.icon}</div>
-                  <div style={{ fontSize:9, color:"#2A4A2A", letterSpacing:"1px", textTransform:"uppercase", marginBottom:6 }}>{tile.key}</div>
-                  <div style={{ fontFamily:"'DM Mono',monospace", fontSize:13, fontWeight:700, color:live?tile.color:"#1A3A1A" }}>
-                    {live?.v || "···"}
-                  </div>
-                  {live?.c && (
-                    <div style={{ fontSize:10, color:live.u?"#00FF41":"#FF3333", marginTop:3 }}>
-                      {live.u?"▲":"▼"} {live.c}
-                    </div>
-                  )}
+                <div key={tile.key} style={{ background:"#010208cc", border:`1px solid ${tile.color}22`, borderRadius:6, padding:"12px 8px", textAlign:"center", transition:"all 0.3s", cursor:"pointer" }}
+                  onMouseEnter={e=>{e.currentTarget.style.border=`1px solid ${tile.color}77`;e.currentTarget.style.boxShadow=`0 0 24px ${tile.color}33`}}
+                  onMouseLeave={e=>{e.currentTarget.style.border=`1px solid ${tile.color}22`;e.currentTarget.style.boxShadow="none"}}>
+                  <div style={{ fontSize:14, marginBottom:3 }}>{tile.icon}</div>
+                  <div style={{ fontSize:8, color:"#1A2A4A", letterSpacing:"1px", textTransform:"uppercase", marginBottom:5 }}>{tile.key}</div>
+                  <div style={{ fontFamily:"'DM Mono',monospace", fontSize:12, fontWeight:700, color:live?tile.color:"#0A1428" }}>{live?.v||"···"}</div>
+                  {live?.c&&<div style={{ fontSize:9, color:live.u?"#34D399":"#F87171", marginTop:2 }}>{live.u?"▲":"▼"} {live.c}</div>}
                 </div>
               );
             })}
           </div>
         </div>
-
-        {/* ── SLIDING QUOTES / INSIGHTS ── */}
-        <div style={{ padding:"24px 40px", borderBottom:"1px solid #00FF4115", background:"#00000066" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <div style={{ width:3, height:16, background:"#00FF41", boxShadow:"0 0 8px #00FF41" }}/>
-              <span style={{ fontSize:8, color:"#00FF41", letterSpacing:"3px", textTransform:"uppercase" }}>
-                {SLIDES[slideIdx].tag}
-              </span>
-            </div>
-            <div style={{ display:"flex", gap:5 }}>
-              {SLIDES.map((_,i) => (
-                <div key={i} onClick={() => setSlideIdx(i)} style={{
-                  width: i===slideIdx?16:5, height:5, borderRadius:3,
-                  background: i===slideIdx?"#00FF41":"#1A2A1A",
-                  cursor:"pointer", transition:"all 0.3s",
-                  boxShadow: i===slideIdx?"0 0 8px #00FF41":"none",
-                }}/>
-              ))}
-            </div>
+        {/* Slides */}
+        <div style={{ padding:"18px 40px", borderBottom:"1px solid #E0BC6A12", background:"#01020888" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}><div style={{ width:3, height:14, background:"#E0BC6A", boxShadow:"0 0 8px #E0BC6A" }}/><span style={{ fontSize:8, color:"#E0BC6A88", letterSpacing:"3px", textTransform:"uppercase" }}>{SLIDES[slideIdx].tag}</span></div>
+            <div style={{ display:"flex", gap:4 }}>{SLIDES.map((_,i)=>(<div key={i} onClick={()=>setSlideIdx(i)} style={{ width:i===slideIdx?14:4, height:4, borderRadius:2, background:i===slideIdx?"#E0BC6A":"#1A2A4A", cursor:"pointer", transition:"all 0.3s", boxShadow:i===slideIdx?"0 0 6px #E0BC6A":"none" }}/>))}</div>
           </div>
-          <div style={{ transition:"opacity 0.5s", opacity:slideFade?1:0, minHeight:60 }}>
-            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(14px,2vw,18px)", fontStyle:"italic", color:"#A8C8A8", lineHeight:1.7 }}>
-              "{SLIDES[slideIdx].text}"
-            </div>
-            <div style={{ fontSize:10, color:"#00FF41", letterSpacing:"2px", marginTop:8, opacity:0.7 }}>
-              — {SLIDES[slideIdx].author}
-            </div>
+          <div style={{ transition:"opacity 0.5s", opacity:slideFade?1:0, minHeight:52 }}>
+            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(13px,1.8vw,17px)", fontStyle:"italic", color:"#7A8BAB", lineHeight:1.7 }}>"{SLIDES[slideIdx].text}"</div>
+            <div style={{ fontSize:9, color:"#E0BC6A77", letterSpacing:"2px", marginTop:7 }}>— {SLIDES[slideIdx].author}</div>
           </div>
         </div>
-
-        {/* ── FEATURE GRID ── */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"1px", background:"#00FF4108", borderTop:"1px solid #00FF4115" }}>
-          {[
-            { icon:"🔬", title:"18-Dimension Deep Research", desc:"Business · Financials · Valuation · Peer · Technical · DCF · Verdict", tab:"research", color:"#00FF41" },
-            { icon:"📈", title:"Technical Charts Suite",     desc:"MA · RSI · MACD · Bollinger Bands · Volume Analysis",               tab:"technical", color:"#E0BC6A" },
-            { icon:"🔍", title:"Smart Screener",             desc:"30 stocks · 10 numeric filters · 8 presets · AI analysis",          tab:"screener",  color:"#00BFFF" },
-            { icon:"💼", title:"Portfolio Tracker",          desc:"Real-time P&L · AI review · Allocation charts · CSV export",        tab:"portfolio", color:"#A855F7" },
-            { icon:"📦", title:"Bulk & Block Deals",         desc:"Institutional smart money tracker · AI deal analysis",              tab:"bulkdeals", color:"#FF6B35" },
-            { icon:"🧮", title:"Financial Calculators",      desc:"SIP · Lumpsum · Position Sizing · Tax · Black-Scholes",            tab:"calculators",color:"#FFD700" },
-          ].map(f => (
-            <div key={f.tab} onClick={() => setActiveTab(f.tab)} style={{
-              background:"#000000", padding:"22px 24px",
-              cursor:"pointer", display:"flex", alignItems:"flex-start", gap:12,
-              transition:"background 0.25s, border 0.25s",
-              borderLeft:`2px solid transparent`,
-            }}
-            onMouseEnter={e=>{e.currentTarget.style.background="#050F05";e.currentTarget.style.borderLeft=`2px solid ${f.color}`}}
-            onMouseLeave={e=>{e.currentTarget.style.background="#000000";e.currentTarget.style.borderLeft="2px solid transparent"}}>
-              <div style={{
-                fontSize:18, width:38, height:38,
-                background:`${f.color}15`, border:`1px solid ${f.color}33`,
-                borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center",
-                flexShrink:0, boxShadow:`0 0 12px ${f.color}15`,
-              }}>{f.icon}</div>
-              <div>
-                <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:14, fontWeight:600, color:"#E8F5E8", marginBottom:4 }}>{f.title}</div>
-                <div style={{ fontSize:10, color:"#2A4A2A", lineHeight:1.6 }}>{f.desc}</div>
-              </div>
+        {/* Features */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"1px", background:"#E0BC6A08", borderTop:"1px solid #E0BC6A12" }}>
+          {[{icon:"🔬",title:"18-Dimension Deep Research",desc:"Business · Financials · Valuation · Peer · Technical · DCF · Verdict",tab:"research",c:"#E0BC6A"},{icon:"📈",title:"Technical Charts Suite",desc:"MA · RSI · MACD · Bollinger Bands · Volume Analysis",tab:"technical",c:"#60A5FA"},{icon:"🔍",title:"Smart Screener",desc:"30 stocks · 10 numeric filters · 8 presets · AI analysis",tab:"screener",c:"#34D399"},{icon:"💼",title:"Portfolio Tracker",desc:"Real-time P&L · AI review · Allocation charts · CSV export",tab:"portfolio",c:"#A78BFA"},{icon:"📦",title:"Bulk & Block Deals",desc:"Institutional smart money tracker · AI deal analysis",tab:"bulkdeals",c:"#FB923C"},{icon:"🧮",title:"Financial Calculators",desc:"SIP · Lumpsum · Position Sizing · Tax · Black-Scholes",tab:"calculators",c:"#FCD34D"}].map(f=>(
+            <div key={f.tab} onClick={()=>setActiveTab(f.tab)} style={{ background:"#010208", padding:"20px 22px", cursor:"pointer", display:"flex", alignItems:"flex-start", gap:12, transition:"all 0.25s", borderLeft:"2px solid transparent" }}
+              onMouseEnter={e=>{e.currentTarget.style.background="#040B14";e.currentTarget.style.borderLeft=`2px solid ${f.c}`}}
+              onMouseLeave={e=>{e.currentTarget.style.background="#010208";e.currentTarget.style.borderLeft="2px solid transparent"}}>
+              <div style={{ fontSize:17, width:36, height:36, background:`${f.c}15`, border:`1px solid ${f.c}33`, borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{f.icon}</div>
+              <div><div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:14, fontWeight:600, color:"#E8F0FF", marginBottom:3 }}>{f.title}</div><div style={{ fontSize:10, color:"#1A2A4A", lineHeight:1.6 }}>{f.desc}</div></div>
             </div>
           ))}
         </div>
-
-        {/* Footer strip */}
-        <div style={{ padding:"12px 24px", display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:"1px solid #00FF4115", background:"#000" }}>
-          <span style={{ fontSize:9, color:"#1A3A1A", letterSpacing:"1px" }}>© {new Date().getFullYear()} DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE</span>
-          <span style={{ fontSize:9, color:"#1A3A1A", letterSpacing:"1px" }}>POWERED BY GROQ AI · NOT SEBI REGISTERED ADVICE</span>
+        <div style={{ padding:"10px 24px", display:"flex", justifyContent:"space-between", borderTop:"1px solid #E0BC6A12", background:"#010208" }}>
+          <span style={{ fontSize:9, color:"#0A1428" }}>© {new Date().getFullYear()} DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE</span>
+          <span style={{ fontSize:9, color:"#0A1428" }}>POWERED BY GROQ AI · NOT SEBI REGISTERED ADVICE</span>
         </div>
       </div>
-
       <style>{`
-        @keyframes entryFadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes spin60s { to{transform:rotate(360deg)} }
-        @keyframes spinRev80s { to{transform:rotate(-360deg)} }
+        @keyframes csmFade{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes csmSpin60{to{transform:rotate(360deg)}}
+        @keyframes csmSpin90{to{transform:rotate(-360deg)}}
+        @keyframes csmSpin120{to{transform:rotate(360deg)}}
       `}</style>
-    </div>
-  );
-}
-
-        <span style={{ fontSize:9, color:"#2A3A55" }}>Powered by Groq AI · For educational purposes only · Not SEBI registered investment advice</span>
-      </div>
     </div>
   );
 }
