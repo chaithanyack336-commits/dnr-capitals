@@ -1078,478 +1078,252 @@ function QuoteRotator() {
 }
 
 function HomePage({ setActiveTab, markets, fetching }) {
-  const canvasRef   = useRef(null);
-  const animRef     = useRef(null);
-  const stateRef    = useRef(null);
-  const [entered,   setEntered]   = useState(false);
-  const [slideIdx,  setSlideIdx]  = useState(0);
-  const [slideFade, setSlideFade] = useState(true);
-  const [counters,  setCounters]  = useState({ stocks:0, research:0, accuracy:0, users:0 });
+  const canvasRef  = useRef(null);
+  const animRef    = useRef(null);
+  const stateRef   = useRef(null);
+  const [slideIdx, setSlideIdx]  = useState(0);
+  const [slideFade,setSlideFade] = useState(true);
+  const [counters, setCounters]  = useState({stocks:0,research:0,accuracy:0,users:0});
+  const [tick,     setTick]      = useState(0);
 
-  // ─────────────────────────────────────────────────────────────
-  //  3D CINEMATIC SPACE ENGINE
-  //  Uses real 3D projection: objects have X,Y,Z coordinates.
-  //  As Z decreases → object rushes toward viewer, grows in size.
-  //  Gives the authentic NASA warp/flythrough feel.
-  // ─────────────────────────────────────────────────────────────
+  // ── 3D WARP STAR + CONSTELLATION SYSTEM ────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // Resize handler
     const resize = () => {
       canvas.width  = canvas.offsetWidth  || window.innerWidth;
       canvas.height = canvas.offsetHeight || window.innerHeight;
-      if (stateRef.current) stateRef.current.needsReinit = true;
+      stateRef.current && (stateRef.current.needsReinit = true);
     };
     resize();
     window.addEventListener('resize', resize);
 
-    // ── UTILITY ──────────────────────────────────────────────
-    const rand  = (min, max) => min + Math.random()*(max-min);
-    const lerp  = (a, b, t) => a + (b-a)*t;
+    const rand = (a,b) => a + Math.random()*(b-a);
 
-    // 3D → 2D projection
-    const project = (x3, y3, z3, fov, cx, cy) => {
-      if (z3 <= 0) return null;
-      const scale = fov / z3;
-      return { x: cx + x3*scale, y: cy + y3*scale, scale };
+    const initScene = () => {
+      const W = canvas.width, H = canvas.height;
+      const FOV = Math.min(W,H) * 0.85;
+      const CX = W/2, CY = H/2;
+      const DEPTH = 1800;
+      const SPEED = 2.2;
+
+      // ── 800 warp stars in 3D ──
+      const stars = Array.from({length:800}, () => {
+        const cols = ['#C8DCFF','#D8E8FF','#FFFFFF','#FFF8EE','#FFEEDD','#FFD090','#FFB060','#FF8844'];
+        return {
+          x: rand(-W*2.5, W*2.5),
+          y: rand(-H*2.5, H*2.5),
+          z: rand(1, DEPTH),
+          pz: DEPTH,
+          col: cols[Math.floor(Math.pow(Math.random(),2)*cols.length)],
+          size: rand(0.3, 2.2),
+        };
+      });
+
+      // ── Constellation nodes — NSE stocks ──
+      const LABELS = ['NIFTY','TCS','HDFC','RELIANCE','INFY','BAJFINANCE',
+        'SBI','WIPRO','LT','TATAMOTORS','ADANIENT','ITC','HUL','AXISBANK',
+        'KOTAKBANK','SUNPHARMA','DRREDDY','ONGC','NTPC','TITAN','ICICIBANK',
+        'HDFCBANK','MARUTI','ASIAN','NESTL','COALIND','POWERGRID','HCLTECH'];
+      const nodes = Array.from({length:28}, (_, i) => ({
+        x: rand(0.08, 0.92),
+        y: rand(0.08, 0.92),
+        vx: (Math.random()-0.5)*0.00025,
+        vy: (Math.random()-0.5)*0.00025,
+        r: rand(2, 4.5),
+        pulse: Math.random()*Math.PI*2,
+        label: LABELS[i%LABELS.length],
+        brightness: rand(0.5, 1.0),
+      }));
+
+      // ── Shooting stars ──
+      const shooters = [];
+      const spawnShooter = () => {
+        if (shooters.length >= 3 && Math.random() > 0.003) return;
+        shooters.push({
+          x: rand(0, W), y: rand(0, H*0.45),
+          vx: rand(5,9), vy: rand(1.5,3.5),
+          len: rand(90,180), alpha:1,
+          col: Math.random()>0.5?'#FFFFFF':'#C8E0FF',
+        });
+      };
+
+      return { W, H, FOV, CX, CY, DEPTH, SPEED, stars, nodes, shooters, spawnShooter, t:0, needsReinit:false };
     };
 
-    // Hex to rgba
+    stateRef.current = initScene();
+
     const rgba = (hex, a) => {
       const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
       return `rgba(${r},${g},${b},${a})`;
     };
 
-    // NASA star temperature colors
-    const STAR_COLS = [
-      '#B0C4FF','#C8D8FF','#DCE8FF', // O/B blue-white (hottest)
-      '#FFFFFF','#FFF8F0',            // A white
-      '#FFEEBB','#FFD980',            // F/G yellow-white, yellow (Sun-like)
-      '#FFB347','#FF8C42',            // K orange
-      '#FF6347','#FF4500',            // M red-orange (Betelgeuse)
-    ];
-
-    // ── INIT SCENE ────────────────────────────────────────────
-    const initScene = () => {
-      const W = canvas.width, H = canvas.height;
-      const FOV = Math.min(W, H) * 0.8;
-      const CX  = W/2, CY = H/2;
-      const DEPTH = 2000;
-
-      // ── STAR FIELD  (3D warp-style) ──
-      // Each star: x,y in 3D space, z = depth (DEPTH=far, 0=at viewer)
-      // On each frame z decreases → star rushes toward you, gets bigger
-      const NUM_STARS = 600;
-      const stars = Array.from({length: NUM_STARS}, () => ({
-        x:   rand(-W*2, W*2),
-        y:   rand(-H*2, H*2),
-        z:   rand(1, DEPTH),
-        pz:  0,           // previous z for trail
-        col: STAR_COLS[Math.floor(Math.pow(Math.random(),2)*STAR_COLS.length)],
-        size: rand(0.4, 2.2),
-      }));
-      // Store prev position for velocity trails
-      stars.forEach(s => { s.pz = s.z; });
-
-      // ── BLACK HOLE (3D positioned, breathes in/out) ──
-      const blackHole = {
-        x3: -W*0.3, y3: H*0.1, z3: 600,
-        vz: -0.15,               // drifting toward viewer
-        targetZ: 400,
-        baseRadius: 70,
-        diskAngle: 0,
-        pulse: 0,
-      };
-
-      // ── NEBULAE CLOUDS (3D positioned, parallax) ──
-      const nebulae = [
-        { x3:-W*0.6, y3:-H*0.4, z3:900, vz:-0.04, baseR:180, color1:'#880E4F', color2:'#CE93D8', alpha:0.12, rot:0, rotSpeed:0.0002 },
-        { x3: W*0.5, y3: H*0.3, z3:1200,vz:-0.03, baseR:220, color1:'#0D47A1', color2:'#E53935', alpha:0.10, rot:1, rotSpeed:-0.0001 },
-        { x3: W*0.1, y3:-H*0.5, z3:800, vz:-0.05, baseR:160, color1:'#1B5E20', color2:'#CDDC39', alpha:0.10, rot:2, rotSpeed:0.0003 },
-        { x3:-W*0.2, y3: H*0.6, z3:1400,vz:-0.02, baseR:250, color1:'#BF360C', color2:'#FFD740', alpha:0.09, rot:0.5, rotSpeed:0.0001 },
-        { x3: W*0.7, y3:-H*0.2, z3:1000,vz:-0.035,baseR:190, color1:'#006064', color2:'#80DEEA', alpha:0.11, rot:1.5, rotSpeed:-0.0002 },
-      ];
-
-      // ── PLANETS (3D orbit + z-depth zoom) ──
-      const planets = [
-        {
-          name:'Jupiter-class',
-          x3: W*0.5, y3:-H*0.2, z3:500, vz:-0.06,
-          orbitT:0, orbitSpeed:0.004, orbitRx:80, orbitRy:30,
-          baseR:32, color:'#CC7B3A', band:'#D4945A', atmosphere:'#FF9A5A44',
-          rings:false,
-        },
-        {
-          name:'Ice Giant',
-          x3:-W*0.4, y3: H*0.35, z3:700, vz:-0.04,
-          orbitT:2, orbitSpeed:0.003, orbitRx:60, orbitRy:22,
-          baseR:22, color:'#4DD0E1', band:'#80DEEA', atmosphere:'#4DD0E133',
-          rings:true,
-        },
-        {
-          name:'Lava World',
-          x3: W*0.2, y3: H*0.5, z3:900, vz:-0.03,
-          orbitT:4, orbitSpeed:0.006, orbitRx:40, orbitRy:15,
-          baseR:16, color:'#B71C1C', band:'#E53935', atmosphere:'#FF572244',
-          rings:false,
-        },
-      ];
-
-      // ── SHOOTING STARS ──
-      const shooters = [];
-      const spawnShooter = () => {
-        if (shooters.length >= 4) return;
-        shooters.push({
-          x: rand(0, W), y: rand(0, H*0.5),
-          vx: rand(5, 10), vy: rand(1.5, 4),
-          len: rand(80, 160), alpha: 1,
-          col: Math.random()>0.5 ? '#FFFFFF' : '#FFE8A0',
-        });
-      };
-
-      return { W, H, FOV, CX, CY, DEPTH, stars, blackHole, nebulae, planets, shooters, spawnShooter, t:0, needsReinit:false };
-    };
-
-    stateRef.current = initScene();
-
-    // ── DRAW LOOP ──────────────────────────────────────────────
     const draw = () => {
-      const s = stateRef.current;
-      if (!s) return;
-      if (s.needsReinit) { stateRef.current = initScene(); return; }
+      const sc = stateRef.current;
+      if (!sc) return;
+      if (sc.needsReinit) { stateRef.current = initScene(); return; }
+      const {W,H,FOV,CX,CY,DEPTH,SPEED} = sc;
+      sc.t++;
 
-      const { W, H, FOV, CX, CY, DEPTH } = s;
-      s.t++;
-      const speed = 1.8; // warp speed — how fast stars rush at you
+      // Background — deep space blue-black
+      ctx.fillStyle = '#000510';
+      ctx.fillRect(0,0,W,H);
 
-      // Background — deep space, not pure black
-      ctx.fillStyle = '#010208';
-      ctx.fillRect(0, 0, W, H);
-
-      // Milky Way ambient glow
-      const mwGrad = ctx.createLinearGradient(0, H*0.25, W, H*0.75);
+      // Milky Way glow band
+      const mwGrad = ctx.createLinearGradient(0,H*0.2,W,H*0.8);
       mwGrad.addColorStop(0,   'rgba(0,0,0,0)');
-      mwGrad.addColorStop(0.3, 'rgba(25,15,50,0.12)');
-      mwGrad.addColorStop(0.5, 'rgba(40,25,70,0.18)');
-      mwGrad.addColorStop(0.7, 'rgba(25,15,50,0.12)');
+      mwGrad.addColorStop(0.35,'rgba(20,15,55,0.18)');
+      mwGrad.addColorStop(0.5, 'rgba(35,25,75,0.28)');
+      mwGrad.addColorStop(0.65,'rgba(20,15,55,0.18)');
       mwGrad.addColorStop(1,   'rgba(0,0,0,0)');
       ctx.fillStyle = mwGrad;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0,0,W,H);
 
-      // ── 1. NEBULAE (back layer, large, parallax) ──
-      s.nebulae.forEach(n => {
-        n.z3 -= n.vz;
-        n.rot += n.rotSpeed;
-        if (n.z3 < 200) n.z3 = DEPTH;
-        const p = project(n.x3, n.y3, n.z3, FOV, CX, CY);
-        if (!p) return;
-        const r = n.baseR * p.scale;
-        if (r < 1) return;
-
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(n.rot);
-
-        // Multi-layer radial gradient nebula
-        const alpha = Math.min(n.alpha, n.alpha * (1 - n.z3/DEPTH * 0.5) * 3);
-        const g1 = ctx.createRadialGradient(0,0,0, 0,0, r);
-        g1.addColorStop(0,   rgba(n.color1, alpha*1.5));
-        g1.addColorStop(0.4, rgba(n.color1, alpha*0.8));
-        g1.addColorStop(0.7, rgba(n.color2, alpha*0.4));
-        g1.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.fillStyle = g1;
-        ctx.scale(1, 0.6);
-        ctx.beginPath();
-        ctx.arc(0, 0, r, 0, Math.PI*2);
-        ctx.fill();
-
-        // Second wisp
-        ctx.scale(1, 1.4);
-        ctx.rotate(1.2);
-        const g2 = ctx.createRadialGradient(r*0.2, r*0.1, 0, r*0.2, r*0.1, r*0.7);
-        g2.addColorStop(0,   rgba(n.color2, alpha*0.8));
-        g2.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.fillStyle = g2;
-        ctx.beginPath();
-        ctx.arc(r*0.2, r*0.1, r*0.7, 0, Math.PI*2);
-        ctx.fill();
-
-        ctx.restore();
-      });
-
-      // ── 2. WARP STAR FIELD (core 3D effect) ──
-      s.stars.forEach(st => {
+      // ── 1. WARP STARS ──
+      sc.stars.forEach(st => {
         st.pz = st.z;
-        st.z -= speed;
+        st.z -= SPEED;
         if (st.z <= 1) {
-          // Reset to far distance with new random position
-          st.x  = rand(-W*2, W*2);
-          st.y  = rand(-H*2, H*2);
+          st.x  = rand(-W*2.5, W*2.5);
+          st.y  = rand(-H*2.5, H*2.5);
           st.z  = DEPTH;
           st.pz = DEPTH;
+          return;
+        }
+        const scl  = FOV/st.z;
+        const pscl = FOV/st.pz;
+        const sx = CX + st.x*scl,  sy = CY + st.y*scl;
+        const px = CX + st.x*pscl, py = CY + st.y*pscl;
+        const alpha = Math.min(1, (1-st.z/DEPTH)*1.6);
+        const rad   = Math.max(0.3, st.size*scl*1.4);
+
+        // Streak trail
+        const trailLen = Math.hypot(sx-px, sy-py);
+        if (trailLen > 0.8) {
+          const tg = ctx.createLinearGradient(px,py,sx,sy);
+          tg.addColorStop(0,'rgba(0,0,0,0)');
+          tg.addColorStop(1, rgba(st.col, alpha*0.75));
+          ctx.save(); ctx.strokeStyle=tg; ctx.lineWidth=rad*0.7;
+          ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(sx,sy); ctx.stroke(); ctx.restore();
         }
 
-        // Current projected position
-        const cur  = project(st.x, st.y, st.z,  FOV, CX, CY);
-        const prev = project(st.x, st.y, st.pz, FOV, CX, CY);
-        if (!cur || !prev) return;
+        // Star glow for bright close stars
+        if (rad > 2.5) {
+          const gg = ctx.createRadialGradient(sx,sy,0,sx,sy,rad*5);
+          gg.addColorStop(0, rgba(st.col, alpha*0.45));
+          gg.addColorStop(1,'rgba(0,0,0,0)');
+          ctx.save(); ctx.fillStyle=gg;
+          ctx.beginPath(); ctx.arc(sx,sy,rad*5,0,Math.PI*2); ctx.fill(); ctx.restore();
 
-        const radius = Math.max(0.3, st.size * cur.scale * 1.2);
-        const alpha  = Math.min(1, (1 - st.z/DEPTH) * 1.4);
-
-        // Draw velocity trail (streak as star rushes toward viewer)
-        const trailLen = Math.sqrt(Math.pow(cur.x-prev.x,2)+Math.pow(cur.y-prev.y,2));
-        if (trailLen > 0.5) {
-          const tGrad = ctx.createLinearGradient(prev.x, prev.y, cur.x, cur.y);
-          tGrad.addColorStop(0, 'rgba(0,0,0,0)');
-          tGrad.addColorStop(1, rgba(st.col, alpha*0.7));
-          ctx.save();
-          ctx.strokeStyle = tGrad;
-          ctx.lineWidth   = radius * 0.8;
-          ctx.beginPath();
-          ctx.moveTo(prev.x, prev.y);
-          ctx.lineTo(cur.x,  cur.y);
-          ctx.stroke();
+          // 4-point diffraction spike
+          ctx.save(); ctx.globalAlpha=alpha*0.3; ctx.strokeStyle=st.col; ctx.lineWidth=0.5;
+          ctx.beginPath(); ctx.moveTo(sx-rad*6,sy); ctx.lineTo(sx+rad*6,sy); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(sx,sy-rad*6); ctx.lineTo(sx,sy+rad*6); ctx.stroke();
           ctx.restore();
         }
 
-        // Star core — glows and grows as it approaches
-        if (radius > 0.3) {
-          // Glow for bright close stars
-          if (radius > 2) {
-            const glowGrad = ctx.createRadialGradient(cur.x,cur.y,0, cur.x,cur.y, radius*4);
-            glowGrad.addColorStop(0, rgba(st.col, alpha*0.4));
-            glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.save();
-            ctx.fillStyle = glowGrad;
-            ctx.beginPath();
-            ctx.arc(cur.x, cur.y, radius*4, 0, Math.PI*2);
-            ctx.fill();
-            ctx.restore();
+        // Star core
+        ctx.save(); ctx.globalAlpha=Math.min(alpha,1); ctx.fillStyle=st.col;
+        ctx.beginPath(); ctx.arc(sx,sy,rad,0,Math.PI*2); ctx.fill(); ctx.restore();
+      });
 
-            // Diffraction cross
-            ctx.save();
-            ctx.globalAlpha = alpha*0.25;
-            ctx.strokeStyle = st.col;
-            ctx.lineWidth = 0.5;
-            ctx.beginPath(); ctx.moveTo(cur.x-radius*5,cur.y); ctx.lineTo(cur.x+radius*5,cur.y); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cur.x,cur.y-radius*5); ctx.lineTo(cur.x,cur.y+radius*5); ctx.stroke();
+      // ── 2. CONSTELLATION NETWORK ──
+      sc.nodes.forEach(n => {
+        n.x += n.vx; n.y += n.vy;
+        if(n.x<0.04||n.x>0.96) n.vx*=-1;
+        if(n.y<0.04||n.y>0.96) n.vy*=-1;
+        n.pulse += 0.018;
+      });
+
+      // Lines between nearby nodes
+      for (let i=0;i<sc.nodes.length;i++) {
+        for (let j=i+1;j<sc.nodes.length;j++) {
+          const a=sc.nodes[i], b=sc.nodes[j];
+          const dx=(a.x-b.x)*W, dy=(a.y-b.y)*H;
+          const dist=Math.hypot(dx,dy);
+          if (dist < W*0.16) {
+            const alpha=(1-dist/(W*0.16))*0.18;
+            ctx.save(); ctx.globalAlpha=alpha;
+            // Electric blue pulse line
+            ctx.strokeStyle='#5BB8FF'; ctx.lineWidth=0.6;
+            ctx.beginPath(); ctx.moveTo(a.x*W,a.y*H); ctx.lineTo(b.x*W,b.y*H); ctx.stroke();
             ctx.restore();
           }
-
-          ctx.save();
-          ctx.globalAlpha = Math.min(alpha, 1);
-          ctx.fillStyle   = st.col;
-          ctx.beginPath();
-          ctx.arc(cur.x, cur.y, radius, 0, Math.PI*2);
-          ctx.fill();
-          ctx.restore();
         }
-      });
+      }
 
-      // ── 3. PLANETS (3D orbit + zoom in/out) ──
-      s.planets.forEach(pl => {
-        pl.orbitT += pl.orbitSpeed;
-        pl.x3 += Math.cos(pl.orbitT) * 0.3;
-        pl.y3 += Math.sin(pl.orbitT) * 0.15;
-        pl.z3 -= pl.vz;
-        if (pl.z3 < 100) pl.z3 = 1100;
-        if (pl.z3 > 1200) pl.z3 = 150;
+      // Nodes — glowing electric blue dots with stock labels
+      sc.nodes.forEach(n => {
+        const x=n.x*W, y=n.y*H;
+        const pulse=0.55+0.45*Math.sin(n.pulse);
+        const brightness=n.brightness*pulse;
 
-        const p = project(pl.x3, pl.y3, pl.z3, FOV, CX, CY);
-        if (!p) return;
-        const r = pl.baseR * p.scale;
-        if (r < 0.5) return;
+        // Outer glow ring
+        const og=ctx.createRadialGradient(x,y,0,x,y,n.r*7);
+        og.addColorStop(0,  `rgba(60,160,255,${brightness*0.25})`);
+        og.addColorStop(0.5,`rgba(40,120,220,${brightness*0.10})`);
+        og.addColorStop(1,  'rgba(0,0,0,0)');
+        ctx.save(); ctx.fillStyle=og;
+        ctx.beginPath(); ctx.arc(x,y,n.r*7,0,Math.PI*2); ctx.fill(); ctx.restore();
 
-        // Atmosphere glow
-        const atmosGrad = ctx.createRadialGradient(p.x, p.y, r*0.7, p.x, p.y, r*2.5);
-        atmosGrad.addColorStop(0,   rgba(pl.atmosphere.slice(0,7), parseFloat('0x'+pl.atmosphere.slice(7,9))/255 * 0.8 || 0.15));
-        atmosGrad.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.save(); ctx.fillStyle = atmosGrad;
-        ctx.beginPath(); ctx.arc(p.x, p.y, r*2.5, 0, Math.PI*2); ctx.fill();
+        // Core dot
+        ctx.save(); ctx.globalAlpha=brightness;
+        ctx.fillStyle='#88CCFF';
+        ctx.beginPath(); ctx.arc(x,y,n.r,0,Math.PI*2); ctx.fill();
+        // Inner bright center
+        ctx.fillStyle='#DDEFFF';
+        ctx.beginPath(); ctx.arc(x,y,n.r*0.4,0,Math.PI*2); ctx.fill();
         ctx.restore();
 
-        // Planet sphere with 3D shading
-        const sphereGrad = ctx.createRadialGradient(p.x-r*0.35, p.y-r*0.35, 0, p.x, p.y, r);
-        sphereGrad.addColorStop(0,   lightenColor(pl.band, 0.45));
-        sphereGrad.addColorStop(0.35, pl.band);
-        sphereGrad.addColorStop(0.7,  pl.color);
-        sphereGrad.addColorStop(1,    darkenColor(pl.color, 0.6));
-        ctx.save(); ctx.fillStyle = sphereGrad;
-        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.fill();
-        ctx.restore();
-
-        // Cloud bands
-        for (let b=0; b<3; b++) {
-          const by = p.y - r*0.5 + b*r*0.4;
-          ctx.save();
-          ctx.globalAlpha = 0.15;
-          ctx.strokeStyle = lightenColor(pl.band, 0.3);
-          ctx.lineWidth   = r*0.18;
-          ctx.beginPath();
-          ctx.ellipse(p.x, by, r*0.9, r*0.08, 0, 0, Math.PI*2);
-          ctx.stroke();
-          ctx.restore();
-        }
-
-        // Ring system
-        if (pl.rings) {
-          ctx.save();
-          ctx.translate(p.x, p.y);
-          const rGrad = ctx.createLinearGradient(-r*2.5,0, r*2.5,0);
-          rGrad.addColorStop(0,   'rgba(180,220,255,0)');
-          rGrad.addColorStop(0.3, 'rgba(180,220,255,0.4)');
-          rGrad.addColorStop(0.5, 'rgba(200,235,255,0.55)');
-          rGrad.addColorStop(0.7, 'rgba(180,220,255,0.4)');
-          rGrad.addColorStop(1,   'rgba(180,220,255,0)');
-          ctx.strokeStyle = rGrad;
-          ctx.lineWidth = r*0.28;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, r*2.3, r*0.55, 0.25, 0, Math.PI*2);
-          ctx.stroke();
-          ctx.lineWidth = r*0.14;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, r*2.8, r*0.68, 0.25, 0, Math.PI*2);
-          ctx.stroke();
-          ctx.restore();
-        }
-
-        // Terminator (shadow line)
-        const shadowGrad = ctx.createRadialGradient(p.x+r*0.4, p.y+r*0.3, 0, p.x, p.y, r);
-        shadowGrad.addColorStop(0,   'rgba(0,0,0,0)');
-        shadowGrad.addColorStop(0.5, 'rgba(0,0,0,0.1)');
-        shadowGrad.addColorStop(1,   'rgba(0,0,8,0.7)');
-        ctx.save(); ctx.fillStyle = shadowGrad;
-        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2); ctx.fill();
+        // Stock label
+        ctx.save(); ctx.globalAlpha=brightness*0.55;
+        ctx.fillStyle='#88CCFF';
+        ctx.font=`600 7px 'DM Mono',monospace`;
+        ctx.fillText(n.label, x+n.r+4, y+3);
         ctx.restore();
       });
 
-      // ── 4. BLACK HOLE (dramatic 3D zoom) ──
-      (() => {
-        const bh = s.blackHole;
-        bh.pulse += 0.012;
-        bh.diskAngle += 0.006;
+      // ── 3. ELECTRIC PULSE ARCS ──
+      // Occasional bright arc between two random nearby nodes
+      if (sc.t % 90 === 0) {
+        const i = Math.floor(Math.random()*sc.nodes.length);
+        const j = (i+1+Math.floor(Math.random()*4))%sc.nodes.length;
+        const a=sc.nodes[i], b=sc.nodes[j];
+        sc._arc = { ax:a.x*W, ay:a.y*H, bx:b.x*W, by:b.y*H, life:18 };
+      }
+      if (sc._arc && sc._arc.life > 0) {
+        const {ax,ay,bx,by,life} = sc._arc;
+        const alpha = (life/18)*0.7;
+        const ag = ctx.createLinearGradient(ax,ay,bx,by);
+        ag.addColorStop(0,'rgba(0,0,0,0)');
+        ag.addColorStop(0.5,`rgba(100,200,255,${alpha})`);
+        ag.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.save(); ctx.strokeStyle=ag; ctx.lineWidth=1.5+life*0.1;
+        ctx.shadowBlur=12; ctx.shadowColor='#4499FF';
+        ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
 
-        // Breathe Z in and out — creates zoom effect
-        bh.z3 += bh.vz;
-        if (bh.z3 < 280) bh.vz =  0.12;
-        if (bh.z3 > 750) bh.vz = -0.12;
-
-        const p = project(bh.x3, bh.y3, bh.z3, FOV, CX, CY);
-        if (!p) return;
-        const rs = bh.baseRadius * p.scale;
-        if (rs < 2) return;
-
-        const cx2 = p.x, cy2 = p.y;
-
-        // Outer gravitational lensing halo
-        const lensGrad = ctx.createRadialGradient(cx2,cy2, rs, cx2,cy2, rs*6);
-        lensGrad.addColorStop(0,   'rgba(0,0,0,0.98)');
-        lensGrad.addColorStop(0.2, 'rgba(5,3,0,0.7)');
-        lensGrad.addColorStop(0.4, 'rgba(15,8,2,0.3)');
-        lensGrad.addColorStop(0.7, 'rgba(8,4,0,0.12)');
-        lensGrad.addColorStop(1,   'rgba(0,0,0,0)');
-        ctx.save(); ctx.fillStyle = lensGrad;
-        ctx.beginPath(); ctx.arc(cx2,cy2, rs*6, 0, Math.PI*2); ctx.fill();
         ctx.restore();
+        sc._arc.life--;
+      }
 
-        // Accretion disk (EHT-accurate perspective ellipse)
-        ctx.save();
-        ctx.translate(cx2, cy2);
-        ctx.rotate(bh.diskAngle);
-
-        const diskLayers = [
-          { rx:rs*3.8, ry:rs*0.85, col:'rgba(255,110,0,0.06)',  lw:rs*1.0 },
-          { rx:rs*3.0, ry:rs*0.68, col:'rgba(255,140,0,0.12)',  lw:rs*0.7 },
-          { rx:rs*2.3, ry:rs*0.52, col:'rgba(255,175,30,0.22)', lw:rs*0.55 },
-          { rx:rs*1.8, ry:rs*0.38, col:'rgba(255,210,80,0.38)', lw:rs*0.42 },
-          { rx:rs*1.42,ry:rs*0.28, col:'rgba(255,235,140,0.55)',lw:rs*0.32 },
-          { rx:rs*1.18,ry:rs*0.20, col:'rgba(200,225,255,0.72)',lw:rs*0.22 }, // inner: hot blue-white
-        ];
-        diskLayers.forEach(dl => {
-          ctx.save();
-          ctx.strokeStyle = dl.col;
-          ctx.lineWidth   = dl.lw;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, dl.rx, dl.ry, 0, 0, Math.PI*2);
-          ctx.stroke();
-          ctx.restore();
-        });
-
-        // Photon ring Doppler brightening — bright arc on approaching side
-        for (let seg = 0; seg < 80; seg++) {
-          const a1 = (seg/80)*Math.PI*2;
-          const a2 = ((seg+1)/80)*Math.PI*2;
-          const bright = 0.3 + 0.7*Math.pow(Math.max(0, Math.sin(a1+Math.PI*0.6)), 1.5);
-          const r2 = 255, g2 = Math.floor(160+80*bright), b2 = Math.floor(60*bright);
-          ctx.save();
-          ctx.strokeStyle = `rgba(${r2},${g2},${b2},${0.6*bright})`;
-          ctx.lineWidth   = rs * 0.14;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, rs*1.25, rs*0.26, 0, a1, a2);
-          ctx.stroke();
-          ctx.restore();
-        }
-        ctx.restore();
-
-        // Event horizon — absolute black
-        ctx.save();
-        ctx.fillStyle = '#000000';
-        ctx.beginPath(); ctx.arc(cx2, cy2, rs, 0, Math.PI*2); ctx.fill();
-        ctx.restore();
-
-        // Relativistic jets (pulsing brightness)
-        const jetBright = 0.5 + 0.5*Math.sin(bh.pulse);
-        const jetLen    = rs * 6;
-        [[0,-jetLen],[0,jetLen]].forEach(([dx,dy]) => {
-          const jGrad = ctx.createLinearGradient(cx2,cy2, cx2+dx,cy2+dy);
-          jGrad.addColorStop(0,   `rgba(180,220,255,${0.75*jetBright})`);
-          jGrad.addColorStop(0.3, `rgba(100,170,255,${0.4*jetBright})`);
-          jGrad.addColorStop(1,   'rgba(60,120,200,0)');
-          ctx.save();
-          ctx.strokeStyle = jGrad;
-          ctx.lineWidth   = rs * 0.22;
-          ctx.lineCap     = 'round';
-          ctx.beginPath(); ctx.moveTo(cx2,cy2); ctx.lineTo(cx2+dx,cy2+dy); ctx.stroke();
-          ctx.restore();
-        });
-      })();
-
-      // ── 5. SHOOTING STARS ──
-      if (Math.random() < 0.006) s.spawnShooter();
-      for (let i = s.shooters.length-1; i >= 0; i--) {
-        const sh = s.shooters[i];
-        const tGrad = ctx.createLinearGradient(sh.x,sh.y, sh.x-sh.vx*sh.len/6, sh.y-sh.vy*sh.len/6);
-        tGrad.addColorStop(0, rgba(sh.col, sh.alpha));
-        tGrad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.save();
-        ctx.strokeStyle = tGrad;
-        ctx.lineWidth   = 1.5;
-        ctx.beginPath(); ctx.moveTo(sh.x,sh.y); ctx.lineTo(sh.x-sh.vx*sh.len/6,sh.y-sh.vy*sh.len/6); ctx.stroke();
-        ctx.restore();
-        sh.x += sh.vx; sh.y += sh.vy; sh.alpha -= 0.016;
-        if (sh.alpha <= 0) s.shooters.splice(i, 1);
+      // ── 4. SHOOTING STARS ──
+      if (Math.random()<0.007) sc.spawnShooter();
+      for (let i=sc.shooters.length-1;i>=0;i--) {
+        const sh=sc.shooters[i];
+        const tg=ctx.createLinearGradient(sh.x,sh.y,sh.x-sh.vx*sh.len/6,sh.y-sh.vy*sh.len/6);
+        tg.addColorStop(0,rgba(sh.col,sh.alpha));
+        tg.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.save(); ctx.strokeStyle=tg; ctx.lineWidth=1.4;
+        ctx.beginPath(); ctx.moveTo(sh.x,sh.y); ctx.lineTo(sh.x-sh.vx*sh.len/6,sh.y-sh.vy*sh.len/6);
+        ctx.stroke(); ctx.restore();
+        sh.x+=sh.vx; sh.y+=sh.vy; sh.alpha-=0.018;
+        if(sh.alpha<=0) sc.shooters.splice(i,1);
       }
 
       animRef.current = requestAnimationFrame(draw);
     };
-
-    // ── COLOR HELPERS ──
-    function lightenColor(hex, amt) {
-      const r=Math.min(255,parseInt(hex.slice(1,3),16)+Math.floor(255*amt));
-      const g=Math.min(255,parseInt(hex.slice(3,5),16)+Math.floor(255*amt));
-      const b=Math.min(255,parseInt(hex.slice(5,7),16)+Math.floor(255*amt));
-      return `rgb(${r},${g},${b})`;
-    }
-    function darkenColor(hex, amt) {
-      const r=Math.max(0,parseInt(hex.slice(1,3),16)-Math.floor(255*amt));
-      const g=Math.max(0,parseInt(hex.slice(3,5),16)-Math.floor(255*amt));
-      const b=Math.max(0,parseInt(hex.slice(5,7),16)-Math.floor(255*amt));
-      return `rgb(${r},${g},${b})`;
-    }
 
     animRef.current = requestAnimationFrame(draw);
     return () => {
@@ -1559,165 +1333,219 @@ function HomePage({ setActiveTab, markets, fetching }) {
     };
   }, []);
 
-  // ── Animated counters ──
+  // ── Counters ──
   useEffect(() => {
-    const targets = { stocks:30, research:18, accuracy:94, users:1200 };
-    const start = Date.now();
-    const tick = () => {
-      const prog = Math.min((Date.now()-start)/2800, 1);
-      const ease = 1-Math.pow(1-prog,3);
-      setCounters({ stocks:Math.floor(ease*targets.stocks), research:Math.floor(ease*targets.research), accuracy:Math.floor(ease*targets.accuracy), users:Math.floor(ease*targets.users) });
-      if (prog < 1) requestAnimationFrame(tick);
+    const targets={stocks:30,research:18,accuracy:94,users:1200};
+    const start=Date.now();
+    const tick=()=>{
+      const p=Math.min((Date.now()-start)/2500,1), e=1-Math.pow(1-p,3);
+      setCounters({stocks:Math.floor(e*targets.stocks),research:Math.floor(e*targets.research),accuracy:Math.floor(e*targets.accuracy),users:Math.floor(e*targets.users)});
+      if(p<1)requestAnimationFrame(tick);
     };
-    setTimeout(tick, 1200);
-  }, []);
+    setTimeout(tick,600);
+  },[]);
+
+  // ── Clock ──
+  useEffect(()=>{const ti=setInterval(()=>setTick(t=>t+1),1000);return()=>clearInterval(ti);},[]);
 
   // ── Slides ──
-  const SLIDES = [
-    { text:"The stock market is a device for transferring money from the impatient to the patient.", author:"Warren Buffett", tag:"Investment Philosophy" },
-    { text:"NIFTY 50 has delivered 14.8% CAGR over 20 years — outperforming every major asset class in India.", author:"DNR Research", tag:"Market Insight" },
-    { text:"In the short run the market is a voting machine. In the long run it is a weighing machine.", author:"Benjamin Graham", tag:"Timeless Wisdom" },
-    { text:"FIIs have invested over ₹2.5 lakh crore in Indian equities in 3 years despite global headwinds.", author:"DNR Data", tag:"Institutional Flow" },
-    { text:"Risk comes from not knowing what you are doing.", author:"Warren Buffett", tag:"Risk Management" },
-    { text:"Indian MF AUM crossed ₹54 lakh crore — retail participation at an all-time high.", author:"AMFI Data", tag:"Market Milestone" },
-    { text:"Know what you own, and know why you own it.", author:"Peter Lynch", tag:"Investment Principle" },
-    { text:"Q3FY25 earnings showed 18% average revenue growth across NIFTY 50 — broad recovery.", author:"DNR Analysis", tag:"Earnings Update" },
+  const SLIDES=[
+    {text:"The stock market is a device for transferring money from the impatient to the patient.",author:"Warren Buffett",tag:"Investment Philosophy"},
+    {text:"NIFTY 50 has delivered 14.8% CAGR over 20 years — outperforming every major asset class in India.",author:"DNR Research",tag:"Market Insight"},
+    {text:"In the short run the market is a voting machine. In the long run it is a weighing machine.",author:"Benjamin Graham",tag:"Timeless Wisdom"},
+    {text:"FIIs invested over ₹2.5 lakh crore in Indian equities despite global headwinds.",author:"DNR Data",tag:"Institutional Flow"},
+    {text:"Risk comes from not knowing what you are doing.",author:"Warren Buffett",tag:"Risk Management"},
+    {text:"Indian MF AUM crossed ₹54 lakh crore — retail participation at an all-time high.",author:"AMFI Data",tag:"Market Milestone"},
+    {text:"Know what you own, and know why you own it.",author:"Peter Lynch",tag:"Investment Principle"},
+    {text:"Q3FY25 earnings showed 18% avg revenue growth across NIFTY 50.",author:"DNR Analysis",tag:"Earnings Update"},
   ];
-  useEffect(() => {
-    const ti = setInterval(() => {
-      setSlideFade(false);
-      setTimeout(() => { setSlideIdx(i=>(i+1)%SLIDES.length); setSlideFade(true); }, 500);
-    }, 5000);
-    return () => clearInterval(ti);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(()=>{const ti=setInterval(()=>{setSlideFade(false);setTimeout(()=>{setSlideIdx(i=>(i+1)%SLIDES.length);setSlideFade(true);},400);},5000);return()=>clearInterval(ti);},[]);
 
-  const PRICE_TILES = [
-    { key:"NIFTY 50",   icon:"📊", color:"#E0BC6A" },
-    { key:"SENSEX",     icon:"📈", color:"#60A5FA" },
-    { key:"NIFTY BANK", icon:"🏦", color:"#A78BFA" },
-    { key:"GOLD (₹)",   icon:"🥇", color:"#FCD34D" },
-    { key:"CRUDE",      icon:"🛢️", color:"#FB923C" },
-    { key:"USD/INR",    icon:"💱", color:"#34D399" },
+  const PRICE_TILES=[
+    {key:"NIFTY 50",  icon:"📊",color:"#5BB8FF"},
+    {key:"SENSEX",    icon:"📈",color:"#C9A84C"},
+    {key:"NIFTY BANK",icon:"🏦",color:"#A78BFA"},
+    {key:"GOLD (₹)",  icon:"🥇",color:"#FCD34D"},
+    {key:"CRUDE",     icon:"🛢️",color:"#FB923C"},
+    {key:"USD/INR",   icon:"💱",color:"#34D399"},
   ];
 
-  if (!entered) {
-    return (
-      <div style={{ position:"relative", width:"100%", height:"calc(100vh - 48px)", overflow:"hidden", background:"#010208" }}>
-        <canvas ref={canvasRef} style={{ position:"absolute", inset:0, width:"100%", height:"100%" }} />
-        <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 65% 65% at 50% 50%, rgba(1,2,8,0.3) 0%, rgba(1,2,8,0.92) 100%)", pointerEvents:"none" }} />
-        <div style={{ position:"relative", zIndex:10, height:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", textAlign:"center", padding:"0 40px" }}>
-          <div style={{ position:"relative", marginBottom:40, animation:"csmFade 1.4s ease forwards" }}>
-            {[160,184,210].map((sz,i) => (
-              <div key={i} style={{ position:"absolute", top:`${-((sz-120)/2)}px`, left:`${-((sz-120)/2)}px`, width:sz, height:sz, borderRadius:"50%", border:`1px solid ${['#E0BC6A55','#60A5FA33','#A78BFA22'][i]}`, animation:`csmSpin${['60','90','120'][i]} ${['60','90','120'][i]}s linear infinite ${i===1?'reverse':''}` }}/>
-            ))}
-            <img src="/logo.png" alt="DNR Capitals" style={{ width:120, height:120, borderRadius:"50%", objectFit:"cover", border:"2px solid #E0BC6A77", boxShadow:"0 0 70px #E0BC6A66,0 0 140px #60A5FA33,0 0 35px #A78BFA22", position:"relative", zIndex:2 }}/>
-          </div>
-          <div style={{ fontSize:9, color:"#E0BC6A", letterSpacing:"8px", textTransform:"uppercase", marginBottom:22, opacity:0.85, animation:"csmFade 1.7s ease forwards" }}>DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE</div>
-          <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(56px,9vw,112px)", fontWeight:700, color:"#F0F8FF", lineHeight:0.88, textShadow:"0 0 120px #60A5FA18", marginBottom:10, animation:"csmFade 1.9s ease forwards" }}>Know Before</h1>
-          <h1 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(56px,9vw,112px)", fontWeight:700, fontStyle:"italic", color:"#E0BC6A", textShadow:"0 0 90px #E0BC6A55", marginBottom:52, display:"block", animation:"csmFade 2.1s ease forwards" }}>You Invest</h1>
-          <button onClick={() => setEntered(true)} style={{ padding:"16px 60px", background:"transparent", border:"1px solid #E0BC6A88", borderRadius:2, color:"#E0BC6A", fontFamily:"'Jost',sans-serif", fontSize:11, fontWeight:600, letterSpacing:"6px", textTransform:"uppercase", cursor:"pointer", transition:"all 0.4s", boxShadow:"0 0 28px #E0BC6A22,inset 0 0 28px #E0BC6A08", animation:"csmFade 2.3s ease forwards" }}
-            onMouseEnter={e=>{e.target.style.background="#E0BC6A15";e.target.style.boxShadow="0 0 60px #E0BC6A55,inset 0 0 40px #E0BC6A18";e.target.style.letterSpacing="9px"}}
-            onMouseLeave={e=>{e.target.style.background="transparent";e.target.style.boxShadow="0 0 28px #E0BC6A22,inset 0 0 28px #E0BC6A08";e.target.style.letterSpacing="6px"}}>
-            ◈ &nbsp; ENTER PLATFORM
-          </button>
-          <div style={{ marginTop:30, fontSize:9, color:"#0A1428", letterSpacing:"2px", animation:"csmFade 2.5s ease forwards" }}>POWERED BY GROQ AI · REAL-TIME DATA · 18 RESEARCH DIMENSIONS</div>
-        </div>
-        <style>{`
-          @keyframes csmFade{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-          @keyframes csmSpin60{to{transform:rotate(360deg)}}
-          @keyframes csmSpin90{to{transform:rotate(-360deg)}}
-          @keyframes csmSpin120{to{transform:rotate(360deg)}}
-        `}</style>
-      </div>
-    );
-  }
+  const now=new Date();
+  const timeStr=now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const dateStr=now.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  const glassPanel=(extra={})=>({background:'rgba(0,5,16,0.72)',backdropFilter:'blur(16px)',borderTop:'1px solid rgba(91,184,255,0.10)',borderBottom:'1px solid rgba(91,184,255,0.06)',...extra});
 
-  return (
-    <div style={{ position:"relative", width:"100%", minHeight:"calc(100vh - 48px)", background:"#010208", overflow:"hidden" }}>
-      <canvas ref={canvasRef} style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0.9 }} />
-      <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 100% 45% at 50% 0%, transparent, #01020888 80%)", pointerEvents:"none" }} />
-      <div style={{ position:"relative", zIndex:10 }}>
-        {/* Hero */}
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", padding:"40px 40px 24px", textAlign:"center" }}>
-          <div style={{ position:"relative", marginBottom:18 }}>
-            {[1,2].map(i=>(
-              <div key={i} style={{ position:"absolute", inset:`${-i*10}px`, borderRadius:"50%", border:`1px solid ${i===1?"#E0BC6A44":"#60A5FA22"}`, animation:`csmSpin${i===1?60:90} ${i===1?60:90}s linear infinite${i===2?" reverse":""}` }}/>
-            ))}
-            <img src="/logo.png" alt="DNR Capitals" style={{ width:88, height:88, borderRadius:"50%", objectFit:"cover", border:"2px solid #E0BC6A55", boxShadow:"0 0 40px #E0BC6A44,0 0 80px #60A5FA22", position:"relative", zIndex:2 }}/>
-          </div>
-          <div style={{ fontSize:8, color:"#E0BC6A77", letterSpacing:"5px", textTransform:"uppercase", marginBottom:18 }}>DNR Capitals · Equity Research Intelligence</div>
-          <div style={{ display:"flex", gap:10, flexWrap:"wrap", justifyContent:"center" }}>
-            {[{label:"🔬 Deep Research",tab:"research",c:"#E0BC6A"},{label:"🔍 Screener",tab:"screener",c:"#60A5FA"},{label:"💼 Portfolio",tab:"portfolio",c:"#A78BFA"},{label:"📊 Markets",tab:"markets",c:"#34D399"}].map(b=>(
-              <button key={b.tab} onClick={()=>setActiveTab(b.tab)} style={{ padding:"9px 22px", background:"transparent", border:`1px solid ${b.c}44`, borderRadius:3, color:b.c, fontFamily:"'Jost',sans-serif", fontSize:11, fontWeight:600, letterSpacing:"1px", cursor:"pointer", transition:"all 0.2s" }}
-                onMouseEnter={e=>{e.currentTarget.style.background=b.c+'18';e.currentTarget.style.borderColor=b.c+'99';e.currentTarget.style.boxShadow=`0 0 20px ${b.c}33`}}
-                onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor=b.c+'44';e.currentTarget.style.boxShadow="none"}}>{b.label}</button>
-            ))}
-          </div>
-        </div>
-        {/* Counters */}
-        <div style={{ display:"flex", justifyContent:"center", borderTop:"1px solid #E0BC6A18", borderBottom:"1px solid #E0BC6A18", background:"#00000077", padding:"16px 0" }}>
-          {[{label:"Stocks Covered",val:counters.stocks,suffix:"+",color:"#E0BC6A"},{label:"Research Dimensions",val:counters.research,suffix:"",color:"#60A5FA"},{label:"AI Accuracy Score",val:counters.accuracy,suffix:"%",color:"#A78BFA"},{label:"Data Points/Stock",val:counters.users,suffix:"+",color:"#34D399"}].map((c,i)=>(
-            <div key={i} style={{ flex:1, textAlign:"center", padding:"0 16px", borderRight:i<3?"1px solid #E0BC6A12":"none" }}>
-              <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"clamp(24px,3.5vw,42px)", fontWeight:700, color:c.color, textShadow:`0 0 20px ${c.color}55` }}>{c.val}{c.suffix}</div>
-              <div style={{ fontSize:8, color:"#1A2A4A", letterSpacing:"2px", textTransform:"uppercase", marginTop:5 }}>{c.label}</div>
+  return(
+    <div style={{position:'relative',width:'100%',minHeight:'calc(100vh - 48px)',overflow:'hidden',background:'#000510'}}>
+
+      {/* ── CANVAS BACKGROUND ── */}
+      <canvas ref={canvasRef} style={{position:'absolute',inset:0,width:'100%',height:'100%'}}/>
+
+      {/* Light vignette — center open, edges dark */}
+      <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse 75% 65% at 50% 40%,rgba(0,5,16,0.05),rgba(0,5,16,0.68))',pointerEvents:'none'}}/>
+
+      <div style={{position:'relative',zIndex:10}}>
+
+        {/* ── TOP IDENTITY BAR ── */}
+        <div style={{...glassPanel(),display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 28px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{position:'relative'}}>
+              <div style={{position:'absolute',inset:-6,borderRadius:'50%',border:'1px solid rgba(91,184,255,0.3)',animation:'warpSpin 8s linear infinite'}}/>
+              <img src='/logo.png' alt='DNR' style={{width:42,height:42,borderRadius:'50%',objectFit:'cover',border:'1px solid rgba(91,184,255,0.4)',boxShadow:'0 0 16px rgba(91,184,255,0.3)',position:'relative',zIndex:2}}/>
             </div>
-          ))}
+            <div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,fontWeight:700,color:'#5BB8FF',letterSpacing:'0.3px',lineHeight:1,textShadow:'0 0 20px rgba(91,184,255,0.4)'}}>DNR Capitals</div>
+              <div style={{fontSize:8,color:'rgba(91,184,255,0.4)',letterSpacing:'2.5px',textTransform:'uppercase',marginTop:3}}>Equity Research Intelligence</div>
+            </div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:24}}>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:'rgba(200,220,255,0.8)',letterSpacing:'1px'}}>{timeStr}</div>
+              <div style={{fontSize:9,color:'rgba(91,184,255,0.35)',marginTop:1}}>{dateStr}</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <div style={{width:5,height:5,borderRadius:'50%',background:'#34D399',boxShadow:'0 0 8px #34D399',animation:'livePulse 2s infinite'}}/>
+              <span style={{fontSize:9,color:'rgba(52,211,153,0.7)',letterSpacing:'2px'}}>LIVE</span>
+            </div>
+          </div>
         </div>
-        {/* Price tiles */}
-        <div style={{ padding:"16px 20px", borderBottom:"1px solid #E0BC6A12" }}>
-          <div style={{ fontSize:8, color:"#1A2A4A", letterSpacing:"3px", textTransform:"uppercase", marginBottom:10, textAlign:"center" }}>● LIVE MARKET DATA</div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:8 }}>
-            {PRICE_TILES.map(tile=>{
+
+        {/* ── LIVE PRICE STRIP ── */}
+        <div style={{...glassPanel({borderTop:'none'}),padding:'8px 28px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:1}}>
+            {PRICE_TILES.map((tile,i)=>{
               const live=markets[tile.key];
-              return (
-                <div key={tile.key} style={{ background:"#010208cc", border:`1px solid ${tile.color}22`, borderRadius:6, padding:"12px 8px", textAlign:"center", transition:"all 0.3s", cursor:"pointer" }}
-                  onMouseEnter={e=>{e.currentTarget.style.border=`1px solid ${tile.color}77`;e.currentTarget.style.boxShadow=`0 0 24px ${tile.color}33`}}
-                  onMouseLeave={e=>{e.currentTarget.style.border=`1px solid ${tile.color}22`;e.currentTarget.style.boxShadow="none"}}>
-                  <div style={{ fontSize:14, marginBottom:3 }}>{tile.icon}</div>
-                  <div style={{ fontSize:8, color:"#1A2A4A", letterSpacing:"1px", textTransform:"uppercase", marginBottom:5 }}>{tile.key}</div>
-                  <div style={{ fontFamily:"'DM Mono',monospace", fontSize:12, fontWeight:700, color:live?tile.color:"#0A1428" }}>{live?.v||"···"}</div>
-                  {live?.c&&<div style={{ fontSize:9, color:live.u?"#34D399":"#F87171", marginTop:2 }}>{live.u?"▲":"▼"} {live.c}</div>}
+              return(
+                <div key={tile.key} style={{padding:'9px 14px',textAlign:'center',borderRight:i<5?'1px solid rgba(91,184,255,0.06)':'none',cursor:'pointer',transition:'background 0.2s'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='rgba(91,184,255,0.05)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <div style={{fontSize:8,color:'rgba(91,184,255,0.35)',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>{tile.key}</div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:600,color:live?tile.color:'rgba(50,80,130,0.6)',letterSpacing:'0.5px',textShadow:live?`0 0 10px ${tile.color}44`:'none'}}>{live?.v||'—'}</div>
+                  {live?.c?<div style={{fontSize:9,color:live.u?'#34D399':'#F87171',marginTop:2}}>{live.u?'▲':'▼'} {live.c}</div>:<div style={{fontSize:9,color:'rgba(50,80,130,0.35)',marginTop:2}}>{fetching?'···':'—'}</div>}
                 </div>
               );
             })}
           </div>
         </div>
-        {/* Slides */}
-        <div style={{ padding:"18px 40px", borderBottom:"1px solid #E0BC6A12", background:"#01020888" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}><div style={{ width:3, height:14, background:"#E0BC6A", boxShadow:"0 0 8px #E0BC6A" }}/><span style={{ fontSize:8, color:"#E0BC6A88", letterSpacing:"3px", textTransform:"uppercase" }}>{SLIDES[slideIdx].tag}</span></div>
-            <div style={{ display:"flex", gap:4 }}>{SLIDES.map((_,i)=>(<div key={i} onClick={()=>setSlideIdx(i)} style={{ width:i===slideIdx?14:4, height:4, borderRadius:2, background:i===slideIdx?"#E0BC6A":"#1A2A4A", cursor:"pointer", transition:"all 0.3s", boxShadow:i===slideIdx?"0 0 6px #E0BC6A":"none" }}/>))}</div>
+
+        {/* ── HERO ── */}
+        <div style={{padding:'52px 60px 40px',display:'flex',flexDirection:'column',alignItems:'center',textAlign:'center'}}>
+          {/* Logo medallion */}
+          <div style={{position:'relative',marginBottom:28}}>
+            <div style={{position:'absolute',inset:-14,borderRadius:'50%',border:'1px solid rgba(91,184,255,0.25)',animation:'warpSpin 12s linear infinite'}}/>
+            <div style={{position:'absolute',inset:-24,borderRadius:'50%',border:'1px solid rgba(91,184,255,0.12)',animation:'warpSpin 20s linear infinite reverse'}}/>
+            <img src='/logo.png' alt='DNR Capitals' style={{width:96,height:96,borderRadius:'50%',objectFit:'cover',border:'2px solid rgba(91,184,255,0.45)',boxShadow:'0 0 50px rgba(91,184,255,0.35),0 0 100px rgba(91,184,255,0.15)',position:'relative',zIndex:2}}/>
           </div>
-          <div style={{ transition:"opacity 0.5s", opacity:slideFade?1:0, minHeight:52 }}>
-            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:"clamp(13px,1.8vw,17px)", fontStyle:"italic", color:"#7A8BAB", lineHeight:1.7 }}>"{SLIDES[slideIdx].text}"</div>
-            <div style={{ fontSize:9, color:"#E0BC6A77", letterSpacing:"2px", marginTop:7 }}>— {SLIDES[slideIdx].author}</div>
+
+          <div style={{fontSize:9,color:'rgba(91,184,255,0.55)',letterSpacing:'7px',textTransform:'uppercase',marginBottom:18}}>
+            DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE
+          </div>
+
+          <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:'clamp(36px,5.5vw,72px)',font
+Weight:600,color:'#E8F4FF',lineHeight:1.05,letterSpacing:'-0.5px',marginBottom:8,textShadow:'0 0 80px rgba(91,184,255,0.15)'}}>
+            Institutional-Grade
+          </h1>
+          <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:'clamp(36px,5.5vw,72px)',fontWeight:600,fontStyle:'italic',color:'#5BB8FF',lineHeight:1.05,letterSpacing:'-0.5px',marginBottom:22,textShadow:'0 0 60px rgba(91,184,255,0.4)'}}>
+            Equity Research
+          </h1>
+          <p style={{fontSize:13,color:'rgba(140,175,220,0.55)',maxWidth:500,lineHeight:1.9,letterSpacing:'0.3px',marginBottom:32,fontWeight:300}}>
+            Groq-powered deep research across 18 dimensions — fundamentals, valuation, technicals, peer benchmarking and portfolio intelligence.
+          </p>
+
+          <div style={{display:'flex',gap:12,flexWrap:'wrap',justifyContent:'center'}}>
+            {[
+              {label:'🔬 Deep Research', tab:'research',  primary:true},
+              {label:'🔍 Screener',      tab:'screener',  primary:false},
+              {label:'💼 Portfolio',     tab:'portfolio', primary:false},
+              {label:'📊 Markets',       tab:'markets',   primary:false},
+            ].map(b=>(
+              <button key={b.tab} onClick={()=>setActiveTab(b.tab)} style={{
+                padding:b.primary?'11px 28px':'10px 22px',
+                background:b.primary?'rgba(91,184,255,0.12)':'transparent',
+                border:`1px solid ${b.primary?'rgba(91,184,255,0.5)':'rgba(91,184,255,0.15)'}`,
+                borderRadius:3, color:b.primary?'#5BB8FF':'rgba(140,175,220,0.6)',
+                fontFamily:"'Jost',sans-serif",fontSize:11,fontWeight:b.primary?600:400,
+                letterSpacing:'1.5px',textTransform:'uppercase',cursor:'pointer',transition:'all 0.2s',
+                boxShadow:b.primary?'0 0 20px rgba(91,184,255,0.15)':'none',
+              }}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(91,184,255,0.18)';e.currentTarget.style.borderColor='rgba(91,184,255,0.7)';e.currentTarget.style.color='#88CCFF';e.currentTarget.style.boxShadow='0 0 24px rgba(91,184,255,0.3)'}}
+              onMouseLeave={e=>{e.currentTarget.style.background=b.primary?'rgba(91,184,255,0.12)':'transparent';e.currentTarget.style.borderColor=b.primary?'rgba(91,184,255,0.5)':'rgba(91,184,255,0.15)';e.currentTarget.style.color=b.primary?'#5BB8FF':'rgba(140,175,220,0.6)';e.currentTarget.style.boxShadow=b.primary?'0 0 20px rgba(91,184,255,0.15)':'none'}}>
+                {b.label}
+              </button>
+            ))}
           </div>
         </div>
-        {/* Features */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"1px", background:"#E0BC6A08", borderTop:"1px solid #E0BC6A12" }}>
-          {[{icon:"🔬",title:"18-Dimension Deep Research",desc:"Business · Financials · Valuation · Peer · Technical · DCF · Verdict",tab:"research",c:"#E0BC6A"},{icon:"📈",title:"Technical Charts Suite",desc:"MA · RSI · MACD · Bollinger Bands · Volume Analysis",tab:"technical",c:"#60A5FA"},{icon:"🔍",title:"Smart Screener",desc:"30 stocks · 10 numeric filters · 8 presets · AI analysis",tab:"screener",c:"#34D399"},{icon:"💼",title:"Portfolio Tracker",desc:"Real-time P&L · AI review · Allocation charts · CSV export",tab:"portfolio",c:"#A78BFA"},{icon:"📦",title:"Bulk & Block Deals",desc:"Institutional smart money tracker · AI deal analysis",tab:"bulkdeals",c:"#FB923C"},{icon:"🧮",title:"Financial Calculators",desc:"SIP · Lumpsum · Position Sizing · Tax · Black-Scholes",tab:"calculators",c:"#FCD34D"}].map(f=>(
-            <div key={f.tab} onClick={()=>setActiveTab(f.tab)} style={{ background:"#010208", padding:"20px 22px", cursor:"pointer", display:"flex", alignItems:"flex-start", gap:12, transition:"all 0.25s", borderLeft:"2px solid transparent" }}
-              onMouseEnter={e=>{e.currentTarget.style.background="#040B14";e.currentTarget.style.borderLeft=`2px solid ${f.c}`}}
-              onMouseLeave={e=>{e.currentTarget.style.background="#010208";e.currentTarget.style.borderLeft="2px solid transparent"}}>
-              <div style={{ fontSize:17, width:36, height:36, background:`${f.c}15`, border:`1px solid ${f.c}33`, borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{f.icon}</div>
-              <div><div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:14, fontWeight:600, color:"#E8F0FF", marginBottom:3 }}>{f.title}</div><div style={{ fontSize:10, color:"#1A2A4A", lineHeight:1.6 }}>{f.desc}</div></div>
+
+        {/* ── STATS ── */}
+        <div style={{...glassPanel(),padding:'16px 0'}}>
+          <div style={{display:'flex',justifyContent:'center'}}>
+            {[
+              {label:'Stocks Covered',     val:counters.stocks,   suffix:'+', color:'#5BB8FF'},
+              {label:'Research Dimensions',val:counters.research, suffix:'',  color:'#C9A84C'},
+              {label:'AI Accuracy Score',  val:counters.accuracy, suffix:'%', color:'#A78BFA'},
+              {label:'Data Points/Stock',  val:counters.users,    suffix:'+', color:'#34D399'},
+            ].map((c,i)=>(
+              <div key={i} style={{flex:1,textAlign:'center',padding:'0 20px',borderRight:i<3?'1px solid rgba(91,184,255,0.08)':'none'}}>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:'clamp(22px,3vw,40px)',fontWeight:700,color:c.color,letterSpacing:'-0.5px',textShadow:`0 0 20px ${c.color}55`}}>{c.val}{c.suffix}</div>
+                <div style={{fontSize:8,color:'rgba(91,184,255,0.35)',letterSpacing:'2px',textTransform:'uppercase',marginTop:5}}>{c.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── WISDOM SLIDE ── */}
+        <div style={{...glassPanel({borderTop:'none'}),padding:'20px 60px'}}>
+          <div style={{display:'flex',alignItems:'flex-start',gap:18}}>
+            <div style={{width:2,minHeight:54,background:'linear-gradient(180deg,#5BB8FF,transparent)',flexShrink:0,boxShadow:'0 0 8px #5BB8FF'}}/>
+            <div style={{flex:1,transition:'opacity 0.4s',opacity:slideFade?1:0}}>
+              <div style={{fontSize:8,color:'rgba(91,184,255,0.4)',letterSpacing:'3px',textTransform:'uppercase',marginBottom:9}}>{SLIDES[slideIdx].tag}</div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:'clamp(13px,1.8vw,17px)',fontStyle:'italic',color:'rgba(180,205,240,0.65)',lineHeight:1.75}}>"{SLIDES[slideIdx].text}"</div>
+              <div style={{fontSize:10,color:'rgba(91,184,255,0.35)',marginTop:9,letterSpacing:'1px'}}>— {SLIDES[slideIdx].author}</div>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:4,flexShrink:0}}>
+              {SLIDES.map((_,i)=>(<div key={i} onClick={()=>setSlideIdx(i)} style={{width:4,height:i===slideIdx?14:4,borderRadius:2,background:i===slideIdx?'#5BB8FF':'rgba(91,184,255,0.15)',cursor:'pointer',transition:'all 0.3s',boxShadow:i===slideIdx?'0 0 6px #5BB8FF':'none'}}/>))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── FEATURE MODULES ── */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',borderTop:'1px solid rgba(91,184,255,0.06)'}}>
+          {[
+            {icon:'🔬',title:'Deep Research Engine',     desc:'18-dimension analysis — business, financials, valuation, peer, DCF, technical, shareholding, AI verdict',tab:'research',    c:'#5BB8FF'},
+            {icon:'📈',title:'Technical Analysis Suite',  desc:'MA, RSI, MACD, Bollinger Bands, volume analysis and AI pattern recognition',                              tab:'technical',   c:'#C9A84C'},
+            {icon:'🔍',title:'Smart Stock Screener',      desc:'30 stocks · 10 numeric filters · 8 presets · sector tags · AI quick analysis',                           tab:'screener',    c:'#34D399'},
+            {icon:'💼',title:'Portfolio Tracker',         desc:'Real-time P&L · position weights · AI health review · allocation charts · CSV export',                    tab:'portfolio',   c:'#A78BFA'},
+            {icon:'🏦',title:'Institutional Momentum',    desc:'Daily FII/DII block deals · monthly MF disclosures · quarterly shareholding tracker',                     tab:'institutional',c:'#FB923C'},
+            {icon:'🧮',title:'Financial Calculators',     desc:'SIP · Lumpsum · Position Sizing · Tax LTCG/STCG · Black-Scholes · MF overlap',                          tab:'calculators', c:'#FCD34D'},
+          ].map((f,i)=>(
+            <div key={f.tab} onClick={()=>setActiveTab(f.tab)} style={{padding:'24px 26px',background:'rgba(0,5,18,0.75)',backdropFilter:'blur(10px)',borderRight:i%3<2?'1px solid rgba(91,184,255,0.05)':'none',borderBottom:'1px solid rgba(91,184,255,0.05)',cursor:'pointer',transition:'background 0.2s',position:'relative',overflow:'hidden'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(5,15,35,0.88)';e.currentTarget.querySelector('.fac').style.width='100%';e.currentTarget.querySelector('.fac').style.opacity='1'}}
+              onMouseLeave={e=>{e.currentTarget.style.background='rgba(0,5,18,0.75)';e.currentTarget.querySelector('.fac').style.width='0%';e.currentTarget.querySelector('.fac').style.opacity='0'}}>
+              <div className='fac' style={{position:'absolute',top:0,left:0,height:'2px',width:'0%',background:f.c,opacity:0,transition:'all 0.35s',boxShadow:`0 0 10px ${f.c}`}}/>
+              <div style={{fontSize:20,marginBottom:12}}>{f.icon}</div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:15,fontWeight:600,color:'rgba(210,228,255,0.9)',marginBottom:7,lineHeight:1.2}}>{f.title}</div>
+              <div style={{fontSize:10,color:'rgba(91,184,255,0.3)',lineHeight:1.7}}>{f.desc}</div>
+              <div style={{marginTop:12,fontSize:9,color:f.c,letterSpacing:'2px',opacity:0.6}}>OPEN →</div>
             </div>
           ))}
         </div>
-        <div style={{ padding:"10px 24px", display:"flex", justifyContent:"space-between", borderTop:"1px solid #E0BC6A12", background:"#010208" }}>
-          <span style={{ fontSize:9, color:"#0A1428" }}>© {new Date().getFullYear()} DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE</span>
-          <span style={{ fontSize:9, color:"#0A1428" }}>POWERED BY GROQ AI · NOT SEBI REGISTERED ADVICE</span>
+
+        {/* Footer */}
+        <div style={{...glassPanel({borderBottom:'none'}),padding:'10px 28px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:9,color:'rgba(50,80,140,0.4)',letterSpacing:'1px'}}>© {new Date().getFullYear()} DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE</span>
+          <span style={{fontSize:9,color:'rgba(50,80,140,0.4)',letterSpacing:'1px'}}>POWERED BY GROQ AI · NOT SEBI REGISTERED ADVICE</span>
         </div>
       </div>
+
       <style>{`
-        @keyframes csmFade{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes csmSpin60{to{transform:rotate(360deg)}}
-        @keyframes csmSpin90{to{transform:rotate(-360deg)}}
-        @keyframes csmSpin120{to{transform:rotate(360deg)}}
+        @keyframes warpSpin{to{transform:rotate(360deg)}}
+        @keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 8px #34D399}50%{opacity:0.5;box-shadow:0 0 16px #34D399}}
       `}</style>
     </div>
   );
 }
+
 
 // ─── MARKETS ──────────────────────────────────────────────────────────────────
 function Markets({ markets={}, fetching=false, onRefresh=()=>{} }) {
