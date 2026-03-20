@@ -1106,21 +1106,53 @@ function HomePage({ setActiveTab, markets, fetching }) {
       const W = canvas.width, H = canvas.height;
       const FOV = Math.min(W,H) * 0.85;
       const CX = W/2, CY = H/2;
-      const DEPTH = 1800;
-      const SPEED = 2.2;
+      const DEPTH = 2000;
+      const SPEED = 1.8;
 
-      // ── 800 warp stars in 3D ──
-      const stars = Array.from({length:800}, () => {
-        const cols = ['#C8DCFF','#D8E8FF','#FFFFFF','#FFF8EE','#FFEEDD','#FFD090','#FFB060','#FF8844'];
-        return {
-          x: rand(-W*2.5, W*2.5),
-          y: rand(-H*2.5, H*2.5),
-          z: rand(1, DEPTH),
-          pz: DEPTH,
-          col: cols[Math.floor(Math.pow(Math.random(),2)*cols.length)],
-          size: rand(0.3, 2.2),
-        };
-      });
+      // ── 1400 warp stars in 3D — more density ──
+      const STAR_COLS = [
+        '#FFFFFF','#F0F8FF','#E8F4FF', // pure white / blue-white
+        '#CCE8FF','#AADDFF','#88CCFF', // electric blue family
+        '#FFEEDD','#FFD090','#FFB060', // warm gold/orange
+        '#FF8844','#FF6622',           // orange-red giants
+      ];
+      const stars = Array.from({length:1400}, () => ({
+        x:    rand(-W*3, W*3),
+        y:    rand(-H*3, H*3),
+        z:    rand(1, DEPTH),
+        pz:   DEPTH,
+        col:  STAR_COLS[Math.floor(Math.pow(Math.random(),1.8)*STAR_COLS.length)],
+        size: rand(0.25, 3.0),
+      }));
+
+      // ── Galaxy spiral — 2000 particles ──
+      const galaxyParticles = [];
+      const GAL_COLS = ['#88CCFF','#AADDFF','#FFFFFF','#FFE8A0','#FFD060','#C8A0FF','#FF9090'];
+      for (let arm=0; arm<3; arm++) {
+        for (let i=0; i<660; i++) {
+          const frac   = i/660;
+          const angle  = (arm/3)*Math.PI*2 + frac*Math.PI*3.5;
+          const radius = frac * Math.min(W,H) * 0.38;
+          const spread = frac * 28;
+          const cx2 = W*0.5 + Math.cos(angle)*radius + (Math.random()-0.5)*spread;
+          const cy2 = H*0.5 + Math.sin(angle)*radius*0.42 + (Math.random()-0.5)*spread*0.42;
+          let col;
+          if (frac<0.12)      col = '#FFF5C0'; // core — warm white-gold
+          else if (frac<0.35) col = '#AADDFF'; // inner arms — blue-white
+          else if (frac<0.65) col = '#88CCFF'; // mid arms — electric blue
+          else                col = '#6699CC'; // outer — dim blue
+          galaxyParticles.push({
+            x: cx2, y: cy2,
+            r: rand(0.4, frac<0.15?3.5:1.8),
+            alpha: (1-frac*0.6)*(0.4+Math.random()*0.5),
+            col,
+            baseX: cx2, baseY: cy2,
+          });
+        }
+      }
+
+      // ── Galaxy core glow ──
+      const galCore = { x:W*0.5, y:H*0.5, angle:0 };
 
       // ── Constellation nodes — NSE stocks ──
       const LABELS = ['NIFTY','TCS','HDFC','RELIANCE','INFY','BAJFINANCE',
@@ -1128,29 +1160,63 @@ function HomePage({ setActiveTab, markets, fetching }) {
         'KOTAKBANK','SUNPHARMA','DRREDDY','ONGC','NTPC','TITAN','ICICIBANK',
         'HDFCBANK','MARUTI','ASIAN','NESTL','COALIND','POWERGRID','HCLTECH'];
       const nodes = Array.from({length:28}, (_, i) => ({
-        x: rand(0.08, 0.92),
-        y: rand(0.08, 0.92),
-        vx: (Math.random()-0.5)*0.00025,
-        vy: (Math.random()-0.5)*0.00025,
-        r: rand(2, 4.5),
-        pulse: Math.random()*Math.PI*2,
-        label: LABELS[i%LABELS.length],
-        brightness: rand(0.5, 1.0),
+        x:  rand(0.06, 0.94),
+        y:  rand(0.06, 0.94),
+        vx: (Math.random()-0.5)*0.00022,
+        vy: (Math.random()-0.5)*0.00022,
+        r:  rand(2.5, 5.5),
+        pulse:      Math.random()*Math.PI*2,
+        pulseSpeed: rand(0.015, 0.03),
+        label:      LABELS[i%LABELS.length],
+        brightness: rand(0.6, 1.0),
+        hue:        Math.random()>0.7 ? '#FFD060' : '#5BB8FF', // mix gold + blue nodes
       }));
+
+      // ── Active electric arcs — multiple simultaneous ──
+      const arcs = [];
+      const spawnArc = () => {
+        if (arcs.length > 5) return;
+        const i = Math.floor(Math.random()*nodes.length);
+        const j = (i + 1 + Math.floor(Math.random()*5)) % nodes.length;
+        arcs.push({
+          ax: nodes[i].x*W, ay: nodes[i].y*H,
+          bx: nodes[j].x*W, by: nodes[j].y*H,
+          life: 24, maxLife: 24,
+          col: Math.random()>0.4 ? '#5BB8FF' : '#FFD060',
+          width: rand(0.8, 2.5),
+          // Jagged lightning path
+          jag: Array.from({length:6}, () => ({
+            ox: (Math.random()-0.5)*40,
+            oy: (Math.random()-0.5)*40,
+          })),
+        });
+      };
 
       // ── Shooting stars ──
       const shooters = [];
       const spawnShooter = () => {
-        if (shooters.length >= 3 && Math.random() > 0.003) return;
+        if (shooters.length >= 5) return;
         shooters.push({
-          x: rand(0, W), y: rand(0, H*0.45),
-          vx: rand(5,9), vy: rand(1.5,3.5),
-          len: rand(90,180), alpha:1,
-          col: Math.random()>0.5?'#FFFFFF':'#C8E0FF',
+          x:   rand(0, W),
+          y:   rand(0, H*0.4),
+          vx:  rand(6,12),
+          vy:  rand(1.5,4),
+          len: rand(100,220),
+          alpha: 1,
+          col: Math.random()>0.5 ? '#FFFFFF' : '#88CCFF',
+          width: rand(0.8, 2),
         });
       };
 
-      return { W, H, FOV, CX, CY, DEPTH, SPEED, stars, nodes, shooters, spawnShooter, t:0, needsReinit:false };
+      // ── Nebula wisps — 4 large colored clouds ──
+      const nebulae = [
+        { x:0.15, y:0.25, rx:0.22, ry:0.14, col:'#4433AA', alpha:0.08, rot:0, speed:0.00015 },
+        { x:0.82, y:0.65, rx:0.20, ry:0.13, col:'#AA3355', alpha:0.07, rot:1, speed:-0.0001 },
+        { x:0.65, y:0.18, rx:0.18, ry:0.11, col:'#1155AA', alpha:0.09, rot:2, speed:0.00012 },
+        { x:0.30, y:0.78, rx:0.20, ry:0.12, col:'#AA6600', alpha:0.07, rot:0.5,speed:0.00008 },
+      ];
+
+      return { W, H, FOV, CX, CY, DEPTH, SPEED, stars, galaxyParticles, galCore, nodes, arcs, spawnArc, shooters, spawnShooter, nebulae, t:0, needsReinit:false };
     };
 
     stateRef.current = initScene();
@@ -1167,27 +1233,63 @@ function HomePage({ setActiveTab, markets, fetching }) {
       const {W,H,FOV,CX,CY,DEPTH,SPEED} = sc;
       sc.t++;
 
-      // Background — deep space blue-black
-      ctx.fillStyle = '#000510';
+      // Background — deep rich space blue-black (not pure black)
+      ctx.fillStyle = 'rgba(0,4,12,1)';
       ctx.fillRect(0,0,W,H);
 
-      // Milky Way glow band
-      const mwGrad = ctx.createLinearGradient(0,H*0.2,W,H*0.8);
-      mwGrad.addColorStop(0,   'rgba(0,0,0,0)');
-      mwGrad.addColorStop(0.35,'rgba(20,15,55,0.18)');
-      mwGrad.addColorStop(0.5, 'rgba(35,25,75,0.28)');
-      mwGrad.addColorStop(0.65,'rgba(20,15,55,0.18)');
-      mwGrad.addColorStop(1,   'rgba(0,0,0,0)');
-      ctx.fillStyle = mwGrad;
-      ctx.fillRect(0,0,W,H);
+      // ── 0. NEBULA WISPS (background layer) ──
+      sc.nebulae.forEach(n => {
+        n.rot += n.speed;
+        const nx=n.x*W, ny=n.y*H, rx=n.rx*W, ry=n.ry*H;
+        ctx.save();
+        ctx.translate(nx,ny);
+        ctx.rotate(n.rot);
+        const ng=ctx.createRadialGradient(0,0,0,0,0,Math.max(rx,ry));
+        const r2=parseInt(n.col.slice(1,3),16),g2=parseInt(n.col.slice(3,5),16),b2=parseInt(n.col.slice(5,7),16);
+        ng.addColorStop(0,`rgba(${r2},${g2},${b2},${n.alpha*2})`);
+        ng.addColorStop(0.4,`rgba(${r2},${g2},${b2},${n.alpha})`);
+        ng.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=ng;
+        ctx.scale(1,ry/rx);
+        ctx.beginPath(); ctx.arc(0,0,rx,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+      });
 
-      // ── 1. WARP STARS ──
+      // ── 1. GALAXY SPIRAL ──
+      sc.galCore.angle += 0.0004;
+      ctx.save();
+      ctx.translate(W*0.5, H*0.5);
+      ctx.rotate(sc.galCore.angle);
+      ctx.translate(-W*0.5, -H*0.5);
+      sc.galaxyParticles.forEach(p => {
+        ctx.save();
+        ctx.globalAlpha = p.alpha * 0.75;
+        ctx.fillStyle   = p.col;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      });
+      ctx.restore();
+
+      // Galaxy core bright glow
+      const cgx=W*0.5, cgy=H*0.5;
+      const cg=ctx.createRadialGradient(cgx,cgy,0,cgx,cgy,Math.min(W,H)*0.07);
+      cg.addColorStop(0,'rgba(255,248,200,0.55)');
+      cg.addColorStop(0.3,'rgba(255,220,100,0.22)');
+      cg.addColorStop(0.6,'rgba(150,180,255,0.10)');
+      cg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.save(); ctx.fillStyle=cg;
+      ctx.beginPath(); ctx.arc(cgx,cgy,Math.min(W,H)*0.07,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+
+      // ── 2. WARP STARS ──
       sc.stars.forEach(st => {
         st.pz = st.z;
         st.z -= SPEED;
         if (st.z <= 1) {
-          st.x  = rand(-W*2.5, W*2.5);
-          st.y  = rand(-H*2.5, H*2.5);
+          st.x  = rand(-W*3, W*3);
+          st.y  = rand(-H*3, H*3);
           st.z  = DEPTH;
           st.pz = DEPTH;
           return;
@@ -1196,129 +1298,148 @@ function HomePage({ setActiveTab, markets, fetching }) {
         const pscl = FOV/st.pz;
         const sx = CX + st.x*scl,  sy = CY + st.y*scl;
         const px = CX + st.x*pscl, py = CY + st.y*pscl;
-        const alpha = Math.min(1, (1-st.z/DEPTH)*1.6);
-        const rad   = Math.max(0.3, st.size*scl*1.4);
+        const alpha = Math.min(1, (1-st.z/DEPTH)*1.8);
+        const rad   = Math.max(0.25, st.size*scl*1.5);
 
-        // Streak trail
+        // Velocity streak
         const trailLen = Math.hypot(sx-px, sy-py);
-        if (trailLen > 0.8) {
+        if (trailLen > 0.5) {
           const tg = ctx.createLinearGradient(px,py,sx,sy);
           tg.addColorStop(0,'rgba(0,0,0,0)');
-          tg.addColorStop(1, rgba(st.col, alpha*0.75));
-          ctx.save(); ctx.strokeStyle=tg; ctx.lineWidth=rad*0.7;
+          tg.addColorStop(1, rgba(st.col, alpha*0.85));
+          ctx.save(); ctx.strokeStyle=tg; ctx.lineWidth=rad*0.75;
           ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(sx,sy); ctx.stroke(); ctx.restore();
         }
 
-        // Star glow for bright close stars
-        if (rad > 2.5) {
-          const gg = ctx.createRadialGradient(sx,sy,0,sx,sy,rad*5);
-          gg.addColorStop(0, rgba(st.col, alpha*0.45));
+        // Glow halo + diffraction for bright stars
+        if (rad > 2) {
+          const gg=ctx.createRadialGradient(sx,sy,0,sx,sy,rad*6);
+          gg.addColorStop(0,rgba(st.col,alpha*0.5));
           gg.addColorStop(1,'rgba(0,0,0,0)');
           ctx.save(); ctx.fillStyle=gg;
-          ctx.beginPath(); ctx.arc(sx,sy,rad*5,0,Math.PI*2); ctx.fill(); ctx.restore();
-
-          // 4-point diffraction spike
-          ctx.save(); ctx.globalAlpha=alpha*0.3; ctx.strokeStyle=st.col; ctx.lineWidth=0.5;
-          ctx.beginPath(); ctx.moveTo(sx-rad*6,sy); ctx.lineTo(sx+rad*6,sy); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(sx,sy-rad*6); ctx.lineTo(sx,sy+rad*6); ctx.stroke();
+          ctx.beginPath(); ctx.arc(sx,sy,rad*6,0,Math.PI*2); ctx.fill(); ctx.restore();
+          // 4-point spike
+          ctx.save(); ctx.globalAlpha=alpha*0.35; ctx.strokeStyle=st.col; ctx.lineWidth=0.6;
+          ctx.beginPath(); ctx.moveTo(sx-rad*7,sy); ctx.lineTo(sx+rad*7,sy); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(sx,sy-rad*7); ctx.lineTo(sx,sy+rad*7); ctx.stroke();
           ctx.restore();
         }
-
-        // Star core
         ctx.save(); ctx.globalAlpha=Math.min(alpha,1); ctx.fillStyle=st.col;
         ctx.beginPath(); ctx.arc(sx,sy,rad,0,Math.PI*2); ctx.fill(); ctx.restore();
       });
 
-      // ── 2. CONSTELLATION NETWORK ──
+      // ── 3. CONSTELLATION NETWORK ──
       sc.nodes.forEach(n => {
         n.x += n.vx; n.y += n.vy;
         if(n.x<0.04||n.x>0.96) n.vx*=-1;
         if(n.y<0.04||n.y>0.96) n.vy*=-1;
-        n.pulse += 0.018;
+        n.pulse += n.pulseSpeed;
       });
 
-      // Lines between nearby nodes
-      for (let i=0;i<sc.nodes.length;i++) {
-        for (let j=i+1;j<sc.nodes.length;j++) {
+      // Connection lines — two layers: dim base + bright close ones
+      for(let i=0;i<sc.nodes.length;i++){
+        for(let j=i+1;j<sc.nodes.length;j++){
           const a=sc.nodes[i], b=sc.nodes[j];
           const dx=(a.x-b.x)*W, dy=(a.y-b.y)*H;
           const dist=Math.hypot(dx,dy);
-          if (dist < W*0.16) {
-            const alpha=(1-dist/(W*0.16))*0.18;
-            ctx.save(); ctx.globalAlpha=alpha;
-            // Electric blue pulse line
-            ctx.strokeStyle='#5BB8FF'; ctx.lineWidth=0.6;
+          const maxD=W*0.18;
+          if(dist<maxD){
+            const prox=1-dist/maxD;
+            // Glow line
+            ctx.save();
+            ctx.globalAlpha=prox*0.28;
+            ctx.strokeStyle=prox>0.6?'#88CCFF':'#4488BB';
+            ctx.lineWidth=prox*1.2;
             ctx.beginPath(); ctx.moveTo(a.x*W,a.y*H); ctx.lineTo(b.x*W,b.y*H); ctx.stroke();
             ctx.restore();
           }
         }
       }
 
-      // Nodes — glowing electric blue dots with stock labels
-      sc.nodes.forEach(n => {
+      // Nodes — pulsing orbs
+      sc.nodes.forEach(n=>{
         const x=n.x*W, y=n.y*H;
-        const pulse=0.55+0.45*Math.sin(n.pulse);
-        const brightness=n.brightness*pulse;
+        const pulse=0.5+0.5*Math.sin(n.pulse);
+        const br=n.brightness*pulse;
+        const col=n.hue;
+        const r2=parseInt(col.slice(1,3),16),g2=parseInt(col.slice(3,5),16),b2=parseInt(col.slice(5,7),16);
 
-        // Outer glow ring
-        const og=ctx.createRadialGradient(x,y,0,x,y,n.r*7);
-        og.addColorStop(0,  `rgba(60,160,255,${brightness*0.25})`);
-        og.addColorStop(0.5,`rgba(40,120,220,${brightness*0.10})`);
-        og.addColorStop(1,  'rgba(0,0,0,0)');
+        // Large outer glow
+        const og=ctx.createRadialGradient(x,y,0,x,y,n.r*10);
+        og.addColorStop(0,`rgba(${r2},${g2},${b2},${br*0.3})`);
+        og.addColorStop(0.4,`rgba(${r2},${g2},${b2},${br*0.1})`);
+        og.addColorStop(1,'rgba(0,0,0,0)');
         ctx.save(); ctx.fillStyle=og;
-        ctx.beginPath(); ctx.arc(x,y,n.r*7,0,Math.PI*2); ctx.fill(); ctx.restore();
+        ctx.beginPath(); ctx.arc(x,y,n.r*10,0,Math.PI*2); ctx.fill(); ctx.restore();
 
-        // Core dot
-        ctx.save(); ctx.globalAlpha=brightness;
-        ctx.fillStyle='#88CCFF';
+        // Ring
+        ctx.save(); ctx.globalAlpha=br*0.4; ctx.strokeStyle=col; ctx.lineWidth=0.7;
+        ctx.beginPath(); ctx.arc(x,y,n.r*2.5,0,Math.PI*2); ctx.stroke(); ctx.restore();
+
+        // Core
+        ctx.save(); ctx.globalAlpha=br*0.95; ctx.fillStyle=col;
         ctx.beginPath(); ctx.arc(x,y,n.r,0,Math.PI*2); ctx.fill();
-        // Inner bright center
-        ctx.fillStyle='#DDEFFF';
-        ctx.beginPath(); ctx.arc(x,y,n.r*0.4,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#FFFFFF';
+        ctx.beginPath(); ctx.arc(x,y,n.r*0.35,0,Math.PI*2); ctx.fill();
         ctx.restore();
 
-        // Stock label
-        ctx.save(); ctx.globalAlpha=brightness*0.55;
-        ctx.fillStyle='#88CCFF';
-        ctx.font=`600 7px 'DM Mono',monospace`;
-        ctx.fillText(n.label, x+n.r+4, y+3);
-        ctx.restore();
+        // Label
+        ctx.save(); ctx.globalAlpha=br*0.65; ctx.fillStyle=col;
+        ctx.font=`700 7.5px 'DM Mono',monospace`;
+        ctx.fillText(n.label,x+n.r+5,y+3); ctx.restore();
       });
 
-      // ── 3. ELECTRIC PULSE ARCS ──
-      // Occasional bright arc between two random nearby nodes
-      if (sc.t % 90 === 0) {
-        const i = Math.floor(Math.random()*sc.nodes.length);
-        const j = (i+1+Math.floor(Math.random()*4))%sc.nodes.length;
-        const a=sc.nodes[i], b=sc.nodes[j];
-        sc._arc = { ax:a.x*W, ay:a.y*H, bx:b.x*W, by:b.y*H, life:18 };
-      }
-      if (sc._arc && sc._arc.life > 0) {
-        const {ax,ay,bx,by,life} = sc._arc;
-        const alpha = (life/18)*0.7;
-        const ag = ctx.createLinearGradient(ax,ay,bx,by);
-        ag.addColorStop(0,'rgba(0,0,0,0)');
-        ag.addColorStop(0.5,`rgba(100,200,255,${alpha})`);
-        ag.addColorStop(1,'rgba(0,0,0,0)');
-        ctx.save(); ctx.strokeStyle=ag; ctx.lineWidth=1.5+life*0.1;
-        ctx.shadowBlur=12; ctx.shadowColor='#4499FF';
-        ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+      // ── 4. ELECTRIC PULSE ARCS — multiple jagged lightning bolts ──
+      if(sc.t%45===0) sc.spawnArc();
+      if(sc.t%70===0) sc.spawnArc();
+      for(let i=sc.arcs.length-1;i>=0;i--){
+        const arc=sc.arcs[i];
+        const prog=arc.life/arc.maxLife;
+        const alpha=prog*0.85;
+        // Draw jagged path
+        const pts=[{x:arc.ax,y:arc.ay}];
+        arc.jag.forEach((j,idx)=>{
+          const t2=(idx+1)/(arc.jag.length+1);
+          pts.push({
+            x: arc.ax+(arc.bx-arc.ax)*t2+j.ox*(prog),
+            y: arc.ay+(arc.by-arc.ay)*t2+j.oy*(prog),
+          });
+        });
+        pts.push({x:arc.bx,y:arc.by});
 
+        // Glow pass
+        ctx.save();
+        ctx.globalAlpha=alpha*0.3;
+        ctx.strokeStyle=arc.col;
+        ctx.lineWidth=arc.width*3;
+        ctx.shadowBlur=20; ctx.shadowColor=arc.col;
+        ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+        pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y)); ctx.stroke();
+        // Core pass
+        ctx.globalAlpha=alpha;
+        ctx.lineWidth=arc.width;
+        ctx.shadowBlur=8;
+        ctx.strokeStyle='#FFFFFF';
+        ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+        pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y)); ctx.stroke();
         ctx.restore();
-        sc._arc.life--;
+
+        arc.life--;
+        if(arc.life<=0) sc.arcs.splice(i,1);
       }
 
-      // ── 4. SHOOTING STARS ──
-      if (Math.random()<0.007) sc.spawnShooter();
-      for (let i=sc.shooters.length-1;i>=0;i--) {
+      // ── 5. SHOOTING STARS ──
+      if(Math.random()<0.009) sc.spawnShooter();
+      for(let i=sc.shooters.length-1;i>=0;i--){
         const sh=sc.shooters[i];
         const tg=ctx.createLinearGradient(sh.x,sh.y,sh.x-sh.vx*sh.len/6,sh.y-sh.vy*sh.len/6);
         tg.addColorStop(0,rgba(sh.col,sh.alpha));
+        tg.addColorStop(0.3,rgba(sh.col,sh.alpha*0.5));
         tg.addColorStop(1,'rgba(0,0,0,0)');
-        ctx.save(); ctx.strokeStyle=tg; ctx.lineWidth=1.4;
+        ctx.save(); ctx.strokeStyle=tg; ctx.lineWidth=sh.width;
         ctx.beginPath(); ctx.moveTo(sh.x,sh.y); ctx.lineTo(sh.x-sh.vx*sh.len/6,sh.y-sh.vy*sh.len/6);
         ctx.stroke(); ctx.restore();
-        sh.x+=sh.vx; sh.y+=sh.vy; sh.alpha-=0.018;
+        sh.x+=sh.vx; sh.y+=sh.vy; sh.alpha-=0.016;
         if(sh.alpha<=0) sc.shooters.splice(i,1);
       }
 
@@ -1442,8 +1563,7 @@ function HomePage({ setActiveTab, markets, fetching }) {
             DNR CAPITALS · EQUITY RESEARCH INTELLIGENCE
           </div>
 
-          <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:'clamp(36px,5.5vw,72px)',font
-Weight:600,color:'#E8F4FF',lineHeight:1.05,letterSpacing:'-0.5px',marginBottom:8,textShadow:'0 0 80px rgba(91,184,255,0.15)'}}>
+          <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:'clamp(36px,5.5vw,72px)',fontWeight:600,color:'#E8F4FF',lineHeight:1.05,letterSpacing:'-0.5px',marginBottom:8,textShadow:'0 0 80px rgba(91,184,255,0.15)'}}>
             Institutional-Grade
           </h1>
           <h1 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:'clamp(36px,5.5vw,72px)',fontWeight:600,fontStyle:'italic',color:'#5BB8FF',lineHeight:1.05,letterSpacing:'-0.5px',marginBottom:22,textShadow:'0 0 60px rgba(91,184,255,0.4)'}}>
@@ -1545,7 +1665,6 @@ Weight:600,color:'#E8F4FF',lineHeight:1.05,letterSpacing:'-0.5px',marginBottom:8
     </div>
   );
 }
-
 
 // ─── MARKETS ──────────────────────────────────────────────────────────────────
 function Markets({ markets={}, fetching=false, onRefresh=()=>{} }) {
@@ -5073,4 +5192,3 @@ export default function App() {
     </>
   );
 }
-
