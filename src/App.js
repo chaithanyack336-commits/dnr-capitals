@@ -1106,11 +1106,11 @@ function HomePage({ setActiveTab, markets, fetching }) {
       const W = canvas.width, H = canvas.height;
       const FOV = Math.min(W,H) * 0.85;
       const CX = W/2, CY = H/2;
-      const DEPTH = 2200;
-      const SPEED = 2.8;
+      const DEPTH = 1800;
+      const SPEED = 2.2;
 
       // ── 800 warp stars in 3D ──
-      const stars = Array.from({length:1200}, () => {
+      const stars = Array.from({length:800}, () => {
         const cols = ['#C8DCFF','#D8E8FF','#FFFFFF','#FFF8EE','#FFEEDD','#FFD090','#FFB060','#FF8844'];
         return {
           x: rand(-W*2.5, W*2.5),
@@ -1168,7 +1168,7 @@ function HomePage({ setActiveTab, markets, fetching }) {
       sc.t++;
 
       // Background — deep space blue-black
-      ctx.fillStyle = '#000812';
+      ctx.fillStyle = '#000510';
       ctx.fillRect(0,0,W,H);
 
       // Milky Way glow band
@@ -1244,10 +1244,10 @@ function HomePage({ setActiveTab, markets, fetching }) {
           const dx=(a.x-b.x)*W, dy=(a.y-b.y)*H;
           const dist=Math.hypot(dx,dy);
           if (dist < W*0.16) {
-            const alpha=(1-dist/(W*0.18))*0.32;
+            const alpha=(1-dist/(W*0.16))*0.18;
             ctx.save(); ctx.globalAlpha=alpha;
             // Electric blue pulse line
-            ctx.strokeStyle='#5BB8FF'; ctx.lineWidth=0.9;
+            ctx.strokeStyle='#5BB8FF'; ctx.lineWidth=0.6;
             ctx.beginPath(); ctx.moveTo(a.x*W,a.y*H); ctx.lineTo(b.x*W,b.y*H); ctx.stroke();
             ctx.restore();
           }
@@ -1262,7 +1262,7 @@ function HomePage({ setActiveTab, markets, fetching }) {
 
         // Outer glow ring
         const og=ctx.createRadialGradient(x,y,0,x,y,n.r*7);
-        og.addColorStop(0,  `rgba(60,160,255,${brightness*0.4})`);
+        og.addColorStop(0,  `rgba(60,160,255,${brightness*0.25})`);
         og.addColorStop(0.5,`rgba(40,120,220,${brightness*0.10})`);
         og.addColorStop(1,  'rgba(0,0,0,0)');
         ctx.save(); ctx.fillStyle=og;
@@ -1287,11 +1287,11 @@ function HomePage({ setActiveTab, markets, fetching }) {
 
       // ── 3. ELECTRIC PULSE ARCS ──
       // Occasional bright arc between two random nearby nodes
-      if (sc.t % 40 === 0) {
+      if (sc.t % 90 === 0) {
         const i = Math.floor(Math.random()*sc.nodes.length);
         const j = (i+1+Math.floor(Math.random()*4))%sc.nodes.length;
         const a=sc.nodes[i], b=sc.nodes[j];
-        sc._arc = { ax:a.x*W, ay:a.y*H, bx:b.x*W, by:b.y*H, life:28 };
+        sc._arc = { ax:a.x*W, ay:a.y*H, bx:b.x*W, by:b.y*H, life:18 };
       }
       if (sc._arc && sc._arc.life > 0) {
         const {ax,ay,bx,by,life} = sc._arc;
@@ -1300,8 +1300,8 @@ function HomePage({ setActiveTab, markets, fetching }) {
         ag.addColorStop(0,'rgba(0,0,0,0)');
         ag.addColorStop(0.5,`rgba(100,200,255,${alpha})`);
         ag.addColorStop(1,'rgba(0,0,0,0)');
-        ctx.save(); ctx.strokeStyle=ag; ctx.lineWidth=2.0+life*0.12;
-        ctx.shadowBlur=20; ctx.shadowColor='#5BB8FF';
+        ctx.save(); ctx.strokeStyle=ag; ctx.lineWidth=1.5+life*0.1;
+        ctx.shadowBlur=12; ctx.shadowColor='#4499FF';
         ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
         ctx.restore();
         sc._arc.life--;
@@ -2350,344 +2350,599 @@ const PRESETS = [
 ];
 
 function Screener() {
-  const [search, setSearch]       = useState("");
-  const [sectorFilter, setSector] = useState("all");
-  const [ratingFilter, setRating] = useState("all");
-  const [sortKey, setSortKey]     = useState("mcapN");
-  const [sortDir, setSortDir]     = useState("desc");
-  const [selected, setSelected]   = useState(null);
-  const [analysis, setAnalysis]   = useState("");
-  const [loading, setLoading]     = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [activePreset, setActivePreset] = useState(null);
+  // ── State ──
+  const [query,      setQuery]      = useState("");
+  const [results,    setResults]    = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [selected,   setSelected]   = useState(null);
+  const [liveData,   setLiveData]   = useState(null);
+  const [liveLoading,setLiveLoading]= useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState("");
+  const [aiLoading,  setAiLoading]  = useState(false);
+  const [activeTab,  setActiveTab2] = useState("search"); // search | watchlist | presets
+  const [recentSearches, setRecent] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('dnr_recent_searches')||'[]'); } catch { return []; }
+  });
 
-  // Numeric range filters
-  const [peMin, setPeMin]       = useState("");
-  const [peMax, setPeMax]       = useState("");
-  const [roeMin, setRoeMin]     = useState("");
-  const [roeMax, setRoeMax]     = useState("");
-  const [mcapMin, setMcapMin]   = useState("");
-  const [mcapMax, setMcapMax]   = useState("");
-  const [deMax, setDeMax]       = useState("");
-  const [revGrMin, setRevGrMin] = useState("");
-  const [patGrMin, setPatGrMin] = useState("");
-  const [divMin, setDivMin]     = useState("");
+  // ── 500 popular NSE stocks for instant search ──
+  const NSE_STOCKS = [
+    {sym:"RELIANCE",name:"Reliance Industries",sector:"Conglomerate"},
+    {sym:"TCS",name:"Tata Consultancy Services",sector:"IT Services"},
+    {sym:"HDFCBANK",name:"HDFC Bank",sector:"Banking"},
+    {sym:"INFOSYS",name:"Infosys Ltd",sector:"IT Services"},
+    {sym:"ICICIBANK",name:"ICICI Bank",sector:"Banking"},
+    {sym:"HINDUNILVR",name:"Hindustan Unilever",sector:"FMCG"},
+    {sym:"KOTAKBANK",name:"Kotak Mahindra Bank",sector:"Banking"},
+    {sym:"WIPRO",name:"Wipro Ltd",sector:"IT Services"},
+    {sym:"TATAMOTORS",name:"Tata Motors",sector:"Auto"},
+    {sym:"ASIANPAINT",name:"Asian Paints",sector:"Consumer"},
+    {sym:"ZOMATO",name:"Zomato Ltd",sector:"Consumer Tech"},
+    {sym:"DIXON",name:"Dixon Technologies",sector:"Electronics"},
+    {sym:"BAJFINANCE",name:"Bajaj Finance",sector:"NBFC"},
+    {sym:"MARUTI",name:"Maruti Suzuki India",sector:"Auto"},
+    {sym:"SUNPHARMA",name:"Sun Pharmaceutical",sector:"Pharma"},
+    {sym:"LT",name:"Larsen & Toubro",sector:"Capital Goods"},
+    {sym:"NESTLEIND",name:"Nestle India",sector:"FMCG"},
+    {sym:"DRREDDY",name:"Dr. Reddy's Laboratories",sector:"Pharma"},
+    {sym:"TITAN",name:"Titan Company",sector:"Consumer"},
+    {sym:"ADANIPORTS",name:"Adani Ports & SEZ",sector:"Infrastructure"},
+    {sym:"TECHM",name:"Tech Mahindra",sector:"IT Services"},
+    {sym:"HINDALCO",name:"Hindalco Industries",sector:"Metals"},
+    {sym:"TATAPOWER",name:"Tata Power",sector:"Power"},
+    {sym:"COALINDIA",name:"Coal India",sector:"Mining"},
+    {sym:"PERSISTENT",name:"Persistent Systems",sector:"IT Services"},
+    {sym:"POLYCAB",name:"Polycab India",sector:"Electronics"},
+    {sym:"ABCAPITAL",name:"Aditya Birla Capital",sector:"NBFC"},
+    {sym:"DEEPAKNTR",name:"Deepak Nitrite",sector:"Chemicals"},
+    {sym:"PIIND",name:"PI Industries",sector:"Chemicals"},
+    {sym:"ABBOTINDIA",name:"Abbott India",sector:"Pharma"},
+    {sym:"AXISBANK",name:"Axis Bank",sector:"Banking"},
+    {sym:"SBIN",name:"State Bank of India",sector:"Banking"},
+    {sym:"BAJAJFINSV",name:"Bajaj Finserv",sector:"NBFC"},
+    {sym:"BAJAJ-AUTO",name:"Bajaj Auto",sector:"Auto"},
+    {sym:"HEROMOTOCO",name:"Hero MotoCorp",sector:"Auto"},
+    {sym:"EICHERMOT",name:"Eicher Motors",sector:"Auto"},
+    {sym:"TVSMOTOR",name:"TVS Motor Company",sector:"Auto"},
+    {sym:"M&M",name:"Mahindra & Mahindra",sector:"Auto"},
+    {sym:"TATASTEEL",name:"Tata Steel",sector:"Metals"},
+    {sym:"JSWSTEEL",name:"JSW Steel",sector:"Metals"},
+    {sym:"SAIL",name:"Steel Authority of India",sector:"Metals"},
+    {sym:"VEDL",name:"Vedanta Ltd",sector:"Metals"},
+    {sym:"NATIONALUM",name:"National Aluminium",sector:"Metals"},
+    {sym:"HCLTECH",name:"HCL Technologies",sector:"IT Services"},
+    {sym:"LTIM",name:"LTIMindtree",sector:"IT Services"},
+    {sym:"MPHASIS",name:"Mphasis Ltd",sector:"IT Services"},
+    {sym:"COFORGE",name:"Coforge Ltd",sector:"IT Services"},
+    {sym:"CYIENT",name:"Cyient Ltd",sector:"IT Services"},
+    {sym:"KPITTECH",name:"KPIT Technologies",sector:"IT Services"},
+    {sym:"TATAELXSI",name:"Tata Elxsi",sector:"IT Services"},
+    {sym:"LTTS",name:"L&T Technology Services",sector:"IT Services"},
+    {sym:"ROUTE",name:"Route Mobile",sector:"IT Services"},
+    {sym:"TANLA",name:"Tanla Platforms",sector:"IT Services"},
+    {sym:"INFY",name:"Infosys",sector:"IT Services"},
+    {sym:"ONGC",name:"Oil & Natural Gas Corp",sector:"Oil & Gas"},
+    {sym:"IOC",name:"Indian Oil Corporation",sector:"Oil & Gas"},
+    {sym:"BPCL",name:"Bharat Petroleum",sector:"Oil & Gas"},
+    {sym:"HPCL",name:"Hindustan Petroleum",sector:"Oil & Gas"},
+    {sym:"GAIL",name:"GAIL India",sector:"Oil & Gas"},
+    {sym:"PETRONET",name:"Petronet LNG",sector:"Oil & Gas"},
+    {sym:"CASTROLIND",name:"Castrol India",sector:"Oil & Gas"},
+    {sym:"HINDPETRO",name:"HPCL",sector:"Oil & Gas"},
+    {sym:"NTPC",name:"NTPC Ltd",sector:"Power"},
+    {sym:"POWERGRID",name:"Power Grid Corp",sector:"Power"},
+    {sym:"ADANIGREEN",name:"Adani Green Energy",sector:"Power"},
+    {sym:"ADANIENSOL",name:"Adani Energy Solutions",sector:"Power"},
+    {sym:"TORNTPOWER",name:"Torrent Power",sector:"Power"},
+    {sym:"CESC",name:"CESC Ltd",sector:"Power"},
+    {sym:"NHPC",name:"NHPC Ltd",sector:"Power"},
+    {sym:"SJVN",name:"SJVN Ltd",sector:"Power"},
+    {sym:"IREDA",name:"Indian Renewable Energy",sector:"Power"},
+    {sym:"CIPLA",name:"Cipla Ltd",sector:"Pharma"},
+    {sym:"DIVISLAB",name:"Divi's Laboratories",sector:"Pharma"},
+    {sym:"AUROPHARMA",name:"Aurobindo Pharma",sector:"Pharma"},
+    {sym:"TORNTPHARM",name:"Torrent Pharmaceuticals",sector:"Pharma"},
+    {sym:"LUPIN",name:"Lupin Ltd",sector:"Pharma"},
+    {sym:"ALKEM",name:"Alkem Laboratories",sector:"Pharma"},
+    {sym:"BIOCON",name:"Biocon Ltd",sector:"Pharma"},
+    {sym:"NATCOPHARM",name:"Natco Pharma",sector:"Pharma"},
+    {sym:"GRANULES",name:"Granules India",sector:"Pharma"},
+    {sym:"APOLLOHOSP",name:"Apollo Hospitals",sector:"Healthcare"},
+    {sym:"FORTIS",name:"Fortis Healthcare",sector:"Healthcare"},
+    {sym:"MAXHEALTH",name:"Max Healthcare",sector:"Healthcare"},
+    {sym:"ASTER",name:"Aster DM Healthcare",sector:"Healthcare"},
+    {sym:"METROPOLIS",name:"Metropolis Healthcare",sector:"Healthcare"},
+    {sym:"LALPATHLAB",name:"Dr. Lal PathLabs",sector:"Healthcare"},
+    {sym:"THYROCARE",name:"Thyrocare Technologies",sector:"Healthcare"},
+    {sym:"INDHOTEL",name:"Indian Hotels",sector:"Hotels"},
+    {sym:"LEMONTREE",name:"Lemon Tree Hotels",sector:"Hotels"},
+    {sym:"CHALET",name:"Chalet Hotels",sector:"Hotels"},
+    {sym:"IRCTC",name:"Indian Railway Catering",sector:"Tourism"},
+    {sym:"EASEMYTRIP",name:"EaseMyTrip",sector:"Tourism"},
+    {sym:"INDIGO",name:"InterGlobe Aviation",sector:"Aviation"},
+    {sym:"SPICEJET",name:"SpiceJet",sector:"Aviation"},
+    {sym:"ADANIAIRPORT",name:"Adani Airports",sector:"Infrastructure"},
+    {sym:"GMRINFRA",name:"GMR Airports",sector:"Infrastructure"},
+    {sym:"IRB",name:"IRB Infrastructure",sector:"Infrastructure"},
+    {sym:"KNR",name:"KNR Constructions",sector:"Infrastructure"},
+    {sym:"ASHOKA",name:"Ashoka Buildcon",sector:"Infrastructure"},
+    {sym:"HDFCLIFE",name:"HDFC Life Insurance",sector:"Insurance"},
+    {sym:"SBILIFE",name:"SBI Life Insurance",sector:"Insurance"},
+    {sym:"ICICIGI",name:"ICICI Lombard",sector:"Insurance"},
+    {sym:"NIACL",name:"New India Assurance",sector:"Insurance"},
+    {sym:"GICRE",name:"General Insurance Corp",sector:"Insurance"},
+    {sym:"STARHEALTH",name:"Star Health Insurance",sector:"Insurance"},
+    {sym:"LICI",name:"Life Insurance Corp",sector:"Insurance"},
+    {sym:"MUTHOOTFIN",name:"Muthoot Finance",sector:"NBFC"},
+    {sym:"MANAPPURAM",name:"Manappuram Finance",sector:"NBFC"},
+    {sym:"CHOLAFIN",name:"Cholamandalam Finance",sector:"NBFC"},
+    {sym:"M&MFIN",name:"M&M Financial Services",sector:"NBFC"},
+    {sym:"LICHSGFIN",name:"LIC Housing Finance",sector:"NBFC"},
+    {sym:"PNB",name:"Punjab National Bank",sector:"Banking"},
+    {sym:"BANKBARODA",name:"Bank of Baroda",sector:"Banking"},
+    {sym:"CANARABANK",name:"Canara Bank",sector:"Banking"},
+    {sym:"UNIONBANK",name:"Union Bank of India",sector:"Banking"},
+    {sym:"INDUSINDBK",name:"IndusInd Bank",sector:"Banking"},
+    {sym:"FEDERALBNK",name:"Federal Bank",sector:"Banking"},
+    {sym:"IDFCFIRSTB",name:"IDFC First Bank",sector:"Banking"},
+    {sym:"BANDHANBNK",name:"Bandhan Bank",sector:"Banking"},
+    {sym:"RBLBANK",name:"RBL Bank",sector:"Banking"},
+    {sym:"YESBANK",name:"Yes Bank",sector:"Banking"},
+    {sym:"KARURVYSYA",name:"Karur Vysya Bank",sector:"Banking"},
+    {sym:"DCBBANK",name:"DCB Bank",sector:"Banking"},
+    {sym:"CSBBANK",name:"CSB Bank",sector:"Banking"},
+    {sym:"SOUTHBANK",name:"South Indian Bank",sector:"Banking"},
+    {sym:"ULTRACEMCO",name:"UltraTech Cement",sector:"Cement"},
+    {sym:"SHREECEM",name:"Shree Cement",sector:"Cement"},
+    {sym:"AMBUJACEMENT",name:"Ambuja Cements",sector:"Cement"},
+    {sym:"ACCLTD",name:"ACC Ltd",sector:"Cement"},
+    {sym:"RAMCOCEM",name:"Ramco Cements",sector:"Cement"},
+    {sym:"DALMIACEM",name:"Dalmia Bharat",sector:"Cement"},
+    {sym:"JKCEMENT",name:"JK Cement",sector:"Cement"},
+    {sym:"STARCEMENT",name:"Star Cement",sector:"Cement"},
+    {sym:"PIDILITIND",name:"Pidilite Industries",sector:"Chemicals"},
+    {sym:"AAPL",name:"Aarti Industries",sector:"Chemicals"},
+    {sym:"AARTIIND",name:"Aarti Industries",sector:"Chemicals"},
+    {sym:"NAVINFLUOR",name:"Navin Fluorine",sector:"Chemicals"},
+    {sym:"FINEORG",name:"Fine Organic Industries",sector:"Chemicals"},
+    {sym:"CLEAN",name:"Clean Science",sector:"Chemicals"},
+    {sym:"ALKYLAMINE",name:"Alkyl Amines",sector:"Chemicals"},
+    {sym:"VINATIORGA",name:"Vinati Organics",sector:"Chemicals"},
+    {sym:"TATACHEM",name:"Tata Chemicals",sector:"Chemicals"},
+    {sym:"GNFC",name:"Gujarat Narmada Valley",sector:"Chemicals"},
+    {sym:"GUJALKALI",name:"Gujarat Alkalies",sector:"Chemicals"},
+    {sym:"HAVELLS",name:"Havells India",sector:"Electronics"},
+    {sym:"VOLTAS",name:"Voltas Ltd",sector:"Electronics"},
+    {sym:"BLUESTAR",name:"Blue Star",sector:"Electronics"},
+    {sym:"CROMPTON",name:"Crompton Greaves",sector:"Electronics"},
+    {sym:"ORIENTELEC",name:"Orient Electric",sector:"Electronics"},
+    {sym:"BAJAJELEC",name:"Bajaj Electricals",sector:"Electronics"},
+    {sym:"SYSKA",name:"Syska LED",sector:"Electronics"},
+    {sym:"WHIRLPOOL",name:"Whirlpool India",sector:"Electronics"},
+    {sym:"AMBER",name:"Amber Enterprises",sector:"Electronics"},
+    {sym:"KAYNES",name:"Kaynes Technology",sector:"Electronics"},
+    {sym:"SBFC",name:"SBFC Finance",sector:"NBFC"},
+    {sym:"POONAWALLA",name:"Poonawalla Fincorp",sector:"NBFC"},
+    {sym:"CREDITACC",name:"CreditAccess Grameen",sector:"NBFC"},
+    {sym:"UJJIVANSFB",name:"Ujjivan Small Finance",sector:"Banking"},
+    {sym:"EQUITASBNK",name:"Equitas Small Finance",sector:"Banking"},
+    {sym:"SURYODAY",name:"Suryoday SFB",sector:"Banking"},
+    {sym:"ADANIENT",name:"Adani Enterprises",sector:"Conglomerate"},
+    {sym:"ADANITRANS",name:"Adani Transmission",sector:"Power"},
+    {sym:"ADANIGAS",name:"Adani Total Gas",sector:"Oil & Gas"},
+    {sym:"ATGL",name:"Adani Total Gas",sector:"Oil & Gas"},
+    {sym:"IEX",name:"Indian Energy Exchange",sector:"Capital Markets"},
+    {sym:"CAMS",name:"CAMS Ltd",sector:"Capital Markets"},
+    {sym:"CDSL",name:"CDSL Ltd",sector:"Capital Markets"},
+    {sym:"BSE",name:"BSE Ltd",sector:"Capital Markets"},
+    {sym:"MCX",name:"Multi Commodity Exchange",sector:"Capital Markets"},
+    {sym:"NSDL",name:"NSDL",sector:"Capital Markets"},
+    {sym:"ANGELONE",name:"Angel One",sector:"Capital Markets"},
+    {sym:"5PAISA",name:"5Paisa Capital",sector:"Capital Markets"},
+    {sym:"IIFL",name:"IIFL Finance",sector:"NBFC"},
+    {sym:"IIFLFIN",name:"IIFL Finance",sector:"NBFC"},
+    {sym:"SWSOLAR",name:"Sterling & Wilson Solar",sector:"Power"},
+    {sym:"TATACONSUM",name:"Tata Consumer Products",sector:"FMCG"},
+    {sym:"BRITANNIA",name:"Britannia Industries",sector:"FMCG"},
+    {sym:"DABUR",name:"Dabur India",sector:"FMCG"},
+    {sym:"MARICO",name:"Marico Ltd",sector:"FMCG"},
+    {sym:"GODREJCP",name:"Godrej Consumer",sector:"FMCG"},
+    {sym:"COLPAL",name:"Colgate-Palmolive",sector:"FMCG"},
+    {sym:"ITC",name:"ITC Ltd",sector:"FMCG"},
+    {sym:"EMAMILTD",name:"Emami Ltd",sector:"FMCG"},
+    {sym:"JYOTHYLAB",name:"Jyothy Labs",sector:"FMCG"},
+    {sym:"VBL",name:"Varun Beverages",sector:"FMCG"},
+    {sym:"HATSUN",name:"Hatsun Agro",sector:"FMCG"},
+    {sym:"RADICO",name:"Radico Khaitan",sector:"Beverages"},
+    {sym:"MCDOWELL-N",name:"United Spirits",sector:"Beverages"},
+    {sym:"UNITEDBRW",name:"United Breweries",sector:"Beverages"},
+    {sym:"JUBLFOOD",name:"Jubilant FoodWorks",sector:"QSR"},
+    {sym:"DEVYANI",name:"Devyani International",sector:"QSR"},
+    {sym:"WESTLIFE",name:"Westlife Foodworld",sector:"QSR"},
+    {sym:"SAPPHIRE",name:"Sapphire Foods",sector:"QSR"},
+    {sym:"BIKAJI",name:"Bikaji Foods",sector:"FMCG"},
+    {sym:"PATANJALI",name:"Patanjali Foods",sector:"FMCG"},
+    {sym:"KFINTECH",name:"KFin Technologies",sector:"Capital Markets"},
+    {sym:"NAUKRI",name:"Info Edge India",sector:"Consumer Tech"},
+    {sym:"POLICYBZR",name:"PB Fintech",sector:"Consumer Tech"},
+    {sym:"PAYTM",name:"One 97 Communications",sector:"Consumer Tech"},
+    {sym:"DELHIVERY",name:"Delhivery Ltd",sector:"Logistics"},
+    {sym:"BLUEDART",name:"Blue Dart Express",sector:"Logistics"},
+    {sym:"MAHINDCIE",name:"Mahindra CIE",sector:"Auto Ancillary"},
+    {sym:"MOTHERSON",name:"Samvardhana Motherson",sector:"Auto Ancillary"},
+    {sym:"BOSCHLTD",name:"Bosch Ltd",sector:"Auto Ancillary"},
+    {sym:"EXIDEIND",name:"Exide Industries",sector:"Auto Ancillary"},
+    {sym:"AMARAJABAT",name:"Amara Raja Energy",sector:"Auto Ancillary"},
+    {sym:"MINDA",name:"Minda Corporation",sector:"Auto Ancillary"},
+    {sym:"SUNDRMFAST",name:"Sundram Fasteners",sector:"Auto Ancillary"},
+    {sym:"SCHAEFFLER",name:"Schaeffler India",sector:"Auto Ancillary"},
+    {sym:"SKFINDIA",name:"SKF India",sector:"Auto Ancillary"},
+    {sym:"TIMKEN",name:"Timken India",sector:"Auto Ancillary"},
+    {sym:"GRINDWELL",name:"Grindwell Norton",sector:"Capital Goods"},
+    {sym:"CUMMINSIND",name:"Cummins India",sector:"Capital Goods"},
+    {sym:"ABB",name:"ABB India",sector:"Capital Goods"},
+    {sym:"SIEMENS",name:"Siemens India",sector:"Capital Goods"},
+    {sym:"BHEL",name:"BHEL",sector:"Capital Goods"},
+    {sym:"BEL",name:"Bharat Electronics",sector:"Defence"},
+    {sym:"HAL",name:"Hindustan Aeronautics",sector:"Defence"},
+    {sym:"COCHINSHIP",name:"Cochin Shipyard",sector:"Defence"},
+    {sym:"MAZAGON",name:"Mazagon Dock",sector:"Defence"},
+    {sym:"GRSE",name:"Garden Reach Shipbuilders",sector:"Defence"},
+    {sym:"BEML",name:"BEML Ltd",sector:"Defence"},
+    {sym:"DATAPATTNS",name:"Data Patterns",sector:"Defence"},
+    {sym:"PARAS",name:"Paras Defence",sector:"Defence"},
+    {sym:"SOLARINDS",name:"Solar Industries",sector:"Defence"},
+    {sym:"AVANTEL",name:"Avantel Ltd",sector:"Defence"},
+    {sym:"DMART",name:"Avenue Supermarts",sector:"Retail"},
+    {sym:"TRENT",name:"Trent Ltd",sector:"Retail"},
+    {sym:"VSTIND",name:"VST Industries",sector:"Retail"},
+    {sym:"SHOPERSTOP",name:"Shoppers Stop",sector:"Retail"},
+    {sym:"VMART",name:"V-Mart Retail",sector:"Retail"},
+    {sym:"RRKABEL",name:"RR Kabel",sector:"Electronics"},
+    {sym:"KEI",name:"KEI Industries",sector:"Electronics"},
+    {sym:"FIEMIND",name:"Fiem Industries",sector:"Auto Ancillary"},
+    {sym:"SUPRAJIT",name:"Suprajit Engineering",sector:"Auto Ancillary"},
+    {sym:"SWARAJENG",name:"Swaraj Engines",sector:"Capital Goods"},
+    {sym:"GPIL",name:"Godawari Power",sector:"Metals"},
+    {sym:"JINDALSAW",name:"Jindal Saw",sector:"Metals"},
+    {sym:"JSPL",name:"Jindal Steel & Power",sector:"Metals"},
+    {sym:"MOIL",name:"MOIL Ltd",sector:"Mining"},
+    {sym:"NMDC",name:"NMDC Ltd",sector:"Mining"},
+    {sym:"MCCOY",name:"Man Industries",sector:"Metals"},
+    {sym:"RITES",name:"RITES Ltd",sector:"Infrastructure"},
+    {sym:"IRCON",name:"Ircon International",sector:"Infrastructure"},
+    {sym:"RVNL",name:"Rail Vikas Nigam",sector:"Infrastructure"},
+    {sym:"IRFC",name:"Indian Railway Finance",sector:"NBFC"},
+    {sym:"RAILTEL",name:"RailTel Corporation",sector:"Telecom"},
+    {sym:"BHARTIARTL",name:"Bharti Airtel",sector:"Telecom"},
+    {sym:"IDEA",name:"Vodafone Idea",sector:"Telecom"},
+    {sym:"TATACOMM",name:"Tata Communications",sector:"Telecom"},
+    {sym:"HFCL",name:"HFCL Ltd",sector:"Telecom"},
+    {sym:"STLTECH",name:"STL Tech",sector:"Telecom"},
+    {sym:"TEJAS",name:"Tejas Networks",sector:"Telecom"},
+    {sym:"ROUTE",name:"Route Mobile",sector:"Telecom"},
+    {sym:"TANLA",name:"Tanla Platforms",sector:"Telecom"},
+    {sym:"VINDHYATEL",name:"Vindhya Telelinks",sector:"Telecom"},
+    {sym:"INDIGOPNTS",name:"Indigo Paints",sector:"Consumer"},
+    {sym:"BERGER",name:"Berger Paints",sector:"Consumer"},
+    {sym:"KNRCON",name:"KNR Constructions",sector:"Infrastructure"},
+    {sym:"PNC",name:"PNC Infratech",sector:"Infrastructure"},
+    {sym:"AHLUCONT",name:"Ahluwalia Contracts",sector:"Infrastructure"},
+    {sym:"NBCC",name:"NBCC India",sector:"Infrastructure"},
+    {sym:"GODREJPROP",name:"Godrej Properties",sector:"Real Estate"},
+    {sym:"DLF",name:"DLF Ltd",sector:"Real Estate"},
+    {sym:"OBEROIRLTY",name:"Oberoi Realty",sector:"Real Estate"},
+    {sym:"PRESTIGE",name:"Prestige Estates",sector:"Real Estate"},
+    {sym:"BRIGADE",name:"Brigade Enterprises",sector:"Real Estate"},
+    {sym:"SOBHA",name:"Sobha Ltd",sector:"Real Estate"},
+    {sym:"PHOENIXLTD",name:"Phoenix Mills",sector:"Real Estate"},
+    {sym:"NUVAMA",name:"Nuvama Wealth",sector:"Capital Markets"},
+    {sym:"360ONE",name:"360 One WAM",sector:"Capital Markets"},
+    {sym:"MOTILALOFS",name:"Motilal Oswal Financial",sector:"Capital Markets"},
+    {sym:"MOFSL",name:"Motilal Oswal",sector:"Capital Markets"},
+    {sym:"GEOJITFSL",name:"Geojit Financial",sector:"Capital Markets"},
+    {sym:"APTUS",name:"Aptus Value Housing",sector:"NBFC"},
+    {sym:"HOMEFIRST",name:"Home First Finance",sector:"NBFC"},
+    {sym:"AAVAS",name:"Aavas Financiers",sector:"NBFC"},
+    {sym:"CANFINHOME",name:"Can Fin Homes",sector:"NBFC"},
+    {sym:"GRUH",name:"Gruh Finance",sector:"NBFC"},
+    {sym:"REPCO",name:"Repco Home Finance",sector:"NBFC"},
+  ];
 
-  const sectors  = [...new Set(SCREENER_STOCKS.map(s => s.sector))].sort();
-  const ratings  = ["BUY","ACCUMULATE","HOLD","SELL"];
+  // ── Search filter ──
+  const searchResults = query.length > 0
+    ? NSE_STOCKS.filter(s =>
+        s.sym.toLowerCase().includes(query.toLowerCase()) ||
+        s.name.toLowerCase().includes(query.toLowerCase()) ||
+        s.sector.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 12)
+    : [];
 
-  const ratingColor = (r) =>
-    r === "BUY"       ? T.greenLight :
-    r === "ACCUMULATE"? T.goldLight  :
-    r === "HOLD"      ? T.gold       : T.redLight;
-
-  const applyPreset = (preset) => {
-    clearFilters();
-    setActivePreset(preset.label);
-    const f = preset.filters;
-    if (f.roeMin)   setRoeMin(String(f.roeMin));
-    if (f.peMax)    setPeMax(String(f.peMax));
-    if (f.revGrMin) setRevGrMin(String(f.revGrMin));
-    if (f.mcapMin)  setMcapMin(String(f.mcapMin));
-    if (f.mcapMax)  setMcapMax(String(f.mcapMax));
-    if (f.divMin)   setDivMin(String(f.divMin));
-    if (f.deMax)    setDeMax(String(f.deMax));
-    if (f.rating)   setRating(f.rating);
-  };
-
-  const clearFilters = () => {
-    setPeMin(""); setPeMax(""); setRoeMin(""); setRoeMax("");
-    setMcapMin(""); setMcapMax(""); setDeMax("");
-    setRevGrMin(""); setPatGrMin(""); setDivMin("");
-    setSector("all"); setRating("all"); setSearch("");
-    setActivePreset(null);
-  };
-
-  const hasActiveFilters = peMin||peMax||roeMin||roeMax||mcapMin||mcapMax||deMax||revGrMin||patGrMin||divMin||sectorFilter!=="all"||ratingFilter!=="all"||search;
-
-  const filtered = SCREENER_STOCKS
-    .filter(s => {
-      if (search && !s.sym.toLowerCase().includes(search.toLowerCase()) && !s.name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (sectorFilter !== "all" && s.sector !== sectorFilter) return false;
-      if (ratingFilter !== "all" && s.rating !== ratingFilter) return false;
-      if (peMin  !== "" && s.pe    < parseFloat(peMin))    return false;
-      if (peMax  !== "" && s.pe    > parseFloat(peMax))    return false;
-      if (roeMin !== "" && s.roe   < parseFloat(roeMin))   return false;
-      if (roeMax !== "" && s.roe   > parseFloat(roeMax))   return false;
-      if (mcapMin!== "" && s.mcapN < parseFloat(mcapMin))  return false;
-      if (mcapMax!== "" && s.mcapN > parseFloat(mcapMax))  return false;
-      if (deMax  !== "" && s.de    > parseFloat(deMax))    return false;
-      if (revGrMin!=="" && s.rev_gr< parseFloat(revGrMin)) return false;
-      if (patGrMin!=="" && (s.pat_gr == null || s.pat_gr < parseFloat(patGrMin))) return false;
-      if (divMin !== "" && s.div   < parseFloat(divMin))   return false;
-      return true;
-    })
-    .sort((a, b) => {
-      const av = a[sortKey] ?? -Infinity;
-      const bv = b[sortKey] ?? -Infinity;
-      return sortDir === "asc" ? av - bv : bv - av;
-    });
-
-  const handleSort = (key) => {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("desc"); }
-  };
-
-  const SortHdr = ({ label, k, style }) => (
-    <span onClick={() => handleSort(k)} style={{ cursor:"pointer", userSelect:"none", display:"flex", alignItems:"center", gap:3, ...(style||{}) }}>
-      {label}
-      <span style={{ fontSize:8, color: sortKey===k ? T.goldLight : T.walnutLight, opacity: sortKey===k ? 1 : 0.5 }}>
-        {sortKey===k ? (sortDir==="asc" ? "▲" : "▼") : "↕"}
-      </span>
-    </span>
-  );
-
-  const quickAnalyze = async (stock) => {
+  // ── Fetch live data for a stock ──
+  const fetchStock = async (stock) => {
     setSelected(stock);
-    setLoading(true); setAnalysis("");
-    await callGroq(
-      `Comprehensive quick analysis of ${stock.sym} (${stock.name}, ${stock.sector} sector):
-Financials: P/E ${stock.pe}x | P/B ${stock.pb}x | ROE ${stock.roe}% | ROCE ${stock.roce ?? "N/A"}% | D/E ${stock.de} | Rev Growth ${stock.rev_gr}% | PAT Growth ${stock.pat_gr ?? "N/A"}% | Div Yield ${stock.div}% | MCap ₹${(stock.mcapN/1e5).toFixed(0)}L Cr
+    setLiveData(null);
+    setAiAnalysis("");
+    setLiveLoading(true);
 
-Provide a structured analysis:
-1) **Valuation Assessment** — Is current P/E cheap / fair / expensive vs sector peers? Justify with numbers.
-2) **Business Quality** — ROE/ROCE sustainability, competitive moat, management quality signals.
-3) **Growth Trajectory** — Can current revenue/PAT growth sustain? Key growth drivers.
-4) **Risk Factors** — Top 3 specific risks for this company right now.
-5) **Technicals** — Key support / resistance levels based on current price range.
-6) **DNR Verdict** — BUY / ACCUMULATE / HOLD / SELL with ideal entry range and 12-month target.
+    try {
+      const yahooSym = stock.sym + ".NS";
+      const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${yahooSym}?modules=summaryDetail,defaultKeyStatistics,financialData,price`;
+      const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxy, {signal: AbortSignal.timeout(10000)});
+      const json = await res.json();
+      const data = JSON.parse(json.contents);
+      const r = data?.quoteSummary?.result?.[0];
+      if (r) {
+        const fd = r.financialData || {};
+        const sd = r.summaryDetail || {};
+        const ks = r.defaultKeyStatistics || {};
+        const pr = r.price || {};
+        setLiveData({
+          name:      pr.longName || stock.name,
+          price:     pr.regularMarketPrice?.raw,
+          change:    pr.regularMarketChange?.raw,
+          changePct: pr.regularMarketChangePercent?.raw,
+          mcap:      pr.marketCap?.raw,
+          pe:        sd.trailingPE?.raw,
+          pb:        ks.priceToBook?.raw,
+          eps:       ks.trailingEps?.raw,
+          roe:       fd.returnOnEquity?.raw ? (fd.returnOnEquity.raw*100).toFixed(1) : null,
+          roce:      fd.returnOnAssets?.raw ? (fd.returnOnAssets.raw*100).toFixed(1) : null,
+          de:        fd.debtToEquity?.raw,
+          rev:       fd.totalRevenue?.raw,
+          netMargin: fd.profitMargins?.raw ? (fd.profitMargins.raw*100).toFixed(1) : null,
+          revenueGrowth: fd.revenueGrowth?.raw ? (fd.revenueGrowth.raw*100).toFixed(1) : null,
+          targetPrice: fd.targetMeanPrice?.raw,
+          recommendation: fd.recommendationKey,
+          week52High: sd.fiftyTwoWeekHigh?.raw,
+          week52Low:  sd.fiftyTwoWeekLow?.raw,
+          dividendYield: sd.dividendYield?.raw ? (sd.dividendYield.raw*100).toFixed(2) : null,
+          beta: sd.beta?.raw,
+          currentRatio: fd.currentRatio?.raw,
+          freeCashflow: fd.freeCashflow?.raw,
+        });
+      } else {
+        // Stock found in our list but Yahoo returned nothing — still show basic info
+        setLiveData({ name: stock.name, price: null, noData: true });
+      }
+    } catch(e) {
+      setLiveData({ name: stock.name, price: null, error: e.message });
+    }
+    setLiveLoading(false);
 
-Be specific with numbers. Reference current FY25 data.`,
-      SYS, (t) => setAnalysis(t)
-    );
-    setLoading(false);
+    // Save to recent
+    const updated = [stock, ...recentSearches.filter(r => r.sym !== stock.sym)].slice(0,8);
+    setRecent(updated);
+    try { localStorage.setItem('dnr_recent_searches', JSON.stringify(updated)); } catch {}
   };
 
-  const FilterInput = ({ label, val, setter, placeholder }) => (
-    <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-      <label style={{ fontSize:9, color:T.muted, letterSpacing:"1px", textTransform:"uppercase" }}>{label}</label>
-      <input className="inp" value={val} onChange={e => { setter(e.target.value); setActivePreset(null); }}
-        placeholder={placeholder} style={{ width:90, padding:"6px 10px", fontSize:12 }} />
-    </div>
-  );
+  // ── AI Quick Analysis ──
+  const runAI = async () => {
+    if (!selected || !liveData) return;
+    setAiLoading(true); setAiAnalysis("");
+    const prompt = `Stock: ${liveData.name} (${selected.sym})
+Sector: ${selected.sector}
+CMP: ₹${liveData.price || 'N/A'}
+P/E: ${liveData.pe || 'N/A'} | P/B: ${liveData.pb || 'N/A'} | ROE: ${liveData.roe || 'N/A'}%
+Net Margin: ${liveData.netMargin || 'N/A'}% | D/E: ${liveData.de || 'N/A'}
+Revenue Growth: ${liveData.revenueGrowth || 'N/A'}% | Target: ₹${liveData.targetPrice || 'N/A'}
+52W High: ₹${liveData.week52High || 'N/A'} | 52W Low: ₹${liveData.week52Low || 'N/A'}
 
-  const fmtMcap = (n) => n >= 100000 ? `₹${(n/100000).toFixed(1)}L Cr` : `₹${(n/1000).toFixed(0)}K Cr`;
+Give a concise 5-point institutional analysis:
+1. Business Quality
+2. Valuation Assessment
+3. Financial Health
+4. Key Risks
+5. Verdict (BUY/HOLD/SELL with target price)
+
+Be specific, data-driven, and current.`;
+    await callGroq(prompt, "You are a senior equity research analyst. Be concise and data-driven.", (t) => setAiAnalysis(t));
+    setAiLoading(false);
+  };
+
+  const fmtCr = (n) => {
+    if (!n) return "N/A";
+    if (n >= 1e12) return `₹${(n/1e12).toFixed(1)}L Cr`;
+    if (n >= 1e9)  return `₹${(n/1e9).toFixed(0)} Cr`;
+    if (n >= 1e7)  return `₹${(n/1e7).toFixed(0)} Cr`;
+    return `₹${n.toFixed(0)}`;
+  };
+
+  const recColor = (r) => {
+    if (!r) return T.muted;
+    if (r.includes('buy') || r.includes('strong_buy')) return T.greenLight;
+    if (r.includes('sell')) return T.redLight;
+    return T.goldLight;
+  };
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:18, flexWrap:"wrap", gap:12 }}>
-        <div>
-          <div className="sec-title">🔍 Stock Screener</div>
-          <div className="sec-sub">30 stocks · Multi-filter · Sortable · AI quick analysis</div>
-        </div>
-        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-          {hasActiveFilters && (
-            <button className="btn-danger" onClick={clearFilters} style={{ fontSize:11 }}>✕ Clear Filters</button>
+      <div className="ph">
+        <div className="pt">Stock Research Universe</div>
+        <div className="ps">Search any NSE listed stock — {NSE_STOCKS.length}+ stocks with live data</div>
+      </div>
+
+      <div style={{display:'flex',gap:12,marginBottom:20,flexWrap:'wrap'}}>
+        {/* Search box */}
+        <div style={{flex:1,minWidth:280,position:'relative'}}>
+          <input
+            className="inp"
+            style={{width:'100%',paddingLeft:36,fontSize:14}}
+            placeholder="Search by name, symbol or sector... (e.g. TCS, HDFC, Pharma)"
+            value={query}
+            onChange={e=>setQuery(e.target.value)}
+            autoComplete="off"
+          />
+          <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14,opacity:0.4}}>🔍</span>
+
+          {/* Dropdown */}
+          {searchResults.length > 0 && (
+            <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,right:0,background:T.navyMid,border:`1px solid ${T.navyBorder}`,borderRadius:8,zIndex:100,overflow:'hidden',boxShadow:'0 8px 32px #00000066'}}>
+              {searchResults.map(s=>(
+                <div key={s.sym} onClick={()=>{setQuery('');fetchStock(s);}} style={{padding:'10px 14px',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:`1px solid ${T.navyBorder}`,transition:'background 0.15s'}}
+                  onMouseEnter={e=>e.currentTarget.style.background=T.navyHover}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <div>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.goldLight,fontWeight:600}}>{s.sym}</span>
+                    <span style={{fontSize:12,color:T.dunDark,marginLeft:10}}>{s.name}</span>
+                  </div>
+                  <span style={{fontSize:10,color:T.muted,background:T.navyBorder,padding:'2px 8px',borderRadius:4}}>{s.sector}</span>
+                </div>
+              ))}
+            </div>
           )}
-          <button className={`btn-ghost ${showFilters ? "on" : ""}`}
-            style={showFilters ? { background:T.walnut, color:T.dun, borderColor:T.walnut } : {}}
-            onClick={() => setShowFilters(f => !f)}>
-            ⚙️ {showFilters ? "Hide" : "Filters"}
-          </button>
         </div>
       </div>
 
-      {/* Presets */}
-      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:14 }}>
-        {PRESETS.map(p => (
-          <button key={p.label} onClick={() => applyPreset(p)}
-            style={{
-              padding:"5px 12px", borderRadius:20, fontSize:11, cursor:"pointer", transition:"all 0.2s",
-              background: activePreset===p.label ? T.gold+"33" : T.walnutDeep,
-              border: `1px solid ${activePreset===p.label ? T.gold+"88" : T.walnut+"44"}`,
-              color: activePreset===p.label ? T.goldLight : T.muted,
-              fontFamily:"'Jost',sans-serif",
-            }} title={p.desc}>
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Search + Sector + Rating bar */}
-      <div className="card" style={{ marginBottom:12, padding:"14px 16px" }}>
-        <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"center" }}>
-          <input className="inp" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="🔍  Search symbol or name..."
-            style={{ maxWidth:240, minWidth:160 }} />
-          <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
-            <button onClick={() => setSector("all")}
-              className="btn-ghost" style={sectorFilter==="all" ? { background:T.walnut, color:T.dun, borderColor:T.walnut } : {}}>
-              All Sectors
-            </button>
-            {sectors.map(sec => (
-              <button key={sec} onClick={() => setSector(sec)}
-                className="btn-ghost"
-                style={sectorFilter===sec ? {
-                  background: (SECTOR_COLORS[sec]||T.walnut)+"44",
-                  color: T.dun,
-                  borderColor: (SECTOR_COLORS[sec]||T.walnut)+"88",
-                } : {}}>
-                {sec}
+      {/* Recent searches */}
+      {!selected && recentSearches.length > 0 && (
+        <div style={{marginBottom:20}}>
+          <div className="sec-hdr">Recent Searches</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {recentSearches.map(s=>(
+              <button key={s.sym} onClick={()=>fetchStock(s)} className="btn-ghost btn-sm">
+                {s.sym} <span style={{fontSize:9,color:T.muted,marginLeft:4}}>{s.sector}</span>
               </button>
             ))}
-          </div>
-          <div style={{ display:"flex", gap:5, marginLeft:"auto" }}>
-            {["all",...ratings].map(r => (
-              <button key={r} onClick={() => setRating(r)}
-                className="btn-ghost"
-                style={ratingFilter===r ? {
-                  background: r==="all" ? T.walnut : ratingColor(r)+"33",
-                  color: r==="all" ? T.dun : ratingColor(r),
-                  borderColor: r==="all" ? T.walnut : ratingColor(r)+"77",
-                  fontWeight:700,
-                } : {}}>
-                {r==="all" ? "All Ratings" : r}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Advanced Numeric Filters */}
-      {showFilters && (
-        <div className="card card-gold" style={{ marginBottom:14 }}>
-          <div style={{ fontSize:11, color:T.goldLight, letterSpacing:"1.5px", textTransform:"uppercase", marginBottom:14, fontWeight:600 }}>
-            ⚙️ Advanced Numeric Filters
-          </div>
-          <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
-            <FilterInput label="P/E Min"      val={peMin}    setter={e => { setPeMin(e); setActivePreset(null); }}     placeholder="e.g. 10" />
-            <FilterInput label="P/E Max"      val={peMax}    setter={e => { setPeMax(e); setActivePreset(null); }}     placeholder="e.g. 40" />
-            <FilterInput label="ROE Min %"    val={roeMin}   setter={e => { setRoeMin(e); setActivePreset(null); }}    placeholder="e.g. 15" />
-            <FilterInput label="ROE Max %"    val={roeMax}   setter={e => { setRoeMax(e); setActivePreset(null); }}    placeholder="e.g. 50" />
-            <FilterInput label="MCap Min(Cr)" val={mcapMin}  setter={e => { setMcapMin(e); setActivePreset(null); }}   placeholder="e.g. 50000" />
-            <FilterInput label="MCap Max(Cr)" val={mcapMax}  setter={e => { setMcapMax(e); setActivePreset(null); }}   placeholder="e.g. 500000" />
-            <FilterInput label="D/E Max"      val={deMax}    setter={e => { setDeMax(e); setActivePreset(null); }}     placeholder="e.g. 1.0" />
-            <FilterInput label="Rev Gr Min %" val={revGrMin} setter={e => { setRevGrMin(e); setActivePreset(null); }}  placeholder="e.g. 15" />
-            <FilterInput label="PAT Gr Min %" val={patGrMin} setter={e => { setPatGrMin(e); setActivePreset(null); }}  placeholder="e.g. 10" />
-            <FilterInput label="Div Yield Min"val={divMin}   setter={e => { setDivMin(e); setActivePreset(null); }}    placeholder="e.g. 2" />
           </div>
         </div>
       )}
 
-      {/* Results count */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8, padding:"0 4px" }}>
-        <span style={{ fontSize:11, color:T.muted }}>
-          Showing <strong style={{ color:T.goldLight }}>{filtered.length}</strong> of {SCREENER_STOCKS.length} stocks
-          {hasActiveFilters && <span style={{ color:T.gold }}> · Filters active</span>}
-        </span>
-        <span style={{ fontSize:10, color:T.walnutLight }}>Click a row for AI analysis · Click column headers to sort</span>
-      </div>
-
-      {/* Table */}
-      <div className="card" style={{ overflowX:"auto", padding:0 }}>
-        {/* Header row */}
-        <div className="scr-row scr-hdr" style={{ padding:"10px 14px", borderBottom:`2px solid ${T.walnut}55` }}>
-          <span>Stock</span>
-          <SortHdr label="MCap"     k="mcapN" />
-          <SortHdr label="P/E"      k="pe" />
-          <SortHdr label="P/B"      k="pb" />
-          <SortHdr label="ROE %"    k="roe" />
-          <SortHdr label="Rev Gr %" k="rev_gr" />
-          <SortHdr label="PAT Gr %" k="pat_gr" />
-          <SortHdr label="D/E"      k="de" />
-          <span>Rating</span>
+      {/* Quick sector picks */}
+      {!selected && (
+        <div style={{marginBottom:20}}>
+          <div className="sec-hdr">Browse by Sector</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {[...new Set(NSE_STOCKS.map(s=>s.sector))].sort().map(sec=>(
+              <button key={sec} onClick={()=>setQuery(sec)} className="btn-ghost btn-sm" style={{fontSize:10}}>
+                {sec} ({NSE_STOCKS.filter(s=>s.sector===sec).length})
+              </button>
+            ))}
+          </div>
         </div>
+      )}
 
-        {filtered.length === 0 ? (
-          <div style={{ textAlign:"center", padding:"48px 20px" }}>
-            <div style={{ fontSize:36, marginBottom:12 }}>🔍</div>
-            <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:18, color:T.dun, marginBottom:6 }}>No stocks match your filters</div>
-            <div style={{ color:T.muted, fontSize:13, marginBottom:16 }}>Try adjusting or clearing your filters</div>
-            <button className="btn-gold" onClick={clearFilters}>✕ Clear All Filters</button>
-          </div>
-        ) : (
-          filtered.map(s => (
-            <div key={s.sym} className="scr-row"
-              style={{ padding:"10px 14px", borderBottom:`1px solid ${T.walnut}22`, cursor:"pointer",
-                background: selected?.sym===s.sym ? T.gold+"0a" : "transparent",
-                borderLeft: selected?.sym===s.sym ? `3px solid ${T.gold}77` : "3px solid transparent",
-              }}
-              onClick={() => quickAnalyze(s)}>
-              <div>
-                <div style={{ fontFamily:"'DM Mono',monospace", fontWeight:700, fontSize:12, color:T.dun }}>{s.sym}</div>
-                <div style={{ fontSize:10, color:T.muted, marginBottom:2 }}>{s.name}</div>
-                <span style={{
-                  fontSize:8, letterSpacing:"0.5px", padding:"1px 6px", borderRadius:8,
-                  background: (SECTOR_COLORS[s.sector]||T.walnut)+"22",
-                  color: (SECTOR_COLORS[s.sector]||T.walnutLight),
-                  border: `1px solid ${(SECTOR_COLORS[s.sector]||T.walnut)}44`,
-                }}>
-                  {s.sector}
-                </span>
-              </div>
-              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11 }}>{fmtMcap(s.mcapN)}</span>
-              <span style={{
-                fontFamily:"'DM Mono',monospace",
-                color: s.pe > 60 ? T.redLight : s.pe < 20 ? T.greenLight : T.dunDark
-              }}>{s.pe}x</span>
-              <span style={{ fontFamily:"'DM Mono',monospace", fontSize:11 }}>{s.pb}x</span>
-              <span style={{ color: s.roe >= 25 ? T.greenLight : s.roe >= 15 ? T.dun : T.redLight, fontWeight: s.roe >= 25 ? 700 : 400 }}>
-                {s.roe}%
-              </span>
-              <span style={{ color: s.rev_gr >= 20 ? T.greenLight : s.rev_gr >= 10 ? T.dun : T.muted }}>
-                {s.rev_gr}%
-              </span>
-              <span style={{ color: s.pat_gr == null ? T.muted : s.pat_gr >= 20 ? T.greenLight : s.pat_gr >= 0 ? T.dun : T.redLight }}>
-                {s.pat_gr != null ? `${s.pat_gr}%` : "—"}
-              </span>
-              <span style={{ color: s.de > 1.5 ? T.redLight : s.de > 0.5 ? T.gold : T.greenLight }}>
-                {s.de}
-              </span>
-              <span style={{
-                color: ratingColor(s.rating), fontWeight:700, fontSize:10,
-                background: ratingColor(s.rating)+"18",
-                padding:"2px 8px", borderRadius:8,
-                border:`1px solid ${ratingColor(s.rating)}33`,
-              }}>
-                {s.rating}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
+      {/* Stock detail panel */}
+      {selected && (
+        <div>
+          {/* Back button */}
+          <button className="btn-ghost btn-sm" style={{marginBottom:16}} onClick={()=>{setSelected(null);setLiveData(null);setAiAnalysis('');}}>
+            ← Back to Search
+          </button>
 
-      {/* Legend */}
-      <div style={{ display:"flex", gap:16, flexWrap:"wrap", marginTop:10, padding:"0 4px", fontSize:10, color:T.mutedDark }}>
-        <span><span style={{ color:T.greenLight }}>■</span> Strong / good</span>
-        <span><span style={{ color:T.gold }}>■</span> Moderate</span>
-        <span><span style={{ color:T.redLight }}>■</span> Weak / high risk</span>
-        <span style={{ marginLeft:"auto", color:T.walnutLight }}>MCap in ₹ Crores · All data FY25</span>
-      </div>
-
-      {/* AI Analysis Panel */}
-      {(selected || loading) && (
-        <div className="card card-gold" style={{ marginTop:18 }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+          {liveLoading ? (
+            <div className="loading"><div className="spin"/><span>Fetching live data for {selected.sym}...</span></div>
+          ) : liveData ? (
             <div>
-              <div className="card-title" style={{ marginBottom:2 }}>🤖 AI Analysis — {selected?.sym}</div>
-              <div style={{ fontSize:10, color:T.muted }}>
-                {selected?.name} · {selected?.sector} ·
-                P/E {selected?.pe}x · ROE {selected?.roe}%
+              {/* Header */}
+              <div className="card card-gold" style={{marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:12}}>
+                  <div>
+                    <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+                      <span style={{fontFamily:"'Cormorant Garamond',serif",fontSize:24,fontWeight:700,color:T.dun}}>{liveData.name}</span>
+                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:T.goldLight,background:T.navyMid,padding:'3px 10px',borderRadius:4,border:`1px solid ${T.navyBorder}`}}>{selected.sym}</span>
+                      <span style={{fontSize:10,color:T.muted,background:T.navyBorder,padding:'3px 10px',borderRadius:4}}>{selected.sector}</span>
+                    </div>
+                    {liveData.price && (
+                      <div style={{display:'flex',alignItems:'baseline',gap:10}}>
+                        <span style={{fontFamily:"'DM Mono',monospace",fontSize:32,fontWeight:700,color:T.dunLight}}>₹{liveData.price?.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+                        <span style={{fontSize:14,color:liveData.changePct>=0?T.greenLight:T.redLight,fontWeight:600}}>
+                          {liveData.changePct>=0?'▲':'▼'} {Math.abs(liveData.changePct*100).toFixed(2)}%
+                        </span>
+                      </div>
+                    )}
+                    {liveData.noData && <div style={{color:T.muted,fontSize:13}}>Live data unavailable — Yahoo Finance may not list this symbol</div>}
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    {liveData.recommendation && (
+                      <div style={{fontSize:14,fontWeight:700,color:recColor(liveData.recommendation),textTransform:'uppercase',letterSpacing:'2px',marginBottom:4}}>
+                        {liveData.recommendation.replace('_',' ')}
+                      </div>
+                    )}
+                    {liveData.targetPrice && <div style={{fontSize:12,color:T.muted}}>Target: <span style={{color:T.goldLight,fontWeight:600}}>₹{liveData.targetPrice}</span></div>}
+                    {liveData.mcap && <div style={{fontSize:11,color:T.muted,marginTop:4}}>MCap: {fmtCr(liveData.mcap)}</div>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Metrics grid */}
+              <div className="g4" style={{marginBottom:14}}>
+                {[
+                  {l:'P/E Ratio',  v:liveData.pe?.toFixed(1)||'N/A'},
+                  {l:'P/B Ratio',  v:liveData.pb?.toFixed(1)||'N/A'},
+                  {l:'ROE',        v:liveData.roe?liveData.roe+'%':'N/A'},
+                  {l:'Net Margin', v:liveData.netMargin?liveData.netMargin+'%':'N/A'},
+                  {l:'D/E Ratio',  v:liveData.de?.toFixed(2)||'N/A'},
+                  {l:'Rev Growth', v:liveData.revenueGrowth?liveData.revenueGrowth+'%':'N/A'},
+                  {l:'52W High',   v:liveData.week52High?`₹${liveData.week52High?.toFixed(0)}`:'N/A'},
+                  {l:'52W Low',    v:liveData.week52Low?`₹${liveData.week52Low?.toFixed(0)}`:'N/A'},
+                  {l:'Div Yield',  v:liveData.dividendYield?liveData.dividendYield+'%':'N/A'},
+                  {l:'Beta',       v:liveData.beta?.toFixed(2)||'N/A'},
+                  {l:'EPS (TTM)',  v:liveData.eps?`₹${liveData.eps?.toFixed(1)}`:'N/A'},
+                  {l:'Revenue',    v:fmtCr(liveData.rev)},
+                ].map(m=>(
+                  <div key={m.l} className="stat">
+                    <div className="stat-lbl">{m.l}</div>
+                    <div className="stat-val" style={{fontSize:15}}>{m.v}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* AI Analysis */}
+              <div className="card" style={{marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                  <div className="card-title" style={{marginBottom:0}}>🔬 AI Quick Analysis</div>
+                  {!aiAnalysis && !aiLoading && (
+                    <button className="btn-gold" onClick={runAI} style={{padding:'7px 18px',fontSize:11}}>
+                      Generate Analysis
+                    </button>
+                  )}
+                </div>
+                {aiLoading && <div className="loading"><div className="spin"/><span>Analysing {selected.sym}...</span></div>}
+                {aiAnalysis && (
+                  <div className="res-box" style={{fontSize:13,lineHeight:1.85}}
+                    dangerouslySetInnerHTML={{__html:aiAnalysis.replace(/\*\*(.*?)\*\*/g,`<strong style='color:${T.goldLight}'>$1</strong>`).replace(/\n/g,'<br/>')}}
+                  />
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                <button className="btn-gold" onClick={()=>setActiveTab('research')} style={{fontSize:11}}>
+                  🔬 Full 18-Dimension Research
+                </button>
+                <button className="btn-primary" onClick={()=>setActiveTab('technical')} style={{fontSize:11}}>
+                  📈 Technical Charts
+                </button>
+                <button className="btn-ghost" onClick={()=>setActiveTab('watchlist')} style={{fontSize:11}}>
+                  ⭐ Add to Watchlist
+                </button>
               </div>
             </div>
-            <button className="btn-ghost btn-sm" onClick={() => { setSelected(null); setAnalysis(""); }}>✕ Close</button>
+          ) : null}
+        </div>
+      )}
+
+      {/* Default: show popular stocks */}
+      {!selected && !query && (
+        <div>
+          <div className="sec-hdr">Popular Stocks — Quick Access</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:8}}>
+            {NSE_STOCKS.slice(0,40).map(s=>(
+              <div key={s.sym} onClick={()=>fetchStock(s)} className="card card-sm" style={{cursor:'pointer',display:'flex',alignItems:'center',gap:10,transition:'all 0.2s'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor=T.goldLight+'44'}
+                onMouseLeave={e=>e.currentTarget.style.borderColor=''}>
+                <div style={{background:T.navyBorder,borderRadius:4,padding:'4px 7px',fontFamily:"'DM Mono',monospace",fontSize:10,color:T.goldLight,fontWeight:700,flexShrink:0}}>{s.sym}</div>
+                <div>
+                  <div style={{fontSize:11,color:T.dunDark,lineHeight:1.2}}>{s.name}</div>
+                  <div style={{fontSize:9,color:T.muted,marginTop:1}}>{s.sector}</div>
+                </div>
+              </div>
+            ))}
           </div>
-          {loading ? (
-            <div className="loading">
-              <div className="spin" />
-              <span>Analyzing {selected?.sym} across valuation, growth & risk dimensions...</span>
-            </div>
-          ) : (
-            analysis && (
-              <div className="res-box"
-                dangerouslySetInnerHTML={{ __html:
-                  analysis
-                    .replace(/\*\*(.*?)\*\*/g, "<strong style='color:"+T.goldLight+"'>$1</strong>")
-                    .replace(/\n/g, "<br/>")
-                }} />
-            )
-          )}
+          <div style={{marginTop:12,textAlign:'center',fontSize:11,color:T.muted}}>
+            Search above to access all {NSE_STOCKS.length}+ stocks — or type any NSE symbol directly
+          </div>
         </div>
       )}
     </div>
