@@ -1,4 +1,4 @@
-/* eslint-disable */  
+/* eslint-disable */
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -5245,3 +5245,4 @@ export default function App() {
     </>
   );
 }
+
