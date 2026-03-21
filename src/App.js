@@ -533,12 +533,13 @@ const styles = `
   }
   .sb-logo:hover{background:${T.navyLight}}
   .sb-logo-img{
-    width:72px;height:72px;border-radius:50%;
+    width:88px;height:88px;border-radius:50%;
     object-fit:cover;
-    border:2px solid ${T.gold}66;
-    box-shadow:0 0 24px #00C8FF44, 0 0 48px #E0BC6A33;
+    border:2px solid ${T.gold}88;
+    box-shadow:0 0 28px #E0BC6A66, 0 0 56px #E0BC6A33;
     margin-bottom:10px;
     transition:box-shadow 0.3s;
+    filter:brightness(1.1) contrast(1.05);
   }
   .sb-logo:hover .sb-logo-img{box-shadow:0 0 32px #00C8FF77, 0 0 60px #E0BC6A55}
   .sb-logo-title{
@@ -1391,7 +1392,13 @@ function HomePage({ setActiveTab, markets, fetching }) {
           <div style={{display:'flex',alignItems:'center',gap:12}}>
             <div style={{position:'relative'}}>
               <div style={{position:'absolute',inset:-6,borderRadius:'50%',border:'1px solid rgba(91,184,255,0.3)',animation:'warpSpin 8s linear infinite'}}/>
-              <img src='/logo.png' alt='DNR' style={{width:42,height:42,borderRadius:'50%',objectFit:'cover',border:'1px solid rgba(91,184,255,0.4)',boxShadow:'0 0 16px rgba(91,184,255,0.3)',position:'relative',zIndex:2}}/>
+              <img src='/logo.png' alt='DNR' style={{
+              width:52,height:52,borderRadius:'50%',objectFit:'cover',
+              border:'2px solid rgba(201,168,76,0.6)',
+              boxShadow:'0 0 18px rgba(201,168,76,0.5), 0 0 36px rgba(201,168,76,0.2)',
+              position:'relative',zIndex:2,
+              filter:'brightness(1.1) contrast(1.05)',
+            }}/>
             </div>
             <div>
               <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17,fontWeight:700,color:'#5BB8FF',letterSpacing:'0.3px',lineHeight:1,textShadow:'0 0 20px rgba(91,184,255,0.4)'}}>DNR Capitals</div>
@@ -1431,10 +1438,17 @@ function HomePage({ setActiveTab, markets, fetching }) {
         {/* ── HERO ── */}
         <div style={{padding:'52px 60px 40px',display:'flex',flexDirection:'column',alignItems:'center',textAlign:'center'}}>
           {/* Logo medallion */}
-          <div style={{position:'relative',marginBottom:28}}>
-            <div style={{position:'absolute',inset:-14,borderRadius:'50%',border:'1px solid rgba(91,184,255,0.25)',animation:'warpSpin 12s linear infinite'}}/>
-            <div style={{position:'absolute',inset:-24,borderRadius:'50%',border:'1px solid rgba(91,184,255,0.12)',animation:'warpSpin 20s linear infinite reverse'}}/>
-            <img src='/logo.png' alt='DNR Capitals' style={{width:96,height:96,borderRadius:'50%',objectFit:'cover',border:'2px solid rgba(91,184,255,0.45)',boxShadow:'0 0 50px rgba(91,184,255,0.35),0 0 100px rgba(91,184,255,0.15)',position:'relative',zIndex:2}}/>
+          <div style={{position:'relative',marginBottom:32}}>
+            <div style={{position:'absolute',inset:-18,borderRadius:'50%',border:'2px solid rgba(201,168,76,0.5)',animation:'warpSpin 12s linear infinite'}}/>
+            <div style={{position:'absolute',inset:-32,borderRadius:'50%',border:'1px solid rgba(91,184,255,0.25)',animation:'warpSpin 20s linear infinite reverse'}}/>
+            <div style={{position:'absolute',inset:-46,borderRadius:'50%',border:'1px solid rgba(201,168,76,0.12)',animation:'warpSpin 35s linear infinite'}}/>
+            <img src='/logo.png' alt='DNR Capitals' style={{
+              width:160,height:160,borderRadius:'50%',objectFit:'cover',
+              border:'3px solid rgba(201,168,76,0.7)',
+              boxShadow:'0 0 40px rgba(201,168,76,0.6), 0 0 80px rgba(201,168,76,0.3), 0 0 120px rgba(91,184,255,0.2), 0 0 8px rgba(201,168,76,0.8)',
+              position:'relative',zIndex:2,
+              filter:'brightness(1.15) contrast(1.05)',
+            }}/>
           </div>
 
           <div style={{fontSize:9,color:'rgba(91,184,255,0.55)',letterSpacing:'7px',textTransform:'uppercase',marginBottom:18}}>
