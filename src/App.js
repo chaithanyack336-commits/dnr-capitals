@@ -3799,17 +3799,94 @@ function SectorRotation() {
     {name:"Cement & Construction",perf:"+3.8%",momentum:"Strong",heat:78,color:"#22c55e",icon:"🏛️",desc:"Infra spending, housing demand"},
   ];
 
+  const [fullRotation, setFullRotation] = useState(null);
+  const [fullLoading, setFullLoading] = useState(false);
+
   const analyzeSector = async (sector) => {
     setSelected(sector);
+    setFullRotation(null);
     setLoading(true);
-    const raw = await callGroq(`Deep dive analysis for ${sector.name} sector in Indian markets. Current performance: ${sector.perf}, Momentum: ${sector.momentum}. Provide: 1) Key drivers for current performance 2) Top 3 stocks to watch with brief reasoning 3) Key risks 4) 3-6 month outlook. Be specific with stock names and data.`, getSYS(), null);
+    const raw = await callGroq(
+      `You are a market strategist analysing the ${sector.name} sector in India.
+Current Performance: ${sector.perf} | Momentum: ${sector.momentum} | Heat Score: ${sector.heat}%
+
+Provide a focused institutional-grade analysis covering:
+1. **Relative Strength vs Nifty** — is this sector outperforming or underperforming and why
+2. **Momentum & Price Action** — describe the current trend, key levels, and pattern
+3. **Earnings Trend** — revenue and PAT trajectory, margin direction, recent quarterly signals
+4. **FII/DII Flow Patterns** — net buying or selling, recent institutional positioning
+5. **Commodity & Currency Impact** — INR, oil, metals, or input cost linkage relevant to this sector
+6. **Valuation vs Historical Average** — PE/PB relative to 5-year average, cheap or expensive
+7. **Macro Tailwinds** — policy, rate cycle, capex, global factors working in favour
+8. **Macro Headwinds** — key risks from macro, regulatory, or global environment
+9. **Stage Assessment** — is this sector Leading / Improving (early-stage) / Weakening (late-stage) / Lagging?
+10. **What to Monitor (next 4–8 weeks)** — 3 specific data points or events investors must track
+
+Use professional market strategy language. Be direct. No generic commentary. Bold key terms.`,
+      `You are DNR Capitals' senior market strategist with 30 years of Indian equity market expertise. Provide institutional-quality, direct sector strategy with specific data points.`,
+      null
+    );
     setAnalysis(raw);
     setLoading(false);
+  };
+
+  const runFullRotationAnalysis = async () => {
+    setSelected(null);
+    setAnalysis(null);
+    setFullRotation(null);
+    setFullLoading(true);
+    const raw = await callGroq(
+      `You are a market strategist. Your job is to identify which sectors in India are strengthening or weakening without giving direct stock recommendations.
+
+Analyse each sector across:
+- Relative strength vs Nifty
+- Momentum and price action trends
+- Earnings trends across the sector
+- FII flow patterns into the sector
+- Commodity and currency impact
+- Valuation vs historical averages
+- Sector leadership dynamics
+- Macro tailwinds and headwinds
+
+Provide a structured markdown table with these exact columns:
+| Sector | Trend | Relative Strength | Earnings Trend | Valuation | Key Tailwind | Key Risk |
+
+Cover ALL of these sectors in the table: IT, Banks, Pharma, Auto, Metals, FMCG, Realty, PSU Banks, Capital Goods, Defence, Consumer, Chemicals, Infrastructure, Renewables.
+
+After the table, provide detailed analysis in these sections:
+
+**LEADING SECTORS** — Which sectors are leading the market and exactly why. Be specific about flows, earnings, and price action.
+
+**LAGGING SECTORS** — Which sectors are lagging and why. Name specific headwinds.
+
+**IMPROVING (Early-Stage Leadership)** — Sectors showing early signs of rotation into them. What signals confirm this.
+
+**WEAKENING (Late-Stage / Reversing)** — Sectors that led recently but are now rolling over. Warning signals.
+
+**MACRO DRIVERS OF CURRENT ROTATION** — What macro factors (rate cycle, FII behaviour, INR, oil, global risk-on/off, budget themes) are driving the current sector rotation.
+
+**WATCHLIST FOR NEXT 4–8 WEEKS** — For each sector, one specific data point, event, or trigger investors must monitor.
+
+Use professional market strategy language. Be direct about which sectors look strong and which look weak. No generic commentary.`,
+      `You are DNR Capitals' chief market strategist. You produce institutional-quality sector rotation research used by fund managers and HNI investors. Your analysis is direct, data-driven, and free of generic commentary.`,
+      null
+    );
+    setFullRotation(raw);
+    setFullLoading(false);
   };
 
   return (
     <div>
       <div className="ph"><h1 className="pt">🔄 Sector Rotation Tracker</h1><p className="ps">Real-time sector momentum & rotation analysis</p></div>
+      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
+        <button
+          onClick={runFullRotationAnalysis}
+          disabled={fullLoading}
+          style={{background:`linear-gradient(135deg,${T.walnut},${T.goldLight})`,border:"none",borderRadius:8,padding:"10px 20px",color:"#1a0e00",fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",gap:8,opacity:fullLoading?0.7:1}}
+        >
+          {fullLoading ? <><div className="spin" style={{width:14,height:14,borderWidth:2}}/>Running Full Analysis...</> : <>📊 Run Full Rotation Analysis</>}
+        </button>
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12,marginBottom:24}}>
         {SECTORS.map(s => (
           <div key={s.name} className="sector-card" onClick={() => analyzeSector(s)} style={{border:`1px solid ${selected?.name===s.name ? T.goldLight : T.walnut+"33"}`}}>
@@ -3838,6 +3915,28 @@ function SectorRotation() {
           </div>
           {loading ? <div className="loading"><div className="spin"/><span>Analyzing sector...</span></div> :
             analysis && <div className="res-box" style={{fontSize:13,lineHeight:1.8}} dangerouslySetInnerHTML={{__html:analysis.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>")}}/>
+          }
+        </div>
+      )}
+      {(fullLoading || fullRotation) && (
+        <div className="card" style={{marginTop:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+            <span style={{fontSize:22}}>📊</span>
+            <div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:700,color:T.dun}}>Full Sector Rotation Analysis</div>
+              <div style={{fontSize:11,color:T.muted}}>IT · Banks · Pharma · Auto · Metals · FMCG · Realty · PSU Banks · Capital Goods · Defence · Consumer · Chemicals · Infrastructure · Renewables</div>
+            </div>
+          </div>
+          {fullLoading
+            ? <div className="loading"><div className="spin"/><span>Running full rotation analysis across 14 sectors...</span></div>
+            : fullRotation && (
+              <div className="res-box" style={{fontSize:13,lineHeight:1.9}}
+                dangerouslySetInnerHTML={{__html:
+                  fullRotation
+                    .replace(/\*\*(.*?)\*\*/g,`<strong style='color:${T.goldLight}'>$1</strong>`)
+                }}
+              />
+            )
           }
         </div>
       )}
