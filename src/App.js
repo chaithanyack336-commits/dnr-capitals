@@ -1752,7 +1752,31 @@ function TechnicalCharts() {
     setLoading(true); setAnalysis("");
     generateTechnicalData(symbol);
     await callGroq(
-      `Technical analysis for ${symbol}: 1) Current trend — uptrend/downtrend/consolidation 2) 50-DMA and 200-DMA levels and golden/death cross status 3) RSI interpretation 4) MACD signal 5) Bollinger Bands — price position 6) Volume analysis — accumulation or distribution 7) Three key support levels with prices 8) Three key resistance levels with prices 9) Chart patterns — identify any forming patterns 10) Ideal entry zone for long-term investor 11) Stop-loss recommendation 12) Overall technical score (1-10) and BUY/SELL/NEUTRAL signal. Be very specific with price levels.`,
+      `You are a professional technical analyst. Your job is to analyse ${symbol} without giving any buy, sell, or hold recommendation.
+
+Analyse: Price trend, support and resistance levels, volume trend, moving averages (20/50/200 DMA), RSI, MACD, relative strength vs Nifty, sector trend, broader market sentiment, key chart pattern.
+
+Provide these structured sections:
+
+**1. TREND SUMMARY TABLE**
+| Metric | Observation |
+Include: Primary Trend / Short-Term Trend / Medium-Term Trend / Volume Trend / Relative Strength vs Nifty / Sector Strength
+
+**2. KEY LEVELS TABLE**
+| Metric | Level |
+Include: Immediate Support / Major Support / Immediate Resistance / Major Resistance / Breakout Zone / Breakdown Zone
+
+**3. TECHNICAL INDICATORS TABLE**
+| Indicator | Reading | Interpretation |
+Include: 20 DMA / 50 DMA / 200 DMA / RSI / MACD / Volume
+
+**4. CHART STRUCTURE**
+Explain: uptrend, downtrend, or consolidation; pattern type (flag, triangle, cup-and-handle, range); whether price action is improving or weakening; momentum direction.
+
+**5. RISK FACTORS**
+What can weaken the chart structure, which levels to watch, broader market impact risk, which event could change the trend.
+
+Be specific with price levels and observations. No buy/sell/hold recommendations.`,
       SYS, (t) => setAnalysis(t)
     );
     setLoading(false);
@@ -2234,18 +2258,89 @@ function QuarterlyHub() {
   const [results, setResults] = useState("");
   const [concall, setConcall] = useState("");
   const [presentation, setPresentation] = useState("");
-  const [loading, setLoading] = useState({ results: false, concall: false, presentation: false });
+  const [forensics, setForensics] = useState("");
+  const [loading, setLoading] = useState({ results: false, concall: false, presentation: false, forensics: false });
   const [tab, setTab] = useState("results");
 
   const fetch = async (type) => {
     if (!symbol.trim()) return;
     setLoading(p => ({ ...p, [type]: true }));
     const prompts = {
-      results: `Quarterly results analysis for ${symbol} — last 4 quarters (Q1-Q4 FY25): For each quarter provide: 1) Revenue (actual vs estimate, YoY%, QoQ%) 2) EBITDA and margin 3) PAT and margin 4) Key metrics — volumes, realizations, order book 5) Beat or miss vs consensus 6) Notable one-time items. End with: trend analysis and whether the business is accelerating or decelerating. Format clearly by quarter.`,
-      concall: `Concall analysis for ${symbol} — last 4 quarters. For each concall highlight: 1) Opening management remarks — tone bullish/cautious 2) Key guidance provided — revenue, margins, capex 3) Critical Q&A highlights — analyst concerns and management responses 4) Specific targets given for next quarter/year 5) Management commentary on industry outlook 6) Any strategy changes or new initiatives announced 7) Red flags or concerns raised. Present quarter by quarter with key quotes.`,
+      results: `You are a senior equity research analyst at a top-tier investment bank. Create a professional quarterly earnings update report for ${symbol}.
+
+Do all of the following automatically. Research using the latest available Quarterly Results, Investor Presentation, Earnings Call Transcript, Exchange Filings, and credible news sources. Use Indian financial terminology. Report values in INR Crores.
+
+**STEP 1 — VERIFY THE LATEST QUARTER:** Confirm the quarter being analysed is the latest reported. Confirm result date and concall date. Note any major announcements post-results.
+
+**STEP 2 — EARNINGS SUMMARY:** Table with actual vs estimate for Revenue, EBITDA, EBITDA Margin, EBIT, PAT, PAT Margin, EPS, Key KPI — with YoY growth, QoQ growth, consensus estimate, beat/miss. Provide 5–7 key takeaways, beat/miss assessment, what drove it, operational quality, management tone.
+
+**STEP 3 — DETAILED P&L ANALYSIS:** Table with current quarter vs YoY vs QoQ for all major P&L lines. Explain revenue drivers, segment performance, pricing vs volume, margin story, operating leverage, one-offs.
+
+**STEP 4 — SEGMENT-WISE PERFORMANCE:** Table by segment with revenue, YoY growth, EBIT/EBITDA, margin, key comments. Identify best and worst performers, demand trends, and new orders.
+
+**STEP 5 — BALANCE SHEET & CASH FLOW HIGHLIGHTS:** Table covering cash, debt, net debt, working capital, receivables, inventory, CFO, Capex, FCF. Explain balance sheet quality, debt movement, working capital, PAT-to-cash conversion.
+
+**STEP 6 — MANAGEMENT COMMENTARY & GUIDANCE:** Summarise concall commentary on demand outlook, pricing, margin, capacity, capex, order book, new products, exports, risks, guidance. Assess whether commentary is more bullish or cautious vs previous quarters.
+
+**STEP 7 — VALUATION IMPACT:** Table of P/E, EV/EBITDA, P/B, market cap, EV vs historical average. Assess whether stock deserves re-rating after results.
+
+**STEP 8 — RISKS & MONITORABLES:** Top 5 risks visible post-quarter, top 5 things to monitor over the next 2–3 quarters, key upside and downside triggers.
+
+**STEP 9 — QUICK VERDICT:** 5 bullet summary, biggest positive, biggest negative, thesis strengthened or weakened, management tone, most important metric to monitor next quarter.
+
+Cite all sources at the bottom.`,
+
+      concall: `You are an experienced equity research analyst with 10+ years covering Indian companies through business cycles. Your expertise is identifying credible growth vs management spin, and spotting early warning signals.
+
+Analyse ${symbol}'s most recent earnings concall to assess management credibility, growth authenticity, risks, and investment attractiveness.
+
+Structure as a formal research report:
+
+**Part 1: Growth & Strategy (300 words)**
+Management's 2–3 key growth drivers. Credibility check vs recent financial trends, previous promises, peer performance. Capital allocation alignment.
+
+**Part 2: Risks & Market Dynamics (300 words)**
+Acknowledged risks. What's absent but should be flagged. Competitive positioning and pricing power. Macro/industry cues mentioned.
+
+**Part 3: Financial Consistency (250 words)**
+Guidance vs reality. Track record of meeting or missing targets. Quality of earnings — one-off items, organic vs inorganic growth.
+
+**Part 4: Management Quality & Red Flags (250 words)**
+Tone assessment (direct/factual or evasive). Q&A quality on tough questions. Red flags: personnel changes, accounting treatment changes, related-party transactions, guidance withdrawn.
+
+**Part 5: Investment Thesis Update (200 words)**
+Bull case, bear case, catalysts to watch, thesis strengthened or weakened.
+
+**Part 6: Follow-up Questions for Management (100 words)**
+2–3 sharp questions with rationale.
+
+Success criteria: Reader has strong conviction on credibility and risk/reward attractiveness.`,
+
       presentation: `Investor presentation analysis for ${symbol}: 1) Company overview and vision slide key points 2) Business segment performance and highlights 3) Financial highlights — key metrics management wants to showcase 4) Growth strategy — organic and inorganic plans 5) Capex plans and expected returns 6) Market opportunity slides — TAM, market share targets 7) ESG and governance highlights 8) Key risks acknowledged by management 9) Analyst day targets if any 10) Overall management confidence level and credibility assessment.`,
+
+      forensics: `You are a senior equity research analyst at a top-tier investment bank. Prepare a detailed 3-statement financial analysis for ${symbol}.
+
+Research automatically using the company's latest Annual Report, Investor Presentation, Concall Transcript, Exchange Filings, and other credible public sources. Report values in INR Crores.
+
+**SECTION 1 — COMPANY OVERVIEW:** Legal name, NSE/BSE ticker, headquarters, year founded, industry, brief description, key business segments, major products/services, key end-markets.
+
+**SECTION 2 — INCOME STATEMENT ANALYSIS:** Table for FY22 to FY26E covering Revenue, Revenue Growth%, EBITDA, EBITDA Margin%, EBIT, EBIT Margin%, PAT, PAT Margin%, EPS, Gross Margin%, Employee Cost, Other Expenses, Interest Cost, Depreciation, Tax Rate. Explain: revenue growth drivers, segment contribution, volume vs pricing, gross margin trend, EBITDA margin trend, operating leverage, one-offs, PAT growth drivers, management commentary on future profitability.
+
+**SECTION 3 — BALANCE SHEET ANALYSIS:** Table for FY22 to FY26E covering all major balance sheet items (assets, liabilities, equity, return ratios). Explain: working capital changes, receivables/inventory/payables trends, fixed assets and capex intensity, major acquisitions or asset sales, debt trend, deleveraging or releveraging, net worth growth, balance sheet quality, key strengths and risks.
+
+**SECTION 4 — CASH FLOW ANALYSIS:** Table for FY22 to FY26E covering CFO, CFI, CFF, Free Cash Flow, Capex, Dividend Paid, Debt Raised/Repaid, Net Change in Cash, CFO/EBITDA, CFO/PAT ratios. Explain: PAT-to-cash conversion, working capital impact on cash flows, capex trend and investment cycle, debt repayment/borrowing trend, dividend payout trend, FCF quality.
+
+**SECTION 5 — WORKING CAPITAL ANALYSIS:** Table for FY22 to FY26E with Debtor Days, Inventory Days, Creditor Days, Cash Conversion Cycle, Working Capital Days. Explain efficiency trends, main drivers, impact on cash flow and return ratios, peer comparison.
+
+**SECTION 6 — CAPITAL ALLOCATION ANALYSIS:** How has management deployed capital over the last 3–5 years? Capex, acquisitions, debt reduction, dividends, buybacks, investments in subsidiaries. Return on invested capital trend. Was capital allocation efficient?
+
+**SECTION 7 — RED FLAGS:** Top risks visible from the 3 financial statements (rising receivables, weak cash conversion, high debt, falling margins, rising inventory, negative FCF, aggressive capex, dilution risk, contingent liabilities, weak return ratios).
+
+**SECTION 8 — QUICK VERDICT:** 5 bullet summary of key takeaways, biggest financial strength, biggest financial weakness, single most important metric to monitor, whether financial profile is improving, stable, or deteriorating.
+
+Cite sources at the bottom.`,
     };
-    const setters = { results: setResults, concall: setConcall, presentation: setPresentation };
+    const setters = { results: setResults, concall: setConcall, presentation: setPresentation, forensics: setForensics };
     setters[type]("");
     await callGroq(prompts[type], getSYS(), (t) => setters[type](t));
     setLoading(p => ({ ...p, [type]: false }));
@@ -2258,7 +2353,7 @@ function QuarterlyHub() {
       <div className="card card-gold" style={{ marginBottom: 18 }}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <input className="inp" value={symbol} onChange={e => setSymbol(e.target.value)} placeholder="Enter stock (e.g., TCS, Infosys, HDFC Bank...)" onKeyDown={e => e.key === "Enter" && fetch(tab)} />
-          <button className="btn-gold" onClick={() => { fetch("results"); fetch("concall"); fetch("presentation"); }} disabled={!symbol.trim() || Object.values(loading).some(Boolean)}>
+          <button className="btn-gold" onClick={() => { fetch("results"); fetch("concall"); fetch("presentation"); fetch("forensics"); }} disabled={!symbol.trim() || Object.values(loading).some(Boolean)}>
             {Object.values(loading).some(Boolean) ? "⏳ Loading All..." : "📥 Fetch All Data"}
           </button>
         </div>
@@ -2268,6 +2363,7 @@ function QuarterlyHub() {
           { id: "results", label: "📊 Quarterly Results" },
           { id: "concall", label: "🎙️ Con Call Analysis" },
           { id: "presentation", label: "📑 Investor Presentation" },
+          { id: "forensics", label: "🔬 Financial Forensics" },
         ].map(t => <button key={t.id} className={`tmb ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
       <div className="card">
@@ -2302,6 +2398,17 @@ function QuarterlyHub() {
             {!presentation && !loading.presentation && <div style={{ textAlign: "center", padding: "40px", color: T.muted }}><div style={{ fontSize: 36, marginBottom: 10 }}>📑</div><div>Enter stock and click Fetch to load investor presentation analysis</div></div>}
             {loading.presentation && <div style={{ color: T.goldLight }}><span className="ld">Analyzing investor presentation</span></div>}
             {presentation && <div className="prose" dangerouslySetInnerHTML={{ __html: presentation.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>") }} />}
+          </>
+        )}
+        {tab === "forensics" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div className="card-title" style={{ marginBottom: 0 }}>🔬 3-Statement Financial Forensics</div>
+              <button className="btn-primary btn-sm" onClick={() => fetch("forensics")} disabled={loading.forensics || !symbol.trim()}>{loading.forensics ? "⏳" : "🔄 Refresh"}</button>
+            </div>
+            {!forensics && !loading.forensics && <div style={{ textAlign: "center", padding: "40px", color: T.muted }}><div style={{ fontSize: 36, marginBottom: 10 }}>🔬</div><div>Enter stock and click Fetch to run 3-statement financial forensics</div></div>}
+            {loading.forensics && <div style={{ color: T.goldLight }}><span className="ld">Running financial forensics — Income Statement · Balance Sheet · Cash Flows</span></div>}
+            {forensics && <div className="prose" dangerouslySetInnerHTML={{ __html: forensics.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>") }} />}
           </>
         )}
       </div>
@@ -3944,6 +4051,334 @@ Use professional market strategy language. Be direct about which sectors look st
   );
 }
 
+// ─── BREAKOUT WATCHLIST ───────────────────────────────────────────────────────
+function BreakoutWatchlist() {
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const run = async () => {
+    setLoading(true); setResult("");
+    await callGroq(
+      `You are a professional momentum analyst. Your job is to identify Indian stocks showing strong technical strength without giving trade recommendations.
+
+Screen for stocks with:
+- Price above 20 DMA, 50 DMA, and 200 DMA
+- Strong volume expansion on breakout or continuation moves
+- RSI above 60 (not yet overbought)
+- Strong relative strength vs Nifty 50
+- Breakout from consolidation, flag, triangle, or 52-week high
+- Strong sector tailwinds supporting the move
+
+Provide a structured table:
+| Stock | Sector | Chart Pattern | Key Resistance | Key Support | Volume Strength | Relative Strength | Momentum View |
+
+Then explain:
+- **Strongest Momentum** — Which stocks have the strongest and most sustained momentum and why
+- **Sector Drivers** — Which sectors are driving the breakout universe
+- **Stage Assessment** — Which setups look early-stage vs extended
+- **Monitor List (2–4 weeks)** — Which charts are worth monitoring and what specific trigger to watch for each
+
+Do not give buy, sell, or hold recommendations. Focus purely on technical observations and pattern quality. Be specific with stock names, levels, and pattern descriptions.`,
+      `You are DNR Capitals' senior momentum and technical analyst specialising in Indian equities. You identify high-quality technical setups with institutional-grade precision.`,
+      (t) => setResult(t)
+    );
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="sec-title">📡 Breakout Watchlist</div>
+      <div className="sec-sub">Momentum stocks with strong technical setups — no buy/sell recommendations</div>
+      <div className="card card-gold" style={{marginBottom:18}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+          <div style={{color:T.muted,fontSize:13}}>Scans for price above all DMAs · RSI 60+ · Volume expansion · Breakout patterns · Nifty relative strength</div>
+          <button className="btn-gold" onClick={run} disabled={loading}>{loading ? "⏳ Scanning..." : "📡 Run Breakout Scan"}</button>
+        </div>
+      </div>
+      {loading && <div className="card"><div className="loading"><div className="spin"/><span>Scanning for breakout setups across Indian equities...</span></div></div>}
+      {result && (
+        <div className="card">
+          <div className="card-title">📡 Breakout Watchlist — {new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</div>
+          <div className="prose" dangerouslySetInnerHTML={{__html: result.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>").replace(/\n/g,"<br/>")}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SECTOR INTELLIGENCE ──────────────────────────────────────────────────────
+function SectorIntelligence() {
+  const [sector, setSector] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const SECTORS = ["IT & Technology","Banking & Financial Services","Pharmaceuticals & Healthcare","Automobile & EV","Metals & Mining","FMCG & Consumer Staples","Real Estate","PSU Banks","Capital Goods & Engineering","Defence & Aerospace","Consumer Discretionary","Chemicals & Specialty","Infrastructure","Renewables & Clean Energy","Telecom","Cement & Construction"];
+
+  const run = async (s) => {
+    const target = s || sector;
+    if (!target) return;
+    setLoading(true); setResult("");
+    await callGroq(
+      `You are a senior equity research analyst at a top-tier investment bank. Prepare a detailed sector overview and industry landscape report for the ${target} sector in India.
+
+Do all of the following automatically. Research using Annual Reports, Investor Presentations, Concall Transcripts, Industry Reports, Government Data, Exchange Filings, CRISIL, ICRA, CARE, McKinsey, BCG, Deloitte, KPMG, news articles, and other credible public sources. Use Indian financial terminology. Report all financial values in INR Crores unless otherwise specified.
+
+**SECTION 1 — SECTOR OVERVIEW:** Definition, key products/services, sector size in India, historical and expected growth rate, major end-user segments, domestic vs export mix, organised vs unorganised share, import dependence, key listed and unlisted players, market structure.
+
+**SECTION 2 — MARKET STRUCTURE:** Table by segment with market size, share, growth rate, and key drivers. Identify fastest-growing, largest, best-margin, and most competitive segments.
+
+**SECTION 3 — VALUE CHAIN ANALYSIS:** Map from raw materials to end customer. Where does value accrue? Who has the strongest margins and bargaining power? Where is the disruption risk?
+
+**SECTION 4 — KEY GROWTH DRIVERS:** Top 5–10 growth drivers with explanation of why each matters, which companies benefit most, and whether short-term or long-term.
+
+**SECTION 5 — RISKS AND HEADWINDS:** Top risks with assessment of which companies are most exposed, which risks are structural vs temporary, and which risks are currently increasing.
+
+**SECTION 6 — COMPETITIVE LANDSCAPE:** Table of top 5–10 listed players with revenue, EBITDA margin, market share, key products, key strength, valuation multiple. Profile each player.
+
+**SECTION 7 — PEER COMPARISON:** Table with revenue growth, EBITDA margin, PAT margin, ROE, ROCE, D/E, market cap, P/E, EV/EBITDA. Identify highest growth, best margins, best balance sheet, strongest return ratios, market share gainers.
+
+**SECTION 8 — REGULATORY & POLICY LANDSCAPE:** Key government policies, subsidies, PLI schemes, import duties, environmental regulations, and whether regulatory direction is improving or tightening.
+
+**SECTION 9 — VALUATION CONTEXT:** Table of P/E, EV/EBITDA, P/B, dividend yield vs sector average and historical average. Which companies deserve premium/discount valuations?
+
+**SECTION 10 — KEY THEMES & FUTURE OUTLOOK:** Top themes for the next 3–5 years. Which companies are best placed? Which may struggle? What to monitor over the next 12–24 months?
+
+**SECTION 11 — QUICK VERDICT:** 5 bullet summary, biggest opportunity, biggest risk, best business model, type of company likely to outperform, whether sector is structurally attractive or overhyped.
+
+Cite all sources at the bottom.`,
+      `You are DNR Capitals' chief sector strategist with 30 years of Indian equity research experience. You produce institutional-quality sector intelligence used by fund managers and HNI investors.`,
+      (t) => setResult(t)
+    );
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="sec-title">🏭 Institutional Sector Intelligence</div>
+      <div className="sec-sub">Deep sector research — market structure, value chain, competitive landscape, valuation</div>
+      <div className="card card-gold" style={{marginBottom:18}}>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <input className="inp" value={sector} onChange={e=>setSector(e.target.value)} placeholder="Enter sector (e.g. IT & Technology, Banking, Pharma...)" onKeyDown={e=>e.key==="Enter"&&run()}/>
+          <button className="btn-gold" onClick={()=>run()} disabled={loading||!sector.trim()}>{loading?"⏳ Researching...":"🏭 Run Sector Intelligence"}</button>
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>
+          {SECTORS.map(s=>(
+            <button key={s} className="btn-ghost" style={{fontSize:11,padding:"4px 10px"}} onClick={()=>{setSector(s);run(s);}}>{s}</button>
+          ))}
+        </div>
+      </div>
+      {loading && <div className="card"><div className="loading"><div className="spin"/><span>Building institutional sector intelligence report...</span></div></div>}
+      {result && (
+        <div className="card">
+          <div className="card-title">🏭 {sector} — Sector Intelligence Report</div>
+          <div className="prose" dangerouslySetInnerHTML={{__html: result.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>").replace(/\n/g,"<br/>")}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MARKET PULSE SNAPSHOT ────────────────────────────────────────────────────
+function MarketPulse() {
+  const [period, setPeriod] = useState("1 day");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const run = async (p) => {
+    const target = p || period;
+    setLoading(true); setResult("");
+    const today = new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+    await callGroq(
+      `DIRECTION: Pull a comprehensive real-time market update covering the last ${target} with focus on Indian and global equity impacts. Date: ${today}
+
+PERSONA: You are an experienced market research analyst with 15+ years of experience covering Indian equities and global markets. Your specialty is connecting global market moves to sectoral impacts on Indian companies.
+
+INPUT: Use only the most recent data from:
+- Global equity indices (S&P 500, NIKKEI, European indices)
+- Indian indices (Nifty 50, Nifty Bank, Midcap indices)
+- Commodities: Crude oil, Gold, Natural Gas
+- Currency: USD/INR
+- Government policy announcements affecting Indian markets
+- Major corporate announcements (block deals, rights issues, dividend announcements)
+
+MEASURE: Present as a structured report with:
+
+**Global Snapshot (100 words):** S&P 500, European indices, Asia-Pacific moves with direction and key drivers.
+
+**Indian Markets (100 words):** Nifty 50 & Nifty Bank performance with key drivers, sector leadership, and market breadth.
+
+**Commodity & Currency (75 words):** Oil, gold, and USD/INR with trading ranges and directional implication for Indian sectors.
+
+**Policy & Corporate Actions (150 words):** Major announcements and regulatory changes with sectoral impact assessment.
+
+**Industry Player Reaction (200 words):** 2–3 perspectives from institutional investors and analysts on current market dynamics.
+
+Success criteria: Highly reputable sources only (Bloomberg, CNBC-TV18, Economic Times, LiveMint). Every claim traceable to a named source.`,
+      `You are DNR Capitals' market intelligence analyst. You produce sharp, sourced market updates for active traders and institutional investors.`,
+      (t) => setResult(t)
+    );
+    setLoading(false);
+  };
+
+  const PERIODS = ["1 day","1 week","1 month"];
+
+  return (
+    <div>
+      <div className="sec-title">📰 Market Pulse Snapshot</div>
+      <div className="sec-sub">Real-time market update — global indices, Indian markets, commodities, policy actions</div>
+      <div className="card card-gold" style={{marginBottom:18}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+          <div style={{color:T.muted,fontSize:13}}>Select period:</div>
+          {PERIODS.map(p=>(
+            <button key={p} className={`btn-ghost ${period===p?"on":""}`} style={period===p?{background:T.walnut,color:T.dun,borderColor:T.walnut}:{}} onClick={()=>setPeriod(p)}>{p}</button>
+          ))}
+          <button className="btn-gold" onClick={()=>run()} disabled={loading}>{loading?"⏳ Pulling data...":"📰 Get Market Pulse"}</button>
+        </div>
+      </div>
+      {loading && <div className="card"><div className="loading"><div className="spin"/><span>Pulling market pulse data...</span></div></div>}
+      {result && (
+        <div className="card">
+          <div className="card-title">📰 Market Pulse — Last {period} · {new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
+          <div className="prose" dangerouslySetInnerHTML={{__html: result.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>").replace(/\n/g,"<br/>")}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MORNING MARKET INTELLIGENCE ──────────────────────────────────────────────
+function MorningIntelligence() {
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const run = async () => {
+    setLoading(true); setResult("");
+    const today = new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+    await callGroq(
+      `You are a senior macro and equity strategist at a top-tier investment bank. Your job is to prepare a sharp, institutional-quality morning market note for Indian investors.
+
+Date: ${today}
+
+Do all of the following automatically. Do not ask questions. Research everything yourself using the latest available market data, global market moves, commodity prices, currency moves, SGX Gift Nifty, FII/DII flows, RBI commentary, bond yields, and major overnight news. The note should be short, actionable, and readable in under 2 minutes.
+
+**TOP CALL:** Start with the single most important takeaway for the day in 2–3 lines.
+
+**GLOBAL MARKETS TABLE:** Covering Nasdaq, S&P 500, Dow Jones, US 10Y Yield, Dollar Index (DXY), USD/INR, Gold, Silver, Brent Crude, Natural Gas, Bitcoin. Explain why US markets moved, bond yield impact, dollar direction, commodity implications for Indian sectors, global sentiment direction.
+
+**INDIAN MARKETS TABLE:** Covering Nifty 50, Bank Nifty, Nifty Midcap 100, Nifty Smallcap 100, Sensex, India VIX, Gift Nifty. Explain: positive or negative open likely, sectors to outperform, sectors to underperform, broad vs large cap strength, sentiment.
+
+**FII / DII FLOWS:** Net flow table. Explain buyer/seller balance, DII support, flow direction for equities.
+
+**COMMODITY & CURRENCY IMPACT:** How Gold, Silver, USD/INR, and Oil will impact IT, Metals, OMCs, Paints, Aviation, Cement, Auto, Pharma, Jewellery, Export-oriented, Import-dependent sectors.
+
+**KEY NEWS & DEVELOPMENTS:** Top 5–10 developments investors should know before the market opens. Format: [Company/Sector]: One-line summary + why it matters.
+
+**TOP STOCKS/SECTORS TO WATCH:** Table with positive/negative flag and reason.
+
+**TRADE SETUP:** Best bullish sector setup, best bearish sector setup, most important macro variable, key Nifty level, key Bank Nifty level, key risk for the day.
+
+Style: Concise, opinionated, actionable. Be specific. Explain why moves matter.`,
+      `You are DNR Capitals' chief morning strategist. Your morning note is read by fund managers and active traders before market open. It must be direct, data-rich, and actionable.`,
+      (t) => setResult(t)
+    );
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="sec-title">🌅 Morning Market Intelligence</div>
+      <div className="sec-sub">Pre-market institutional briefing — global cues, Indian open, key levels, trade setups</div>
+      <div className="card card-gold" style={{marginBottom:18}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+          <div style={{color:T.muted,fontSize:13}}>Global markets · Gift Nifty · FII/DII flows · Commodity impact · News that matters · Trade setup</div>
+          <button className="btn-gold" onClick={run} disabled={loading}>{loading?"⏳ Preparing briefing...":"🌅 Generate Morning Note"}</button>
+        </div>
+      </div>
+      {loading && <div className="card"><div className="loading"><div className="spin"/><span>Preparing morning market intelligence...</span></div></div>}
+      {result && (
+        <div className="card">
+          <div className="card-title">🌅 Morning Intelligence — {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+          <div className="prose" dangerouslySetInnerHTML={{__html: result.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>").replace(/\n/g,"<br/>")}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── POST-MARKET INTELLIGENCE ─────────────────────────────────────────────────
+function PostMarketIntelligence() {
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const run = async () => {
+    setLoading(true); setResult("");
+    const today = new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+    await callGroq(
+      `You are a senior market strategist and technical analyst. Your job is to prepare a professional post-market India summary after the market closes.
+
+Date: ${today}
+
+Do all of the following automatically. Do not ask questions. Research everything yourself using NSE data, sector performance, FII/DII flows, commodity prices, global markets, earnings updates, and major news developments.
+
+**SECTION 1 — MARKET SNAPSHOT**
+Table: Nifty 50 | Sensex | Bank Nifty | Nifty Midcap 100 | Nifty Smallcap 100 | India VIX — with closing level, % change, and key takeaway for each.
+Then explain: risk-on or risk-off, broader market vs large caps, leading sectors, lagging sectors, market breadth.
+
+**SECTION 2 — SECTOR PERFORMANCE**
+Table across IT, Banks, Pharma, Auto, Metals, FMCG, Realty, PSU, Capital Goods, Defence — with % change, trend, and key driver.
+Then explain: strongest momentum sectors, weakening sectors, leadership shifts, extended sectors, what to monitor tomorrow.
+
+**SECTION 3 — KEY MARKET MOVERS**
+Table of top gainers, top losers, earnings-driven movers, news-driven stocks, block deals, and order wins.
+
+**SECTION 4 — COMMODITIES, CURRENCIES & GLOBALS**
+Table covering: Gold, Silver, Brent Crude, USD/INR, Dollar Index, US 10Y Yield, Nasdaq Futures.
+Then explain: global cue direction, commodity impact on Indian sectors, currency impact on exporters vs importers, oil situation.
+
+**SECTION 5 — FII / DII FLOWS**
+FII and DII net flows table. Explain whether FIIs are turning buyers or sellers, DII support, flow direction for equities.
+
+**SECTION 6 — TECHNICAL ANALYSIS**
+Table covering: Nifty Trend, Bank Nifty Trend, Market Breadth, RSI, MACD, India VIX, Key Support, Key Resistance, Breakout/Breakdown Zone.
+Then explain: market structure, breadth quality, overbought/oversold, important levels for tomorrow, volatility expectations.
+
+**SECTION 7 — KEY EVENTS FOR TOMORROW**
+List key earnings, global data, RBI/Fed commentary, IPO listings, F&O expiry, government announcements.
+
+**SECTION 8 — NEXT WEEK OUTLOOK**
+Key earnings, macro events, strong sectors, vulnerable sectors, biggest risk and opportunity.
+
+**SECTION 9 — QUICK VERDICT**
+5 bullet summary, biggest positive, biggest negative, most important thing to watch, sentiment direction, most important Nifty level.
+
+Style: Concise, professional, actionable. Explain why moves matter, not just what moves. Use exact figures. This should read like a premium end-of-day market wrap sent to active traders and fund managers.`,
+      `You are DNR Capitals' post-market intelligence strategist. Your end-of-day report is read by active traders and fund managers. It must be precise, data-driven, and forward-looking.`,
+      (t) => setResult(t)
+    );
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="sec-title">🌆 Post-Market Intelligence</div>
+      <div className="sec-sub">End-of-day institutional wrap — market snapshot, sector moves, flows, technicals, tomorrow's outlook</div>
+      <div className="card card-gold" style={{marginBottom:18}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+          <div style={{color:T.muted,fontSize:13}}>Market snapshot · Sector performance · FII/DII flows · Technical levels · Tomorrow's events · Next week outlook</div>
+          <button className="btn-gold" onClick={run} disabled={loading}>{loading?"⏳ Preparing wrap...":"🌆 Generate Post-Market Report"}</button>
+        </div>
+      </div>
+      {loading && <div className="card"><div className="loading"><div className="spin"/><span>Preparing post-market intelligence report...</span></div></div>}
+      {result && (
+        <div className="card">
+          <div className="card-title">🌆 Post-Market Intelligence — {new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
+          <div className="prose" dangerouslySetInnerHTML={{__html: result.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>").replace(/\n/g,"<br/>")}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── PRICE ALERTS ─────────────────────────────────────────────────────────────
 function PriceAlerts({ onClose }) {
   const [alerts, setAlerts] = useState([
@@ -5282,7 +5717,9 @@ export default function App() {
           quarterly:"Quarterly Hub", bulkdeals:"Bulk Deals", news:"News Feed",
           ipo:"IPO Tracker", fii:"FII / DII", sector:"Sector Rotation",
           calculators:"Calculators", calendar:"Calendar", tools:"Adv. Tools",
-          legends:"Legends", institutional:"Inst. Momentum" },
+          legends:"Legends", institutional:"Inst. Momentum",
+          breakout:"Breakout Watchlist", sectorintel:"Sector Intelligence",
+          marketpulse:"Market Pulse", morning:"Morning Intelligence", postmarket:"Post-Market Report" },
   };
   const L = LABELS.EN;
 
@@ -5295,6 +5732,16 @@ export default function App() {
         { id:"research",     icon:"🔬", label:L.research },
         { id:"technical",    icon:"📈", label:L.technical },
         { id:"institutional",icon:"🏦", label:L.institutional },
+        { id:"breakout",     icon:"📡", label:L.breakout },
+        { id:"sectorintel",  icon:"🏭", label:L.sectorintel },
+      ]
+    },
+    {
+      label:"Daily Intelligence",
+      items:[
+        { id:"morning",    icon:"🌅", label:L.morning },
+        { id:"postmarket", icon:"🌆", label:L.postmarket },
+        { id:"marketpulse",icon:"📰", label:L.marketpulse },
       ]
     },
     {
@@ -5450,6 +5897,11 @@ export default function App() {
                 {activeTab === "calendar"      && <FinancialCalendar />}
                 {activeTab === "tools"         && <AdvancedTools />}
                 {activeTab === "bulkdeals"     && <BulkDeals />}
+                {activeTab === "breakout"      && <BreakoutWatchlist />}
+                {activeTab === "sectorintel"   && <SectorIntelligence />}
+                {activeTab === "marketpulse"   && <MarketPulse />}
+                {activeTab === "morning"       && <MorningIntelligence />}
+                {activeTab === "postmarket"    && <PostMarketIntelligence />}
               </div>
             )}
 
