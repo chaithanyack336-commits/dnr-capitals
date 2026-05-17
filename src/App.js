@@ -14,57 +14,70 @@ const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 // ─── THEME — CARBON BLACK + ELECTRIC BLUE + GOLD (Institutional) ──────────────────
 const T = {
-  // Carbon black backgrounds
-  navyDeepest: "#000000",
-  navyDeep:    "#050505",
-  navy:        "#0A0A0A",
-  navyMid:     "#0F0F0F",
-  navyLight:   "#141414",
-  navyBorder:  "#0A1428",
-  navyHover:   "#060D18",
-  navyActive:  "#060F2A",
-  // Neon green matrix
-  matrixGreen:      "#00C8FF",
-  matrixGreenDim:   "#0099CC",
-  matrixGreenPale:  "#00C8FF33",
-  matrixGreenGlow:  "#00C8FF88",
-  matrixGreenDeep:  "#002A3A",
-  // Gold accents (kept for premium feel)
-  gold:        "#C9A84C",
-  goldLight:   "#E0BC6A",
-  goldPale:    "#F5D88A",
-  goldDim:     "#9A7A38",
-  goldGlow:    "#E0BC6A55",
+  // Deep Navy backgrounds — matches DNR Capitals logo navy #1B2B5E
+  navyDeepest: "#080F1E",
+  navyDeep:    "#0C1527",
+  navy:        "#101D30",
+  navyMid:     "#142340",
+  navyLight:   "#1A2D50",
+  navyBorder:  "#1E3560",
+  navyHover:   "#162848",
+  navyActive:  "#1C3260",
+
+  // Brand navy (exact logo navy)
+  brandNavy:       "#1B2B5E",
+  brandNavyLight:  "#243880",
+  brandNavyDark:   "#111C3E",
+
+  // Gold accents — matches DNR Capitals logo gold
+  gold:        "#B8942A",
+  goldLight:   "#D4AA40",
+  goldPale:    "#E8C860",
+  goldDim:     "#8A6E1E",
+  goldGlow:    "#D4AA4055",
+  goldBright:  "#F0C84A",
+
   // Text
-  dun:         "#E8F0FF",
-  dunLight:    "#F0F8FF",
-  dunDark:     "#A8C8E8",
-  muted:       "#2A4A6A",
-  mutedDark:   "#0A1E3A",
-  // Semantic
-  green:       "#00C8FF",
-  greenLight:  "#40D8FF",
-  red:         "#FF3333",
-  redLight:    "#FF6666",
-  blue:        "#00BFFF",
-  blueLight:   "#40D0FF",
-  // Logo cosmic blue
-  cosmicBlue:      "#1A5FB4",
-  cosmicBlueLight: "#3A8FE8",
-  cosmicBlueDim:   "#0D3A7A",
-  cosmicBluePale:  "#5AAEFF",
-  // Legacy aliases
-  walnut:       "#0A1428",
-  walnutLight:  "#0A1A38",
-  walnutDark:   "#060E1A",
-  walnutDeep:   "#0A0A0A",
-  walnutDeeper: "#050505",
-  cream:        "#E8F0FF",
-  ink:          "#000000",
+  dun:         "#EAEEf8",
+  dunLight:    "#F4F6FC",
+  dunDark:     "#B8C8E8",
+  muted:       "#5A78A8",
+  mutedDark:   "#2A3D6A",
+
+  // Semantic — updated to match navy+gold theme
+  green:       "#2ECC9A",
+  greenLight:  "#50E0B0",
+  red:         "#E84848",
+  redLight:    "#F07070",
+  blue:        "#4A90D9",
+  blueLight:   "#6AAFF0",
+
+  // Cosmic blue (kept for charts)
+  cosmicBlue:      "#2456A4",
+  cosmicBlueLight: "#4A7ED4",
+  cosmicBlueDim:   "#162E6A",
+  cosmicBluePale:  "#6A9EE0",
+
+  // Legacy aliases — remapped to navy theme
+  walnut:       "#1B2B5E",
+  walnutLight:  "#243880",
+  walnutDark:   "#111C3E",
+  walnutDeep:   "#0C1527",
+  walnutDeeper: "#080F1E",
+  cream:        "#EAEEf8",
+  ink:          "#080F1E",
+
   // Light mode
-  surface:    "#F0F8FF",
-  surfaceAlt: "#E0F0E0",
-  border:     "#A0C0A0",
+  surface:    "#F0F4FC",
+  surfaceAlt: "#E4ECFA",
+  border:     "#B8C8E8",
+
+  // Matrix green (kept for live indicators — repurposed to brand gold glow)
+  matrixGreen:      "#D4AA40",
+  matrixGreenDim:   "#B8942A",
+  matrixGreenPale:  "#D4AA4033",
+  matrixGreenGlow:  "#D4AA4088",
+  matrixGreenDeep:  "#1B2B5E",
 };
 
 // ─── GROQ API WITH REAL-TIME AWARENESS ───────────────────────────────────────
@@ -467,7 +480,7 @@ function fmtNum(n, prefix="") {
   return `${prefix}${n.toFixed(2)}`;
 }
 
-// ─── STYLES — DEEP NAVY + GOLD BLOOMBERG TERMINAL ────────────────────────────
+// ─── STYLES — DEEP NAVY + GOLD (DNR CAPITALS BRAND THEME) ────────────────────
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Jost:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
@@ -479,7 +492,7 @@ const styles = `
 
   body{
     font-family:'Jost',sans-serif;
-    background:#000000;
+    background:${T.navyDeepest};
     color:${T.dun};
     -webkit-font-smoothing:antialiased;
     text-rendering:optimizeLegibility;
@@ -492,9 +505,9 @@ const styles = `
   /* TOP BAR */
   .top-bar{
     position:fixed;top:0;left:0;right:0;height:48px;z-index:300;
-    background:#000000;
-    border-bottom:1px solid #0A1A0A;
-    box-shadow:0 1px 0 ${T.gold}18, 0 4px 20px #00000044;
+    background:${T.navyDeep};
+    border-bottom:1px solid ${T.navyBorder};
+    box-shadow:0 1px 0 ${T.gold}22, 0 4px 20px ${T.navyDeepest}88;
     display:flex;align-items:center;padding:0 16px 0 0;gap:0;
   }
 
@@ -509,12 +522,12 @@ const styles = `
   .sidebar{
     position:fixed;left:0;top:48px;bottom:0;
     width:220px;
-    background:#050505;
-    border-right:1px solid #0A1A0A;
+    background:${T.navyDeep};
+    border-right:1px solid ${T.navyBorder};
     display:flex;flex-direction:column;
     overflow-y:auto;overflow-x:hidden;
     z-index:200;
-    box-shadow:2px 0 20px #00000033;
+    box-shadow:2px 0 20px ${T.navyDeepest}66;
   }
   .sidebar::-webkit-scrollbar{width:3px}
   .sidebar::-webkit-scrollbar-track{background:transparent}
@@ -541,10 +554,10 @@ const styles = `
     transition:box-shadow 0.3s;
     filter:brightness(1.1) contrast(1.05);
   }
-  .sb-logo:hover .sb-logo-img{box-shadow:0 0 32px #00C8FF77, 0 0 60px #E0BC6A55}
+  .sb-logo:hover .sb-logo-img{box-shadow:0 0 24px ${T.goldGlow}, 0 0 48px ${T.brandNavy}88}
   .sb-logo-title{
     font-family:'Cormorant Garamond',serif;
-    font-size:17px;font-weight:700;color:#00C8FF;
+    font-size:17px;font-weight:700;color:${T.goldLight};
     letter-spacing:0.5px;line-height:1;
   }
   .sb-logo-sub{
@@ -557,7 +570,7 @@ const styles = `
   .sb-group-label{
     padding:4px 16px 6px;
     font-size:8px;font-weight:700;letter-spacing:2px;
-    text-transform:uppercase;color:#1A3A1A;
+    text-transform:uppercase;color:${T.navyBorder};
   }
   .sb-item{
     display:flex;align-items:center;gap:10px;
@@ -568,20 +581,20 @@ const styles = `
     white-space:nowrap;
   }
   .sb-item:hover{
-    color:#E8F5E8;background:#0A1A0A;
-    border-color:#061A2A;
+    color:${T.dunLight};background:${T.navyLight};
+    border-color:${T.navyBorder};
   }
   .sb-item.active{
-    color:#00C8FF;
-    background:linear-gradient(135deg,#061A2A,#060A18);
-    border-color:#00C8FF33;
-    box-shadow:0 0 12px #00C8FF22;
+    color:${T.goldLight};
+    background:linear-gradient(135deg,${T.brandNavyDark},${T.brandNavy}88);
+    border-color:${T.gold}44;
+    box-shadow:0 0 12px ${T.gold}18;
   }
   .sb-item.active::before{
     content:'';position:absolute;left:8px;
     width:3px;height:20px;border-radius:2px;
-    background:linear-gradient(180deg,#39FF14,#00C8FF);
-    box-shadow:0 0 8px #00C8FF;
+    background:linear-gradient(180deg,${T.goldBright},${T.gold});
+    box-shadow:0 0 8px ${T.gold}88;
   }
   .sb-item{position:relative;}
   .sb-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
@@ -596,7 +609,7 @@ const styles = `
     display:flex;align-items:center;gap:6px;
     font-size:9px;color:${T.muted};
   }
-  .sb-live-dot{width:6px;height:6px;border-radius:50%;background:#00C8FF;animation:livePulse 2s infinite}
+  .sb-live-dot{width:6px;height:6px;border-radius:50%;background:${T.green};animation:livePulse 2s infinite}
   @keyframes livePulse{0%,100%{opacity:1;box-shadow:0 0 0 0 ${T.green}44}50%{opacity:0.7;box-shadow:0 0 0 4px transparent}}
 
   /* CONTENT AREA */
@@ -626,22 +639,22 @@ const styles = `
     font-size:10px;cursor:pointer;transition:all 0.18s;
     font-family:'Jost',sans-serif;letter-spacing:0.3px;
   }
-  .tb-btn:hover{background:#0A1A0A;border-color:#00C8FF44;color:#00C8FF}
+  .tb-btn:hover{background:${T.navyLight};border-color:${T.gold}44;color:${T.goldLight}}
   .tb-btn:active{transform:scale(0.97)}
   .tb-btn.active{background:${T.gold}22;border-color:${T.gold}66;color:${T.goldLight}}
 
   /* MAIN CONTENT */
-  .main{padding:24px;max-width:1600px;width:100%;background:#000}
+  .main{padding:24px;max-width:1600px;width:100%;background:${T.navyDeepest}}
 
   /* CARDS */
   .card{
-    background:linear-gradient(135deg,${T.navyMid},${T.navy});
+    background:linear-gradient(135deg,${T.navyMid},${T.navyLight});
     border:1px solid ${T.navyBorder};border-radius:12px;padding:18px;
     transition:border-color 0.2s,box-shadow 0.2s;
   }
-  .card:hover{border-color:${T.navyActive};box-shadow:0 8px 32px #00000044}
-  .card-gold{border-color:${T.gold}44;box-shadow:0 0 20px ${T.gold}0f}
-  .card-gold:hover{border-color:${T.gold}77}
+  .card:hover{border-color:${T.brandNavy};box-shadow:0 8px 32px ${T.navyDeepest}88}
+  .card-gold{border-color:${T.gold}55;box-shadow:0 0 20px ${T.gold}12}
+  .card-gold:hover{border-color:${T.gold}88}
   .card-blue{border-color:${T.cosmicBlue}44}
   .card-sm{padding:12px 14px}
 
@@ -885,7 +898,7 @@ const styles = `
     box-shadow:0 0 60px ${T.gold}55,0 0 120px ${T.cosmicBlue}44,0 0 20px ${T.gold}33;
     transition:box-shadow 0.4s;
   }
-  .home-logo-wrap:hover .home-logo-img{box-shadow:0 0 80px ${T.gold}88,0 0 160px ${T.cosmicBlue}66,0 0 30px ${T.gold}55}
+  .home-logo-wrap:hover .home-logo-img{box-shadow:0 0 60px ${T.goldGlow},0 0 120px ${T.brandNavy}66,0 0 24px ${T.gold}44}
   .home-logo-ring{
     position:absolute;inset:-12px;border-radius:50%;
     border:1px solid ${T.gold}33;
@@ -4379,6 +4392,290 @@ Style: Concise, professional, actionable. Explain why moves matter, not just wha
   );
 }
 
+// ─── STOCK ONE-PAGER GENERATOR ────────────────────────────────────────────────
+function StockOnePager() {
+  const [symbol, setSymbol] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const QUICK = ["RELIANCE","TCS","HDFCBANK","INFY","ICICIBANK","WIPRO","BAJFINANCE","ADANIENT","MARUTI","SUNPHARMA","LT","NTPC","POWERGRID","COALINDIA","ONGC"];
+
+  const run = async (s) => {
+    const target = s || symbol;
+    if (!target.trim()) return;
+    setLoading(true); setResult("");
+    await callGroq(
+      `You are a senior equity research analyst at a top-tier investment bank. Create a professional, data-rich one-page company strip profile.
+
+Stock / Company Name: ${target}
+
+Do all of the following automatically. Do not ask questions. Research everything yourself and populate every section with real, verified data. Do not leave any placeholders.
+
+**SECTION 1 — COMPANY OVERVIEW:**
+Full legal name, stock ticker with exchange, headquarters location, year founded, number of employees, industry and sub-sector, current MD/CEO and CFO, brief 2-line description.
+
+**SECTION 2 — BUSINESS & POSITIONING:**
+Core business model, key products/services and revenue contribution, primary end markets, key competitive advantages/moat, top 2–3 competitors and positioning, key growth drivers for the next 2–3 years.
+
+**SECTION 3 — KEY FINANCIALS (Last 3 Years + Current Year Estimate):**
+Clean table with Revenue, EBITDA, EBITDA Margin%, PAT, PAT Margin%, EPS, Revenue Growth%, ROE%, ROCE%, Debt to Equity — for FY22, FY23, FY24, FY25E.
+
+**SECTION 4 — VALUATION SNAPSHOT:**
+Current Market Cap, Enterprise Value (EV), current P/E vs 3-year average, EV/EBITDA current vs 3-year average, Price to Book current vs 3-year average, Price to Sales, 52-week high and low, current stock price, 1-year price return%.
+
+**SECTION 5 — SHAREHOLDING PATTERN (Latest Quarter):**
+Promoter holding% and change vs previous quarter, FII holding%, DII holding%, public/retail holding%, notable institutional investors.
+
+**SECTION 6 — RECENT DEVELOPMENTS (Last 90 Days):**
+5 most material recent developments — earnings results, new orders, capacity additions, management changes, regulatory approvals, partnerships, or significant news. One line per development with date.
+
+**SECTION 7 — KEY RISKS:**
+Top 4 risks an investor should be aware of.
+
+**SECTION 8 — QUICK VERDICT:**
+Without giving any buy/sell/hold recommendation:
+- 3-line summary of what makes this company interesting or worth watching
+- The single most important metric or event to monitor in the next 12 months
+- Valuation context — above, below, or in line with historical average multiples, with reasoning
+
+Present output as a clean structured format as if it were a printed one-pager used in a pitch book. Cite data sources at the bottom.`,
+      `You are DNR Capitals' senior equity research analyst. You produce institutional-quality one-page company profiles used in pitch books and client presentations. Every data point must be real and verified. No placeholders allowed.`,
+      (t) => setResult(t)
+    );
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="sec-title">📋 Stock One-Pager Generator</div>
+      <div className="sec-sub">Instant institutional-grade company strip profile — financials, valuation, shareholding, recent developments</div>
+      <div className="card card-gold" style={{marginBottom:18}}>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          <input className="inp" value={symbol} onChange={e=>setSymbol(e.target.value.toUpperCase())} placeholder="Enter stock name or ticker (e.g. RELIANCE, TCS, HDFCBANK)" onKeyDown={e=>e.key==="Enter"&&run()}/>
+          <button className="btn-gold" onClick={()=>run()} disabled={loading||!symbol.trim()}>{loading?"⏳ Generating...":"📋 Generate One-Pager"}</button>
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:12}}>
+          {QUICK.map(s=>(
+            <button key={s} className="btn-ghost" style={{fontSize:11,padding:"4px 10px"}} onClick={()=>{setSymbol(s);run(s);}}>{s}</button>
+          ))}
+        </div>
+      </div>
+      {loading && (
+        <div className="card">
+          <div className="loading"><div className="spin"/><span>Researching {symbol} — building one-pager from annual reports, filings, and market data...</span></div>
+        </div>
+      )}
+      {result && (
+        <div className="card">
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <div className="card-title">📋 {symbol} — Company One-Pager</div>
+            <div style={{fontSize:11,color:T.muted}}>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
+          </div>
+          <div className="prose" dangerouslySetInnerHTML={{__html: result.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>").replace(/\n/g,"<br/>")}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── COMPETITIVE LANDSCAPE DECODER ───────────────────────────────────────────
+function CompetitiveLandscape() {
+  const [company, setCompany] = useState("");
+  const [competitors, setCompetitors] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const PRESETS = [
+    {company:"RELIANCE",comp:"ONGC, BPCL, IOC, ADANIENT"},
+    {company:"TCS",comp:"INFY, WIPRO, HCL Technologies, LTIMindtree"},
+    {company:"HDFCBANK",comp:"ICICIBANK, SBIN, KOTAKBANK, AXISBANK"},
+    {company:"MARUTI",comp:"Tata Motors, Hyundai India, Mahindra, Kia India"},
+    {company:"SUNPHARMA",comp:"CIPLA, DRREDDY, LUPIN, DIVISLAB"},
+    {company:"LT",comp:"TIINDIA, BEL, ABB, Siemens India"},
+  ];
+
+  const run = async () => {
+    if (!company.trim()) return;
+    setLoading(true); setResult("");
+    await callGroq(
+      `You are a senior equity research analyst at a top-tier investment bank. Prepare a detailed competitive landscape analysis.
+
+Company Name: ${company}
+Key Competitors: ${competitors || "identify the top competitors automatically"}
+
+Research automatically using Annual Reports, Investor Presentations, Concall Transcripts, Exchange Filings, Screener, Capital IQ, Trendlyne, CRISIL, ICRA, industry reports, and news. Report financial figures in INR Crores.
+
+**SECTION 1 — INDUSTRY OVERVIEW:**
+Industry size in India, growth rate/expected CAGR, key demand drivers, key risks, industry structure, major listed and unlisted players, key trends for the next 3–5 years.
+
+**SECTION 2 — COMPANY POSITIONING:**
+Market share, revenue size, EBITDA margin, ROE/ROCE, major business segments, key products/services, geographic presence, customer profile, competitive advantages/moat.
+Explain in 5–7 bullet points: why customers choose this company, what differentiates it, player type (premium/scale/low-cost/niche/innovation-led), and whether its position is strengthening or weakening.
+
+**SECTION 3 — COMPETITOR IDENTIFICATION:**
+Direct competitors, indirect competitors, emerging challengers, global players, unlisted competitors.
+Group by: large incumbents, mid-sized challengers, niche players, new entrants, global competitors.
+
+**SECTION 4 — PEER COMPARISON TABLE:**
+Revenue, revenue growth, EBITDA margin, PAT margin, ROE, ROCE, D/E, market share, market cap, P/E, EV/EBITDA.
+Identify: scale leader, highest margin, best return ratios, market share gainer, most expensive on valuation.
+
+**SECTION 5 — BUSINESS MODEL COMPARISON:**
+Business model, key products/services, key customers, geography, pricing position, strengths, weaknesses.
+Identify who competes on price vs quality vs distribution vs technology.
+
+**SECTION 6 — MARKET SHARE & POSITIONING:**
+Current and 3-year market share trend. Is industry consolidating or fragmenting? Who is gaining share and why? Who is losing share and why?
+
+**SECTION 7 — COMPETITIVE ADVANTAGES / MOAT ANALYSIS:**
+Table rating: Brand Strength, Distribution Network, Scale Advantage, Manufacturing Capability, Technology/R&D, Customer Relationships, Switching Costs, Regulatory Advantage, Cost Leadership, Network Effects — as Strong/Moderate/Weak with explanation.
+
+**SECTION 8 — STRATEGIC RISKS:**
+Top risks to the company's competitive position from new entrants, pricing pressure, technology disruption, import competition, customer concentration, etc.
+
+**SECTION 9 — VALUATION VS PEERS:**
+Market cap, P/E, EV/EBITDA, P/B, P/S, dividend yield table. Explain premium/discount justification.
+
+**SECTION 10 — QUICK VERDICT:**
+5 bullet summary, biggest competitive advantage, biggest competitive weakness, most important thing to monitor over the next 12 months, whether market position is improving or deteriorating.
+
+Cite all sources at the bottom.`,
+      `You are DNR Capitals' senior competitive intelligence analyst. You produce institutional-quality competitive landscape reports used by fund managers for positioning decisions. Every data point must be real and sourced.`,
+      (t) => setResult(t)
+    );
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="sec-title">⚔️ Competitive Landscape Decoder</div>
+      <div className="sec-sub">Deep competitive intelligence — moat analysis, peer comparison, market share, strategic risks</div>
+      <div className="card card-gold" style={{marginBottom:18}}>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
+          <input className="inp" style={{flex:1}} value={company} onChange={e=>setCompany(e.target.value.toUpperCase())} placeholder="Company (e.g. TCS)" onKeyDown={e=>e.key==="Enter"&&run()}/>
+          <input className="inp" style={{flex:2}} value={competitors} onChange={e=>setCompetitors(e.target.value)} placeholder="Key competitors (optional — e.g. INFY, WIPRO, HCL Technologies)" onKeyDown={e=>e.key==="Enter"&&run()}/>
+          <button className="btn-gold" onClick={run} disabled={loading||!company.trim()}>{loading?"⏳ Analysing...":"⚔️ Decode Landscape"}</button>
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:4}}>
+          {PRESETS.map(p=>(
+            <button key={p.company} className="btn-ghost" style={{fontSize:11,padding:"4px 10px"}} onClick={()=>{setCompany(p.company);setCompetitors(p.comp);}}>{p.company} vs peers</button>
+          ))}
+        </div>
+      </div>
+      {loading && (
+        <div className="card">
+          <div className="loading"><div className="spin"/><span>Decoding competitive landscape for {company}...</span></div>
+        </div>
+      )}
+      {result && (
+        <div className="card">
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <div className="card-title">⚔️ {company} — Competitive Landscape</div>
+            <div style={{fontSize:11,color:T.muted}}>{new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
+          </div>
+          <div className="prose" dangerouslySetInnerHTML={{__html: result.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>").replace(/\n/g,"<br/>")}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── CHART EXPLAINER FOR NON-FINANCE AUDIENCES ───────────────────────────────
+function ChartExplainer() {
+  const [context, setContext] = useState("");
+  const [data, setData] = useState("");
+  const [decision, setDecision] = useState("");
+  const [result, setResult] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const EXAMPLES = [
+    {label:"Revenue vs Profit trend",data:"Company revenue grew from ₹8,000Cr to ₹12,000Cr over 3 years, but net profit margin fell from 15% to 9%",dec:"Investment decision"},
+    {label:"P/E ratio comparison",data:"Stock P/E is 45x vs sector average of 28x and historical average of 32x",dec:"Valuation assessment"},
+    {label:"Debt vs Cash flow",data:"Company debt is ₹5,000Cr, CFO is ₹800Cr annually, interest cost is ₹450Cr, D/E ratio is 1.8x",dec:"Balance sheet risk review"},
+    {label:"Market share chart",data:"Company A: 34%, Company B: 28%, Company C: 19%, Others: 19% — 3 years ago Company A had 40%",dec:"Competitive positioning"},
+    {label:"FII vs DII flows",data:"FIIs net sold ₹45,000Cr in last 3 months, DIIs net bought ₹38,000Cr, Nifty down 8%",dec:"Market sentiment"},
+  ];
+
+  const run = async () => {
+    if (!data.trim()) return;
+    setLoading(true); setResult("");
+    await callGroq(
+      `DIRECTION: Explain what this chart/data shows and why it matters for understanding the company's business or sector.
+
+PERSONA: You are a partner at a tier-1 investment bank known for explaining complex financial data to non-specialist clients. Your strength is connecting data to business impact.
+
+INPUT:
+- I am a client who understands basic business concepts (revenue, cost, profit) but does NOT have a finance or accounting background.
+- I need to understand this in the context of: ${decision || "general investment understanding"}
+- Context: ${context || "Indian equity markets"}
+- Chart/Data: ${data}
+
+MEASURE: Provide explanation in this exact structure:
+
+**1. What Is This Chart Showing? (100 words)**
+X-axis, Y-axis, what each bar/line/number represents. Plain language only.
+
+**2. Why Should I Care? (100 words)**
+Connect directly to business performance or strategic position. What does this mean for the company's future?
+
+**3. Key Term Definitions (50 words)**
+Explain any finance terms (EBITDA, market cap, P/E, D/E, CFO, etc.) used — as if the reader has zero background.
+
+**4. What Does This Tell Us? (150 words)**
+Are trends improving or deteriorating? Is this good or bad? How does it compare to sector norms? What should a non-finance person conclude?
+
+**5. One-Line Takeaway**
+Summarise the main insight in ONE clear, jargon-free sentence.
+
+Success benchmark: A non-financial executive should feel confident using this explanation to make a decision.`,
+      `You are DNR Capitals' client education specialist. You translate complex financial charts and data into clear, jargon-free explanations that non-finance executives and retail investors can immediately act on. Clarity and accuracy are equally important.`,
+      (t) => setResult(t)
+    );
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <div className="sec-title">📖 Chart Explainer</div>
+      <div className="sec-sub">Translate complex financial charts and data into plain English — for non-finance audiences</div>
+      <div className="card card-gold" style={{marginBottom:18}}>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <input className="inp" style={{flex:1}} value={context} onChange={e=>setContext(e.target.value)} placeholder="Company or sector context (e.g. TCS, Banking sector, Nifty 50)"/>
+            <input className="inp" style={{flex:1}} value={decision} onChange={e=>setDecision(e.target.value)} placeholder="Purpose (e.g. Investment decision, Due diligence, Board presentation)"/>
+          </div>
+          <textarea
+            className="inp"
+            style={{width:"100%",minHeight:100,resize:"vertical",fontFamily:"inherit"}}
+            value={data}
+            onChange={e=>setData(e.target.value)}
+            placeholder="Paste your chart data, financial figures, or describe the chart here...&#10;&#10;Example: Revenue grew from ₹8,000Cr to ₹12,000Cr over 3 years but profit margin fell from 15% to 9%..."
+          />
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {EXAMPLES.map((ex,i)=>(
+                <button key={i} className="btn-ghost" style={{fontSize:11,padding:"4px 10px"}} onClick={()=>{setData(ex.data);setDecision(ex.dec);setContext("");}}>{ex.label}</button>
+              ))}
+            </div>
+            <button className="btn-gold" onClick={run} disabled={loading||!data.trim()}>{loading?"⏳ Explaining...":"📖 Explain This Chart"}</button>
+          </div>
+        </div>
+      </div>
+      {loading && (
+        <div className="card">
+          <div className="loading"><div className="spin"/><span>Translating chart data into plain English...</span></div>
+        </div>
+      )}
+      {result && (
+        <div className="card">
+          <div className="card-title">📖 Chart Explanation — {context || "Financial Data"}</div>
+          <div className="prose" dangerouslySetInnerHTML={{__html: result.replace(/\*\*(.*?)\*\*/g,"<strong style='color:"+T.goldLight+"'>$1</strong>").replace(/\n/g,"<br/>")}}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── PRICE ALERTS ─────────────────────────────────────────────────────────────
 function PriceAlerts({ onClose }) {
   const [alerts, setAlerts] = useState([
@@ -5719,7 +6016,8 @@ export default function App() {
           calculators:"Calculators", calendar:"Calendar", tools:"Adv. Tools",
           legends:"Legends", institutional:"Inst. Momentum",
           breakout:"Breakout Watchlist", sectorintel:"Sector Intelligence",
-          marketpulse:"Market Pulse", morning:"Morning Intelligence", postmarket:"Post-Market Report" },
+          marketpulse:"Market Pulse", morning:"Morning Intelligence", postmarket:"Post-Market Report",
+          onepager:"Stock One-Pager", competitive:"Competitive Landscape", chartexplainer:"Chart Explainer" },
   };
   const L = LABELS.EN;
 
@@ -5734,6 +6032,9 @@ export default function App() {
         { id:"institutional",icon:"🏦", label:L.institutional },
         { id:"breakout",     icon:"📡", label:L.breakout },
         { id:"sectorintel",  icon:"🏭", label:L.sectorintel },
+        { id:"onepager",     icon:"📋", label:L.onepager },
+        { id:"competitive",  icon:"⚔️",  label:L.competitive },
+        { id:"chartexplainer",icon:"📖", label:L.chartexplainer },
       ]
     },
     {
@@ -5836,7 +6137,7 @@ export default function App() {
             <div className="sb-logo" onClick={() => setActiveTab("home")}>
               <img src="/logo.png" alt="DNR Capitals" className="sb-logo-img" />
               <div className="sb-logo-title">DNR Capitals</div>
-              <div className="sb-logo-sub">Equity Research Intelligence</div>
+              <div className="sb-logo-sub">Research. Trade. Grow.</div>
             </div>
 
             {/* Nav groups */}
@@ -5902,6 +6203,9 @@ export default function App() {
                 {activeTab === "marketpulse"   && <MarketPulse />}
                 {activeTab === "morning"       && <MorningIntelligence />}
                 {activeTab === "postmarket"    && <PostMarketIntelligence />}
+                {activeTab === "onepager"      && <StockOnePager />}
+                {activeTab === "competitive"   && <CompetitiveLandscape />}
+                {activeTab === "chartexplainer"&& <ChartExplainer />}
               </div>
             )}
 
