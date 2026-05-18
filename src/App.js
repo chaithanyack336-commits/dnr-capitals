@@ -9,7 +9,7 @@ import {
 
 // ─── PASTE YOUR GROQ API KEY HERE ────────────────────────────────────────────
 const GROQ_API_KEY = process.env.REACT_APP_GROQ_API_KEY || "";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "llama-3.3-70b-versatile"; // Best Groq model — 70B, 128k context
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── THEME — CARBON BLACK + ELECTRIC BLUE + GOLD (Institutional) ──────────────────
@@ -92,20 +92,21 @@ async function callGroq(prompt, systemPrompt, onStream) {
   const YEAR = new Date().getFullYear();
   const QUARTER = Math.ceil((new Date().getMonth()+1)/3);
 
-  const enhancedSystem = `${systemPrompt || "You are DNR Capitals AI Research Engine — expert equity analyst with 30 years experience in Indian and global markets."}
+  const enhancedSystem = `${systemPrompt || "You are DNR Capitals AI Research Engine — institutional-grade equity analyst with 30+ years experience in Indian and global markets."}
 
-⚠️ REAL-TIME DATA REQUIREMENTS (NON-NEGOTIABLE):
-- Today is ${TODAY}. Current financial year: FY${YEAR-2000+1}.
-- Current quarter: Q${QUARTER}FY${YEAR-2000+1}
-- You MUST provide data current as of ${TODAY}
-- NEVER give targets or prices from 2022 or 2023 — those are WRONG and USELESS
-- For ANY stock price mentioned: use the most recent known price
-- For targets: calculate based on CURRENT price and CURRENT earnings
-- For shareholding: use latest available quarter (Q3FY25 or Q4FY25)
-- For results: reference Q3FY25 (Oct-Dec 2024) or Q4FY25 (Jan-Mar 2025) results
-- Always mention: "As of ${TODAY}, CMP is approximately ₹XXX"
-- If Himadri Speciality is asked: current price ~₹447, not ₹140
-- ALWAYS state your data source date clearly`;
+REAL-TIME DATA & RESEARCH MANDATE (NON-NEGOTIABLE):
+- Today is ${TODAY}. Current financial year: FY${YEAR-2000+1}. Current quarter: Q${QUARTER}FY${YEAR-2000+1}.
+- You have comprehensive knowledge of ALL listed Indian companies on NSE and BSE — large cap, mid cap, small cap, micro cap.
+- You cover ALL Indian market sectors: IT, Banking, NBFC, Insurance, Pharma, Healthcare, Auto, Auto Ancillaries, FMCG, Consumer, Retail, Metals, Mining, Oil & Gas, Chemicals, Specialty Chemicals, Agrochemicals, Fertilizers, Capital Goods, Engineering, Defence, Aerospace, Infrastructure, Roads, Ports, Airports, Railways, Power, Renewables, Solar, Wind, Real Estate, Cement, Telecom, Media, Hospitality, Aviation, Logistics, Textiles, Apparel, Jewellery, Gems, Paper, Sugar, Dairy, Quick Commerce, Fintech, and all emerging sectors.
+- You provide analysis for companies across ALL market caps — from NIFTY 50 giants to SME-listed companies.
+- ALWAYS use the most current available data: latest quarterly results (Q3FY25 or Q4FY25), latest shareholding (Dec 2024 or Mar 2025 quarter), latest annual report (FY24 or FY25).
+- ALWAYS provide actual current market price, 52-week high/low, and current valuation multiples.
+- NEVER provide stale 2022 or 2023 prices or targets — always calculate based on current price.
+- ALWAYS cite your data source and its date clearly.
+- For any company, provide real financial figures from their actual filings — not generic placeholders.
+- Research depth: Use knowledge from NSE/BSE filings, SEBI disclosures, company annual reports, investor presentations, concall transcripts, analyst reports, Bloomberg, Reuters, ET Markets, Moneycontrol, Screener.in, Trendlyne, Tijori Finance, CRISIL, ICRA, CARE data.
+- State clearly: "Data as of ${TODAY} based on latest available public filings."`;
+
 
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -1938,24 +1939,371 @@ function StockResearch() {
   const [peerData, setPeerData] = useState(null);
 
   const prompts = {
-    "Business Overview": s => `Analyze ${s} (${exchange}): 1) Company background, founding, promoters, milestones 2) Core business model and value proposition 3) Revenue segment breakdown with % 4) Market position and competitive moat 5) Track record over 5-10 years. Business Quality Rating /10 with reasons.`,
-    "Product Portfolio": s => `${s} product/service portfolio deep dive: 1) All segments with revenue % 2) New launches last 2 years 3) Competitive positioning vs peers 4) R&D pipeline 5) Geographic revenue split — domestic vs exports. Identify growth engines and risks.`,
-    "Industry Analysis": s => `Industry analysis for ${s}'s sector: 1) TAM in INR crore 2) 3Y/5Y/10Y CAGR projections 3) Regulatory landscape 4) Porter's 5 Forces 5) Tailwinds and headwinds 6) Top 5 competitors market share 7) Industry attractiveness /10. Investment thesis.`,
-    "Financial Statements": s => `${s} financial health overview FY20-FY24: 1) Revenue CAGR 2) EBITDA margin trend 3) PAT growth 4) ROE and ROCE trend 5) Red and green flags 6) Financial health /10 vs sector benchmarks.`,
-    "Balance Sheet": s => `${s} balance sheet FY20-FY24: 1) Reserves trend 2) Cash position 3) Fixed assets/gross block 4) Total debt trajectory — assess critically 5) D/E trend 6) Current ratio 7) Working capital cycle 8) Asset quality. Rank debt management /10.`,
-    "Income Statement": s => `${s} income statement FY20-FY24: 1) Revenue growth each year 2) Gross profit and margin 3) Employee/operating expenses as % revenue 4) EBITDA and margin trend 5) Depreciation 6) Finance costs 7) EBIT margin 8) PAT and margin 9) EPS growth. Identify margin inflection points.`,
-    "Cash Flow Analysis": s => `${s} cash flow analysis 5 years: 1) OCF trend — growing? 2) OCF vs PAT — earnings quality 3) Trade receivables vs revenue — flag if growing faster 4) FCF trend 5) Capex intensity 6) Cash from financing 7) FCF yield. Rate /10.`,
-    "Peer Comparison": s => `Comprehensive peer comparison for ${s}: Compare with top 4-5 direct competitors on: 1) Revenue and revenue growth 2) EBITDA margins 3) PAT margins 4) ROE and ROCE 5) Debt to Equity 6) P/E ratio 7) EV/EBITDA 8) Market cap 9) Stock returns 1Y/3Y 10) Overall competitive positioning. Who is winning and why? Format as clear comparison with specific numbers for each company.`,
-    "Quarterly Results": s => `${s} last 4 quarterly results: 1) Quarter-wise revenue with QoQ and YoY growth 2) Margin trajectory 3) Beat/miss estimates 4) Key surprises 5) Concall key highlights 6) Guidance provided 7) One-time items 8) Volume vs realization. Fundamental improvement or deterioration?`,
-    "Management Analysis": s => `${s} management quality: 1) MD/CEO background and tenure 2) Recent KMP changes impact 3) Past promises vs delivery 4) Capital allocation history 5) Related party transactions 6) Management stake and insider transactions 7) 3-5 year targets 8) Latest concall commentary. Rate /10.`,
-    "Corporate Actions": s => `${s} corporate actions: 1) Dividend history and payout ratio 2) Stock splits and bonus issues 3) Buybacks 4) Acquisitions/mergers last 3 years 5) SEBI/BSE/NSE announcements 6) Insider trading 7) Promoter pledge trend 8) QIP/rights dilution. Governance score /10.`,
-    "Shareholding Pattern": s => `${s} shareholding analysis last 6 quarters: 1) Promoter holding % trend and pledges 2) FII/FPI trend 3) DII trend 4) Retail trend 5) Notable institutional investors 6) Block/bulk deals 7) Smart money behavior. Score /10.`,
-    "Key Ratios": s => `${s} comprehensive ratios: 1) P/E, P/B, EV/EBITDA, P/S, PEG vs 5Y averages and peers 2) ROE, ROCE, ROA trend 3) D/E, interest coverage 4) Asset turnover, inventory days, debtor days 5) Margins vs peers 6) Revenue/PAT/EPS 3Y CAGR. Full scorecard vs benchmarks.`,
-    "DCF Valuation": s => `DCF and relative valuation for ${s}: 1) Revenue growth assumptions Y1-Y5, Y6-Y10 2) WACC calculation with India risk premium 3) FCF projections 10 years 4) Terminal value 5) DCF intrinsic value per share 6) EV/EBITDA relative valuation 7) P/E relative valuation 8) Average target price 9) CMP vs intrinsic — upside/downside % 10) Y1-Y5 price targets bull/base/bear case.`,
-    "Audit & Governance": s => `${s} governance: 1) Auditor quality, any changes 2) Latest audit report — qualified opinions 3) Related party transactions 4) Board independence 5) SEBI regulatory actions 6) Pending litigations 7) NCLT proceedings 8) ESG rating. Governance score /10.`,
-    "News & Sentiment": s => `${s} news and sentiment: 1) Major news last 6 months 2) Analyst upgrades/downgrades and target changes 3) Controversies 4) Industry news impact 5) Social sentiment 6) Recent catalysts 7) Upcoming catalysts. Sentiment score /10.`,
-    "Technical Analysis": s => `${s} technical analysis: 1) Current trend 2) 50/100/200 DMA levels 3) RSI reading 4) MACD signal 5) Three support levels 6) Three resistance levels 7) Volume pattern 8) Chart patterns 9) Ideal entry zone 10) Stop-loss recommendation. Technical score /10.`,
-    "Final Verdict": s => `Final investment verdict for ${s} as 30-year experienced investor and hedge fund manager: 1) Investment thesis summary 2) Five key strengths 3) Five key risks 4) Valuation attractiveness 5) Recommendation: STRONG BUY/BUY/ACCUMULATE/HOLD/AVOID 6) Ideal entry price range 7) Target price 1Y/3Y/5Y 8) Portfolio allocation — core/tactical/avoid 9) Conviction /10 10) Key monitorables. Write as if your own money is at stake.`,
+    "Business Overview": s => `You are a senior equity research analyst at a top-tier investment bank. Prepare a comprehensive business overview for ${s} (${exchange}).
+
+Research using the company's latest Annual Report, Investor Presentation, Exchange Filings, and credible sources. Cover:
+1. **Company Profile** — Full legal name, NSE/BSE ticker, headquarters, year founded, number of employees, current MD/CEO and CFO
+2. **Business Model** — Core revenue model, value proposition, how the company makes money
+3. **Revenue Segments** — All segments with % contribution, revenue breakdown domestic vs exports
+4. **Competitive Moat** — Brand, distribution, patents, switching costs, cost advantage, network effects — what protects margins
+5. **Market Position** — Market share, industry ranking, positioned as premium/scale/niche/innovation-led
+6. **Promoter Background** — Founding family/institution, track record, reputation, governance history
+7. **Key Milestones** — Major inflection points, acquisitions, capacity expansions, turnarounds in last 5-10 years
+8. **Growth Drivers (2–3 years)** — Top 3 specific growth drivers with evidence
+9. **Business Quality Rating** — Score /10 with specific reasons
+
+Use real data from latest filings. Cite sources. No placeholders.`,
+
+    "Product Portfolio": s => `You are a senior equity research analyst. Prepare a detailed product and service portfolio analysis for ${s} (${exchange}).
+
+Cover:
+1. **Complete Portfolio** — Every product/service line with revenue contribution %, gross margin profile, and growth rate
+2. **Segment Deep-Dive** — For each segment: size, growth, competitive position, key customers, pricing power
+3. **New Launches (Last 2 Years)** — Products/services launched, initial traction, revenue potential
+4. **R&D Pipeline** — CAPEX on R&D, pipeline products, expected launch timeline, patent portfolio
+5. **Geographic Revenue Split** — Domestic vs exports, top geographies, concentration risk
+6. **Pricing Power** — Can the company pass on cost increases? Evidence from last 2 years
+7. **Product Mix Shift** — Is the company moving up the value chain? Premium vs commodity mix trend
+8. **Key Risks** — Products facing disruption, margin pressure, regulatory risk
+9. **Growth Engines** — Which segments will drive the next 3-year growth cycle
+
+Use real data from latest annual report and investor presentations. State data period clearly.`,
+
+    "Industry Analysis": s => `You are a senior equity research analyst. Prepare a comprehensive industry analysis for the sector in which ${s} (${exchange}) operates.
+
+Cover:
+1. **Industry Size** — TAM in INR Crore, current penetration, organised vs unorganised share
+2. **Growth Projections** — 3Y/5Y/10Y CAGR with drivers, historical growth vs forward estimates
+3. **Industry Structure** — Fragmented or consolidated? Top 5 players market share table
+4. **Porter's 5 Forces** — Supplier power, buyer power, substitutes, new entrants, rivalry — score each
+5. **Regulatory Landscape** — Key regulations, PLI schemes, import duties, environmental norms, policy direction
+6. **Global Context** — How does India's industry compare globally? Export opportunity or import threat?
+7. **Tailwinds** — Top 5 specific macro/structural tailwinds with timeline
+8. **Headwinds** — Top 5 risks — structural vs cyclical, which are increasing
+9. **Value Chain** — Where does value accrue? Who captures the most margin in the chain?
+10. **Industry Attractiveness** — Score /10 with reasoning, comparison to other sectors
+
+Use CRISIL, ICRA, CARE, government data, industry association reports. Cite all sources.`,
+
+    "Financial Statements": s => `You are a senior equity research analyst at a top-tier investment bank. Prepare a detailed financial statements analysis for ${s} (${exchange}).
+
+Research using latest Annual Report, Exchange Filings, and credible sources. Report in INR Crores.
+
+**Income Statement Table (FY21–FY25 or latest 5 years):**
+Revenue | Revenue Growth% | Gross Profit | Gross Margin% | EBITDA | EBITDA Margin% | EBIT | EBIT Margin% | PAT | PAT Margin% | EPS | Employee Cost | Other Expenses | Interest | Depreciation | Tax Rate
+
+**Analysis:**
+1. Revenue growth drivers — volume vs pricing, segment contribution, cyclical vs structural
+2. Gross margin trend — input cost impact, pricing power evidence
+3. EBITDA margin trend — operating leverage, cost control quality
+4. PAT growth drivers — one-offs, tax rate changes, interest cost trend
+5. EPS trajectory — dilution impact if any
+6. Management commentary on future profitability (from latest concall)
+7. Key red flags in the income statement
+8. Financial Health Score /10
+
+Cite data sources and financial year clearly.`,
+
+    "Balance Sheet": s => `You are a senior equity research analyst. Prepare a detailed balance sheet analysis for ${s} (${exchange}).
+
+Report in INR Crores. Table for FY21–FY25:
+Total Assets | Fixed Assets (Gross Block) | Net Block | Investments | Cash & Equivalents | Total Inventories | Trade Receivables | Other Current Assets | Total Equity | Reserves | Total Debt | Long-Term Debt | Short-Term Debt | Trade Payables | Other Current Liabilities | Net Debt | Book Value Per Share | D/E Ratio | Current Ratio | Quick Ratio | ROE | ROCE
+
+**Analysis:**
+1. Debt trajectory — is company deleveraging or releveraging? Net debt trend
+2. Cash position — cash generation vs deployment quality
+3. Fixed assets and capex intensity — maintenance vs growth capex
+4. Working capital — receivables/inventory/payables trends, cash conversion cycle
+5. Net worth growth — retained earnings vs dilution
+6. Balance sheet quality — asset-heavy vs asset-light, return on assets
+7. Any major acquisitions, investments in subsidiaries, goodwill concerns
+8. Red flags — rising receivables, inventory buildup, hidden contingent liabilities
+9. Balance Sheet Strength Score /10
+
+Cite sources and latest available data period.`,
+
+    "Income Statement": s => `You are a senior equity research analyst. Prepare a granular income statement analysis for ${s} (${exchange}).
+
+Report in INR Crores. Provide actuals for FY21–FY25 + FY26E:
+Revenue | Raw Materials | Gross Profit | Gross Margin% | Employee Costs | Other Manufacturing/Operating Expenses | EBITDA | EBITDA Margin% | Depreciation | EBIT | EBIT Margin% | Finance Costs/Interest | PBT | Tax | PAT | Minority Interest | PAT (Adjusted) | PAT Margin% | EPS (Basic) | EPS (Diluted)
+
+**Deep Analysis:**
+1. Revenue growth each year — volume vs price decomposition
+2. Raw material cost as % of revenue — input cost sensitivity
+3. Gross margin inflection points — identify years of compression/expansion and causes
+4. Employee cost trend — automation/productivity or bloating?
+5. EBITDA margin analysis — where are the margin levers?
+6. Depreciation and D&A intensity — capex cycle implications
+7. Finance costs trend — debt repayment or new borrowing?
+8. Effective tax rate analysis — deferred tax, MAT credits
+9. PAT quality — recurring vs one-time items
+10. EPS growth CAGR — 3Y and 5Y
+
+Use actual company data from annual reports. Cite sources.`,
+
+    "Cash Flow Analysis": s => `You are a senior equity research analyst. Prepare a comprehensive cash flow analysis for ${s} (${exchange}).
+
+Report in INR Crores. Table for FY21–FY25:
+Cash Flow from Operations (CFO) | Cash Flow from Investing (CFI) | Cash Flow from Financing (CFF) | Free Cash Flow (FCF) | Capex | Dividend Paid | Debt Raised | Debt Repaid | Net Change in Cash | CFO/EBITDA Ratio | CFO/PAT Ratio | FCF Yield
+
+**Analysis:**
+1. PAT-to-cash conversion quality — CFO/PAT ratio trend, why it's high or low
+2. Working capital impact on cash flows — receivables, inventory, payables changes
+3. Capex cycle — maintenance vs growth capex, capex as % of revenue trend
+4. Investment cycle — where is the company in its capex cycle? Peak or trough?
+5. Debt repayment vs new borrowing — is FCF being used to reduce debt?
+6. Dividend payout trend — policy, coverage, sustainability
+7. FCF quality — consistency, cyclicality, structural improvement
+8. Cash flow red flags — PAT growing but CFO declining, rising receivables
+9. Cash Flow Health Score /10
+
+Use actual company filings. Cite data source and year.`,
+
+    "Peer Comparison": s => `You are a senior equity research analyst. Prepare an institutional-grade peer comparison for ${s} (${exchange}).
+
+**Step 1 — Identify Peers:** List the top 5–7 direct listed competitors on NSE/BSE with their tickers.
+
+**Step 2 — Peer Comparison Table (latest available data):**
+Company | Ticker | Market Cap (₹Cr) | Revenue (₹Cr) | Revenue Growth% | EBITDA Margin% | PAT Margin% | ROE% | ROCE% | D/E | P/E | EV/EBITDA | P/B | 1Y Return% | 3Y Return%
+
+**Step 3 — Analysis:**
+1. Scale leader — who has the largest revenue and market cap, and why
+2. Margin leader — who has the best EBITDA and PAT margins, structural reasons
+3. Return ratios leader — best ROE/ROCE and why
+4. Valuation comparison — who is cheapest/most expensive and whether premium/discount is justified
+5. Market share trends — who is gaining vs losing share, evidence
+6. Balance sheet comparison — best and worst leverage position
+7. Stock performance comparison — 1Y and 3Y returns, who has outperformed
+8. Overall competitive positioning of ${s} vs peers — is its position strengthening or weakening?
+9. Key differentiators — what does ${s} do better than peers? Where does it lag?
+
+Provide actual figures. No placeholders. Cite sources.`,
+
+    "Quarterly Results": s => `You are a senior equity research analyst. Prepare a detailed quarterly results analysis for ${s} (${exchange}).
+
+Cover the latest 4 quarters (Q1FY25 through Q4FY25 or most recently reported):
+
+**Quarterly P&L Table:**
+Quarter | Revenue (₹Cr) | YoY% | QoQ% | EBITDA (₹Cr) | EBITDA Margin% | PAT (₹Cr) | PAT Margin% | EPS | Beat/Miss vs Consensus
+
+**For each quarter provide:**
+1. Revenue breakdown by segment — which segment drove growth or drag
+2. Margin story — gross margin, EBITDA margin changes and causes
+3. One-time items — exceptional gains/losses, provisions
+4. Beat or miss vs analyst consensus and by how much
+5. Key surprises — positive and negative
+
+**Trend Analysis:**
+1. Is the business accelerating or decelerating? Evidence from sequential trends
+2. Volume vs pricing dynamics — which is driving revenue
+3. Operating leverage — revenue growth vs margin expansion/compression
+4. Guidance provided — management targets for next quarter/year
+5. Concall key highlights — most important management statements
+6. Earnings quality — are profits recurring and cash-backed?
+7. Fundamental Trajectory Score — Improving / Stable / Deteriorating with reasoning
+
+Use NSE/BSE exchange filings and concall transcripts. Cite quarter and date.`,
+
+    "Management Analysis": s => `You are a senior equity research analyst. Prepare a management quality assessment for ${s} (${exchange}).
+
+Cover:
+1. **Leadership Profile** — Current MD/CEO: background, tenure, prior experience, track record
+2. **CFO & Key Management** — CFO background, tenure, any recent KMP changes and implications
+3. **Board Composition** — Independent directors ratio, quality of board, audit committee strength
+4. **Capital Allocation Track Record** — Last 5 years: how was cash deployed? Capex, acquisitions, dividends, buybacks — was it value-creating?
+5. **Promises vs Delivery** — Management guidance from 2–3 years ago vs actual outcomes. Did they deliver?
+6. **Communication Quality** — Concall tone: direct and transparent or evasive? How do they handle tough questions?
+7. **Related Party Transactions** — Material RPTs, any governance concerns
+8. **Promoter Activity** — Promoter stake trend, pledging, insider buying/selling
+9. **Strategic Vision** — 3–5 year targets articulated, clarity of long-term strategy
+10. **Red Flags** — Any SEBI actions, accounting controversies, auditor changes, litigation
+11. **Management Quality Score /10** — with specific evidence for the rating
+
+Use concall transcripts, annual report governance section, SEBI disclosures. Cite sources.`,
+
+    "Corporate Actions": s => `You are a senior equity research analyst. Analyse corporate actions and governance for ${s} (${exchange}).
+
+Cover:
+1. **Dividend History** — Last 5 years: dividend per share, payout ratio, yield, consistency, policy
+2. **Bonus Issues & Stock Splits** — History, rationale, market reaction
+3. **Buybacks** — History, buyback price vs market price, value returned to shareholders
+4. **Acquisitions & Mergers** — Last 3–5 years: what was acquired, price paid, strategic rationale, integration success, value creation/destruction
+5. **QIP / Rights Issue / Preferential Allotment** — Dilution history, pricing, use of proceeds, impact on EPS
+6. **SEBI & Regulatory Announcements** — Any regulatory actions, show-cause notices, consent orders
+7. **Promoter Pledging** — Current pledge %, trend over 2 years, risk assessment
+8. **Insider Trading Disclosures** — Significant insider buys/sells in last 12 months
+9. **Delisting / Restructuring Plans** — Any restructuring, demerger, or consolidation
+10. **Governance Score /10** — with specific evidence
+
+Use BSE/NSE corporate action database, SEBI filings. Cite sources and dates.`,
+
+    "Shareholding Pattern": s => `You are a senior equity research analyst. Prepare a detailed shareholding pattern analysis for ${s} (${exchange}).
+
+Cover last 6 quarters of shareholding data:
+
+**Shareholding Table:**
+Quarter | Promoter% | Promoter Pledge% | FII/FPI% | DII% | MF% | Insurance% | Retail/Public% | Total Non-Promoter%
+
+**Analysis:**
+1. Promoter trend — increasing or decreasing holding, pledge trend (critical red flag if rising)
+2. FII/FPI trend — are foreign institutions buying or selling? Net change over 6 quarters
+3. DII trend — domestic institutional stance, which MFs are entering/exiting
+4. Retail trend — smart money vs retail divergence signal
+5. Notable institutional investors — top 10 shareholders, any new entrants, exits
+6. Block/Bulk Deals — significant transactions in last 6 months with price
+7. Smart money behaviour — what does institutional accumulation/distribution signal?
+8. Concentration risk — top 10 holders % of total float
+9. Free float — actual tradeable shares as % of total
+10. Shareholding Quality Score /10
+
+Use NSE/BSE shareholding disclosures. State exact quarter of latest data.`,
+
+    "Key Ratios": s => `You are a senior equity research analyst. Prepare a comprehensive ratio analysis for ${s} (${exchange}).
+
+**Valuation Ratios Table (Current vs 1Y Avg vs 3Y Avg vs 5Y Avg vs Sector Avg):**
+P/E | Forward P/E | P/B | EV/EBITDA | EV/Revenue | P/S | PEG Ratio | Dividend Yield | Market Cap | Enterprise Value
+
+**Profitability Ratios Table (FY22–FY25):**
+Gross Margin% | EBITDA Margin% | EBIT Margin% | PAT Margin% | ROE% | ROCE% | ROA% | ROIC% | Asset Turnover
+
+**Leverage Ratios Table (FY22–FY25):**
+D/E Ratio | Net Debt/EBITDA | Interest Coverage Ratio | Current Ratio | Quick Ratio | Debt Service Coverage
+
+**Efficiency Ratios Table (FY22–FY25):**
+Inventory Days | Debtor Days | Creditor Days | Cash Conversion Cycle | Working Capital Days | Asset Turnover | Fixed Asset Turnover
+
+**Growth Metrics:**
+Revenue CAGR (1Y/3Y/5Y) | EBITDA CAGR (1Y/3Y/5Y) | PAT CAGR (1Y/3Y/5Y) | EPS CAGR (1Y/3Y/5Y)
+
+**Scorecard:** For each ratio category, score vs sector peers and 5-year history. Overall Fundamental Score /10.
+
+Use Screener.in, Trendlyne, company filings. Cite data source and period.`,
+
+    "DCF Valuation": s => `You are a senior equity research analyst. Prepare a rigorous DCF and multi-method valuation for ${s} (${exchange}).
+
+**Step 1 — Base Case Assumptions:**
+- Current revenue, EBITDA margin, PAT (FY25 actuals or latest)
+- Revenue growth assumptions: Y1-Y3 (near term), Y4-Y7 (medium term), Y8-Y10 (terminal phase), terminal growth rate
+- EBITDA margin trajectory — expansion, stable, or compression with reasoning
+- WACC components: risk-free rate (current 10Y G-Sec yield), equity risk premium, beta, cost of debt, D/E, effective WACC
+- Tax rate assumption
+
+**Step 2 — DCF Model (10-year):**
+FCF projections Y1–Y10 | PV of FCF | Terminal Value | PV of Terminal Value | Enterprise Value | Net Debt | Equity Value | Intrinsic Value Per Share | CMP vs Intrinsic — Upside/Downside%
+
+**Step 3 — Relative Valuation:**
+EV/EBITDA method: sector average multiple → implied price
+P/E method: forward earnings → implied price
+P/B method: sector P/B → implied price
+Average of all methods → blended target price
+
+**Step 4 — Scenario Analysis:**
+Bull Case (price + upside%) | Base Case (price + upside%) | Bear Case (price + downside%)
+Price targets: 12-month | 24-month | 36-month
+
+**Step 5 — Valuation Verdict:**
+Is the stock cheap, fair, or expensive vs intrinsic value and peers? Key assumptions that drive the bull/bear case.
+
+State CMP, market cap, and valuation date clearly. Cite sources.`,
+
+    "Audit & Governance": s => `You are a senior equity research analyst. Prepare a governance and audit quality assessment for ${s} (${exchange}).
+
+Cover:
+1. **Auditor Quality** — Current statutory auditor, Big 4 or otherwise, auditor tenure, any changes in last 5 years and reason
+2. **Audit Report** — Latest audit report: qualified or unqualified? Any emphasis of matter, key audit matters flagged
+3. **Accounting Quality** — Revenue recognition policy, inventory valuation, depreciation policy — any aggressive accounting?
+4. **Related Party Transactions** — Material RPTs: amounts, nature, arm's length or not, % of revenue, trend
+5. **Board Composition** — Total directors, independent directors ratio, women directors, board diversity, committee structure
+6. **SEBI Actions** — Any regulatory actions, adjudication orders, consent orders, show-cause notices in last 5 years
+7. **Litigation & Contingent Liabilities** — Pending cases, tax disputes, arbitrations, potential financial impact
+8. **NCLT/Insolvency Proceedings** — Any proceedings, IBC exposure
+9. **ESG Standing** — Environmental compliance, social responsibility, governance ratings if available
+10. **Promoter Governance History** — Any past controversies, fund diversion concerns, group company issues
+11. **Governance Score /10** — Specific evidence for the rating, red flags, green flags
+
+Use SEBI EDGAR, NSE/BSE filings, annual report governance section. Cite sources.`,
+
+    "News & Sentiment": s => `You are a senior equity research analyst. Prepare a comprehensive news, sentiment and catalyst analysis for ${s} (${exchange}).
+
+Cover:
+1. **Major News (Last 6 Months)** — Top 8–10 material developments: results, orders, capacity additions, management changes, regulatory approvals, partnerships, JVs — with date and market impact
+2. **Analyst Coverage** — Recent upgrades/downgrades from top brokerages, target price changes, consensus rating
+3. **Institutional Activity** — FII/DII net buying/selling, block deals, bulk deals in last 3 months
+4. **Controversies & Risks** — Any negative news, regulatory issues, management disputes, ESG concerns
+5. **Industry News Impact** — How recent sector developments affect this specific company
+6. **Upcoming Catalysts (3–6 months)** — Scheduled result dates, CAPEX completion, product launches, policy decisions, order wins expected
+7. **Macro Sensitivity** — How sensitive is this stock to INR, oil, interest rates, global cues?
+8. **Social & Market Sentiment** — Retail investor sentiment, social media buzz, search trends
+9. **Analyst Consensus** — Bloomberg/Reuters consensus: average target price, % upside from CMP, number of buys/holds/sells
+10. **Sentiment Score /10** — Overall sentiment: strongly positive, positive, neutral, cautious, negative
+
+Use ET Markets, Moneycontrol, CNBC-TV18, Bloomberg, Reuters. Cite sources with dates.`,
+
+    "Technical Analysis": s => `You are a professional technical analyst. Analyse ${s} (${exchange}) without giving any buy, sell, or hold recommendation.
+
+**1. TREND SUMMARY TABLE**
+| Metric | Observation |
+Primary Trend | Short-Term Trend | Medium-Term Trend | Volume Trend | Relative Strength vs Nifty | Sector Strength | Broader Market Context
+
+**2. KEY LEVELS TABLE**
+| Level Type | Price (₹) |
+Immediate Support | Major Support | Strong Support (52W low zone) | Immediate Resistance | Major Resistance | 52-Week High | Breakout Zone | Breakdown Zone
+
+**3. TECHNICAL INDICATORS TABLE**
+| Indicator | Current Reading | Interpretation |
+20 DMA | 50 DMA | 100 DMA | 200 DMA | RSI (14) | MACD | MACD Signal | MACD Histogram | Bollinger Bands | Volume vs 20D Average | ADX
+
+**4. CHART STRUCTURE**
+- Current pattern: uptrend / downtrend / consolidation / basing
+- Pattern type: flag, triangle, cup-and-handle, base, range, wedge
+- Price action quality: improving or weakening
+- Volume confirmation: accumulation or distribution
+- Momentum direction and strength
+
+**5. RISK FACTORS**
+Levels that would invalidate bullish structure, broader market risk, event risk, which trigger could change the trend direction.
+
+No buy/sell/hold recommendation. State approximate CMP and data date.`,
+
+    "Final Verdict": s => `You are DNR Capitals' chief investment strategist with 30 years of experience managing institutional portfolios in Indian markets. Prepare the definitive investment verdict for ${s} (${exchange}).
+
+This is the final synthesis of all research dimensions. Write as if your own capital is at stake.
+
+**1. INVESTMENT THESIS SUMMARY (150 words)**
+The core reason this stock is or isn't worth owning at current price. Be direct.
+
+**2. FIVE KEY STRENGTHS**
+Specific, evidence-backed strengths — business moat, financial quality, management, growth runway, valuation
+
+**3. FIVE KEY RISKS**
+Specific, evidence-backed risks — business, financial, macro, regulatory, competitive
+
+**4. FINANCIAL QUALITY VERDICT**
+Score the business: Revenue Growth / Margin Quality / Balance Sheet / Cash Generation / Capital Allocation — each /10
+
+**5. VALUATION ASSESSMENT**
+Current CMP, current market cap, P/E vs historical avg, EV/EBITDA vs peers. Is it cheap, fair, or expensive? By how much?
+
+**6. INVESTMENT VERDICT**
+STRONG BUY / BUY / ACCUMULATE / HOLD / REDUCE / AVOID
+State the exact reasoning. This must be specific to current price.
+
+**7. PRICE TARGETS**
+12-month target (₹) with upside% | 24-month target (₹) | 36-month target (₹)
+Bull case target | Base case target | Bear case target
+
+**8. IDEAL ENTRY ZONE**
+Price range where the risk/reward is most attractive. Key level to watch.
+
+**9. PORTFOLIO ALLOCATION GUIDANCE**
+Core holding (5%+) / Tactical position (2–3%) / Watchlist only / Avoid — with reasoning
+
+**10. KEY MONITORABLES**
+Top 5 specific metrics, events, or data points to track over the next 2–4 quarters
+
+**CONVICTION SCORE: /10**
+
+State CMP, analysis date, and data sources clearly.`,
   };
 
   const mockCharts = (sym) => {
