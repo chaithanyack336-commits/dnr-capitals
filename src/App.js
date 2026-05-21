@@ -148,67 +148,130 @@ REAL-TIME DATA & RESEARCH MANDATE (NON-NEGOTIABLE):
 }
 
 // ─── REAL-TIME STOCK DATA ─────────────────────────────────────────────────────
-async function fetchRealTimeData(symbol) {
-  // Try multiple free sources
-  const nseSymbol = symbol.replace(".NS","").replace(".BO","").toUpperCase();
-  
-  try {
-    // Yahoo Finance via allorigins CORS proxy
-    const yahooSymbol = nseSymbol + ".NS";
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`;
-    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxy);
-    const json = await res.json();
-    const data = JSON.parse(json.contents);
-    const q = data?.chart?.result?.[0];
-    if (q) {
-      const meta = q.meta;
-      return {
-        symbol: nseSymbol,
-        price: meta.regularMarketPrice,
-        previousClose: meta.previousClose || meta.chartPreviousClose,
-        change: (meta.regularMarketPrice - (meta.previousClose || meta.chartPreviousClose)).toFixed(2),
-        changePct: (((meta.regularMarketPrice - (meta.previousClose || meta.chartPreviousClose)) / (meta.previousClose || meta.chartPreviousClose)) * 100).toFixed(2),
-        high52w: meta.fiftyTwoWeekHigh,
-        low52w: meta.fiftyTwoWeekLow,
-        volume: meta.regularMarketVolume,
-        marketCap: meta.marketCap,
-        currency: meta.currency,
-        exchange: meta.exchangeName,
-        source: "Yahoo Finance (Live)",
-        timestamp: new Date().toLocaleString("en-IN")
-      };
-    }
-  } catch(e) {}
+// ─── ROBUST REAL-TIME DATA ENGINE ────────────────────────────────────────────
+// Multiple CORS proxies — tries each until one succeeds
+const CORS_PROXIES = [
+  (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
 
-  try {
-    // Fallback: Alpha Vantage free tier
-    const res2 = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${nseSymbol}.BSE&apikey=demo`);
-    const d2 = await res2.json();
-    const q2 = d2["Global Quote"];
-    if (q2 && q2["05. price"]) {
-      return {
-        symbol: nseSymbol,
-        price: parseFloat(q2["05. price"]),
-        previousClose: parseFloat(q2["08. previous close"]),
-        change: parseFloat(q2["09. change"]),
-        changePct: parseFloat(q2["10. change percent"]),
-        volume: parseInt(q2["06. volume"]),
-        source: "Alpha Vantage (Live)",
-        timestamp: new Date().toLocaleString("en-IN")
-      };
-    }
-  } catch(e) {}
-
+async function fetchViaProxy(url, timeoutMs = 8000) {
+  for (const makeProxy of CORS_PROXIES) {
+    try {
+      const proxyUrl = makeProxy(url);
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(timeoutMs) });
+      if (!res.ok) continue;
+      const json = await res.json();
+      // allorigins returns {contents: "..."}, others return raw JSON
+      const text = json.contents ?? JSON.stringify(json);
+      const parsed = JSON.parse(text);
+      return parsed;
+    } catch (_) { continue; }
+  }
   return null;
+}
+
+// Resolve stock name to Yahoo Finance ticker
+async function resolveYahooSymbol(input) {
+  const clean = input.trim().toUpperCase().replace(".NS","").replace(".BO","");
+  // Try NSE first, then BSE
+  const candidates = [`${clean}.NS`, `${clean}.BO`, clean];
+  for (const sym of candidates) {
+    try {
+      const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${sym}&fields=regularMarketPrice,shortName`;
+      const data = await fetchViaProxy(url, 5000);
+      const q = data?.quoteResponse?.result?.[0];
+      if (q?.regularMarketPrice) return sym;
+    } catch(_) {}
+  }
+  // Try search API
+  try {
+    const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(input)}&lang=en-IN&region=IN&quotesCount=3`;
+    const data = await fetchViaProxy(url, 5000);
+    const quotes = data?.quotes?.filter(q => q.exchDisp === "NSE" || q.exchDisp === "BSE") || [];
+    if (quotes[0]?.symbol) return quotes[0].symbol;
+  } catch(_) {}
+  return `${clean}.NS`; // default fallback
+}
+
+async function fetchRealTimeData(symbol) {
+  const yahooSymbol = await resolveYahooSymbol(symbol);
+
+  // v7 quote endpoint — returns price, 52w, PE, market cap, volume in one call
+  const quoteUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${yahooSymbol}&fields=regularMarketPrice,regularMarketPreviousClose,regularMarketChange,regularMarketChangePercent,fiftyTwoWeekHigh,fiftyTwoWeekLow,regularMarketVolume,marketCap,trailingPE,epsTrailingTwelveMonths,bookValue,priceToBook,currency,fullExchangeName,shortName,longName,regularMarketDayHigh,regularMarketDayLow,regularMarketOpen,averageVolume10days,fiftyDayAverage,twoHundredDayAverage`;
+  const data = await fetchViaProxy(quoteUrl, 10000);
+  const q = data?.quoteResponse?.result?.[0];
+
+  if (q && q.regularMarketPrice) {
+    const price = q.regularMarketPrice;
+    const prev  = q.regularMarketPreviousClose || price;
+    return {
+      symbol:       yahooSymbol.replace(".NS","").replace(".BO",""),
+      yahooSymbol,
+      shortName:    q.shortName || q.longName || symbol,
+      price,
+      previousClose:prev,
+      change:       q.regularMarketChange?.toFixed(2)   ?? (price - prev).toFixed(2),
+      changePct:    q.regularMarketChangePercent?.toFixed(2) ?? (((price-prev)/prev)*100).toFixed(2),
+      dayHigh:      q.regularMarketDayHigh,
+      dayLow:       q.regularMarketDayLow,
+      open:         q.regularMarketOpen,
+      high52w:      q.fiftyTwoWeekHigh,
+      low52w:       q.fiftyTwoWeekLow,
+      volume:       q.regularMarketVolume,
+      avgVolume10d: q.averageVolume10days,
+      marketCap:    q.marketCap,
+      pe:           q.trailingPE,
+      eps:          q.epsTrailingTwelveMonths,
+      bookValue:    q.bookValue,
+      pb:           q.priceToBook,
+      dma50:        q.fiftyDayAverage,
+      dma200:       q.twoHundredDayAverage,
+      currency:     q.currency,
+      exchange:     q.fullExchangeName,
+      source:       "Yahoo Finance Live (v7)",
+      timestamp:    new Date().toLocaleString("en-IN"),
+      fetchSuccess: true,
+    };
+  }
+
+  // Fallback: v8 chart endpoint
+  try {
+    const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=5d`;
+    const cd = await fetchViaProxy(chartUrl, 8000);
+    const meta = cd?.chart?.result?.[0]?.meta;
+    if (meta?.regularMarketPrice) {
+      const price = meta.regularMarketPrice;
+      const prev  = meta.previousClose || meta.chartPreviousClose || price;
+      return {
+        symbol: yahooSymbol.replace(".NS","").replace(".BO",""),
+        yahooSymbol,
+        price,
+        previousClose: prev,
+        change:    (price - prev).toFixed(2),
+        changePct: (((price-prev)/prev)*100).toFixed(2),
+        high52w:   meta.fiftyTwoWeekHigh,
+        low52w:    meta.fiftyTwoWeekLow,
+        volume:    meta.regularMarketVolume,
+        marketCap: meta.marketCap,
+        dma50:     meta.fiftyDayAverage,
+        dma200:    meta.twoHundredDayAverage,
+        exchange:  meta.exchangeName,
+        source:    "Yahoo Finance Live (v8 chart)",
+        timestamp: new Date().toLocaleString("en-IN"),
+        fetchSuccess: true,
+      };
+    }
+  } catch(_) {}
+
+  return { fetchSuccess: false, symbol: symbol.toUpperCase(), timestamp: new Date().toLocaleString("en-IN") };
 }
 
 // Fetch full fundamentals from Yahoo Finance
 async function fetchFundamentals(symbol) {
-  const nseSymbol = symbol.replace(".NS","").replace(".BO","").toUpperCase();
-  const yahooSymbol = nseSymbol + ".NS";
+  const yahooSymbol = await resolveYahooSymbol(symbol);
 
-  // Fetch all modules including TTM income statement + quarterly data
   const modules = [
     "summaryDetail","defaultKeyStatistics","financialData",
     "incomeStatementHistory","incomeStatementHistoryQuarterly",
@@ -217,23 +280,26 @@ async function fetchFundamentals(symbol) {
     "earningsTrend","earningsHistory","recommendationTrend"
   ].join(",");
 
-  const proxies = [
-    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query1.finance.yahoo.com/v10/finance/quoteSummary/${yahooSymbol}?modules=${modules}`)}`,
-    `https://api.allorigins.win/get?url=${encodeURIComponent(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${yahooSymbol}?modules=${modules}`)}`,
+  const urls = [
+    `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${yahooSymbol}?modules=${modules}`,
+    `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${yahooSymbol}?modules=${modules}`,
   ];
 
-  for (const proxy of proxies) {
+  let r = null;
+  for (const url of urls) {
     try {
-      const res = await fetch(proxy, {signal: AbortSignal.timeout(10000)});
-      const json = await res.json();
-      const data = JSON.parse(json.contents);
-      const r = data?.quoteSummary?.result?.[0];
-      if (!r) continue;
+      const data = await fetchViaProxy(url, 12000);
+      const result = data?.quoteSummary?.result?.[0];
+      if (result) { r = result; break; }
+    } catch(_) { continue; }
+  }
+  if (!r) return null;
 
-      const fd = r.financialData || {};
-      const sd = r.summaryDetail || {};
-      const ks = r.defaultKeyStatistics || {};
-      const et = r.earningsTrend?.trend || [];
+  try {
+    const fd = r.financialData || {};
+    const sd = r.summaryDetail || {};
+    const ks = r.defaultKeyStatistics || {};
+    const et = r.earningsTrend?.trend || [];
 
       // ── TTM Income Statement (sum last 4 quarters) ──
       const qIncome = r.incomeStatementHistoryQuarterly?.incomeStatementHistory || [];
@@ -352,11 +418,8 @@ async function fetchFundamentals(symbol) {
         dataAsOf: `Latest Quarter: ${latestQDate} | Latest Annual: ${latestAnnualDate}`,
         fetchedAt: today.toLocaleString("en-IN"),
       };
-    } catch(e) { continue; }
-  }
-  return null;
+    } catch(e) { return null; }
 }
-
 // ─── LIVE MARKET DATA ENGINE ──────────────────────────────────────────────────
 // Yahoo Finance symbols mapped to display labels
 const MARKET_SYMBOLS = [
@@ -375,23 +438,21 @@ const MARKET_SYMBOLS = [
 ];
 
 async function fetchSingleQuote(sym) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`;
-  const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-  const res  = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
-  const json = await res.json();
-  const data = JSON.parse(json.contents);
-  const q    = data?.chart?.result?.[0];
-  if (!q) return null;
-  const meta = q.meta;
-  const price = meta.regularMarketPrice;
-  const prev  = meta.previousClose || meta.chartPreviousClose || price;
-  return {
-    price,
-    prev,
-    change:    (price - prev).toFixed(2),
-    changePct: (((price - prev) / prev) * 100).toFixed(2),
-    up:        price >= prev,
-  };
+  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(sym)}&fields=regularMarketPrice,regularMarketPreviousClose,regularMarketChange,regularMarketChangePercent`;
+  const data = await fetchViaProxy(url, 8000);
+  const q = data?.quoteResponse?.result?.[0];
+  if (q?.regularMarketPrice) {
+    const price = q.regularMarketPrice;
+    const prev  = q.regularMarketPreviousClose || price;
+    return {
+      price,
+      prev,
+      change:    q.regularMarketChange?.toFixed(2)        ?? (price-prev).toFixed(2),
+      changePct: q.regularMarketChangePercent?.toFixed(2) ?? (((price-prev)/prev)*100).toFixed(2),
+      up: (q.regularMarketChange ?? (price-prev)) >= 0,
+    };
+  }
+  return null;
 }
 
 async function fetchLiveMarkets() {
@@ -2517,6 +2578,40 @@ Data fetched: ${fundData.fetchedAt}\n`;
               {completedSteps.includes(s) ? "✓ " : activeStep === i ? "⟳ " : ""}{s}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* ── Live Data Status Banner ── */}
+      {stockInfo && (isResearching || completedSteps.length > 0) && (
+        <div style={{
+          background: liveData?.fetchSuccess ? `${T.green}12` : `${T.red}12`,
+          border: `1px solid ${liveData?.fetchSuccess ? T.green : T.red}44`,
+          borderRadius: 10, padding: "10px 16px", marginBottom: 12,
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10
+        }}>
+          {liveData?.fetchSuccess ? (
+            <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+              <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:T.green,fontWeight:700}}>
+                <span style={{width:8,height:8,background:T.green,borderRadius:"50%",display:"inline-block",boxShadow:`0 0 6px ${T.green}`}}/>
+                LIVE MARKET DATA LOADED
+              </span>
+              <span style={{fontFamily:"'DM Mono',monospace",fontSize:20,fontWeight:700,color:T.dunLight}}>
+                ₹{liveData.price?.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}
+              </span>
+              <span style={{fontSize:13,color:liveData.changePct>=0?T.greenLight:T.redLight,fontWeight:600}}>
+                {liveData.changePct>=0?"▲":"▼"} {Math.abs(liveData.changePct)}%
+              </span>
+              <span style={{fontSize:11,color:T.muted}}>52W: ₹{liveData.low52w?.toFixed(0)} – ₹{liveData.high52w?.toFixed(0)}</span>
+              {liveData.pe && <span style={{fontSize:11,color:T.muted}}>P/E: {liveData.pe?.toFixed(1)}</span>}
+              {liveData.marketCap && <span style={{fontSize:11,color:T.muted}}>MCap: {fmtNum(liveData.marketCap)}</span>}
+            </div>
+          ) : (
+            <div style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:T.red}}>
+              <span>⚠️ Live price fetch failed — AI will use training knowledge (may be slightly outdated).</span>
+              <span style={{color:T.muted,fontSize:11}}>Try again or check your internet connection.</span>
+            </div>
+          )}
+          <span style={{fontSize:10,color:T.muted}}>{liveData?.timestamp} · {liveData?.source || "Yahoo Finance"}</span>
         </div>
       )}
 
