@@ -118,7 +118,7 @@ REAL-TIME DATA & RESEARCH MANDATE (NON-NEGOTIABLE):
           { role: "system", content: enhancedSystem },
           { role: "user", content: prompt }
         ],
-        max_tokens: 2048, temperature: 0.4, stream: true,
+        max_tokens: 1500, temperature: 0.4, stream: true,
       }),
     });
     if (!res.ok) { const e = await res.text(); throw new Error(`Groq Error ${res.status}: ${e}`); }
@@ -2455,12 +2455,12 @@ Data fetched: ${fundData.fetchedAt}\n`;
     for (let i = 0; i < RESEARCH_STEPS.length; i++) {
       const step = RESEARCH_STEPS[i];
       setActiveStep(i);
-      // Add delay every 3 steps to avoid TPM rate limit (12000 tokens/min)
-      if (i > 0 && i % 3 === 0) {
-        setSections(prev => ({ ...prev, [step]: "⏳ Waiting 4s to respect API rate limits..." }));
-        await sleep(4000);
+      // Wait 5 seconds between EVERY step to stay within 12,000 TPM free limit
+      if (i > 0) {
+        setSections(prev => ({ ...prev, [step]: `⏳ Preparing next section in 5s... (${i}/${RESEARCH_STEPS.length})` }));
+        await sleep(5000);
       }
-      let retries = 2;
+      let retries = 3;
       while (retries >= 0) {
         try {
           let text = "";
@@ -2477,12 +2477,12 @@ Data fetched: ${fundData.fetchedAt}\n`;
           break;
         } catch(e) {
           if (e.message?.includes("429") && retries > 0) {
-            // Rate limited — wait 8 seconds and retry
-            setSections(prev => ({ ...prev, [step]: `⏳ Rate limit hit — retrying in 8s... (attempt ${3-retries}/2)` }));
-            await sleep(8000);
+            // Rate limited — wait 20 seconds and retry
+            setSections(prev => ({ ...prev, [step]: `⏳ Rate limit hit — waiting 20s before retry... (attempt ${4-retries}/3)` }));
+            await sleep(20000);
             retries--;
           } else {
-            setSections(prev => ({ ...prev, [step]: "Analysis unavailable. Please retry." }));
+            setSections(prev => ({ ...prev, [step]: `⚠️ Section temporarily unavailable. Click 'Deep Research' again to retry from this section.` }));
             setCompletedSteps(prev => [...prev, step]);
             break;
           }
